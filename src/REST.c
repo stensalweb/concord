@@ -34,8 +34,9 @@ curl_easy_set_write(CURL *easy_handle, api_response_st *buffer)
 
   curl_easy_setopt(easy_handle, CURLOPT_HTTPHEADER, header);
   curl_easy_setopt(easy_handle, CURLOPT_URL, strcat(base_url, g_config.url_route));
-  //curl_easy_setopt(easy_handle, CURLOPT_FAILONERROR, 1L);
-  //curl_easy_setopt(easy_handle, CURLOPT_VERBOSE, 1L);
+
+  curl_easy_setopt(easy_handle, CURLOPT_FAILONERROR, 1L);
+  curl_easy_setopt(easy_handle, CURLOPT_VERBOSE, 1L);
 
   // SET CURL_EASY CALLBACK //
   curl_easy_setopt(easy_handle, CURLOPT_WRITEFUNCTION, api_response_write_callback);

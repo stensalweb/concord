@@ -23,18 +23,6 @@ discord_user_init()
 void
 discord_user_destroy(discord_user_st *user)
 {
-  if (NULL != user->id)
-    free(user->id);
-  if (NULL != user->username)
-    free(user->username);
-  if (NULL != user->discriminator)
-    free(user->discriminator);
-  if (NULL != user->avatar)
-    free(user->avatar);
-  if (NULL != user->locale)
-    free(user->locale);
-  if (NULL != user->email)
-    free(user->email);
   if (NULL != user->guilds)
     jsonc_destroy(user->guilds);
 
@@ -58,51 +46,41 @@ discord_get_user(discord_user_st* user, char user_id[])
   api_response_st buffer = {0};
   curl_easy_set_write(user->easy_handle, &buffer);
 
-  jsonc_item_st *root = jsonc_parse(buffer.response);
-  assert(NULL != root);
+  jsonc_sscanf(
+      buffer.response,
+      "id%s,username%s,discriminator%s,avatar%s,bot%d,system%d,mfa_enabled%d,locale%s,verified%d,email%s,flags%lld,premium_type%lld,public_flags%lld",
+      user->id,
+      user->username,
+      user->discriminator,
+      user->avatar,
+      (int*)&user->bot,
+      (int*)&user->sys,
+      (int*)&user->mfa_enabled,
+      user->locale,
+      (int*)&user->verified,
+      user->email,
+      &user->flags,
+      &user->premium_type,
+      &user->public_flags);
 
-  jsonc_item_st *tmp;
-
-  tmp = jsonc_get_branch(root,"id");
-  user->id = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"username");
-  user->username = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"discriminator");
-  user->discriminator = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"avatar");
-  user->avatar = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"bot");
-  user->bot = jsonc_get_boolean(tmp);
-
-  tmp = jsonc_get_branch(root,"system");
-  user->sys = jsonc_get_boolean(tmp);
-
-  tmp = jsonc_get_branch(root,"mfa_enabled");
-  user->mfa_enabled = jsonc_get_boolean(tmp);
-
-  tmp = jsonc_get_branch(root,"locale");
-  user->locale = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"verified");
-  user->verified = jsonc_get_boolean(tmp);
-
-  tmp = jsonc_get_branch(root,"email");
-  user->email = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"flags");
-  user->flags = jsonc_get_integer(tmp);
-
-  tmp = jsonc_get_branch(root,"premium_type");
-  user->premium_type = jsonc_get_integer(tmp);
-
-  tmp = jsonc_get_branch(root,"public_flags");
-  user->public_flags = jsonc_get_integer(tmp);
-
-  jsonc_destroy(root);
+  /* UNCOMMENT FOR TESTING
+  fprintf(stdout,
+      "\njson: %s\nUSER: %s %s %s %s %d %d %d %s %d %s %lld %lld %lld\n",
+      buffer.response,
+      user->id,
+      user->username,
+      user->discriminator,
+      user->avatar,
+      user->bot,
+      user->sys,
+      user->mfa_enabled,
+      user->locale,
+      user->verified,
+      user->email,
+      user->flags,
+      user->premium_type,
+      user->public_flags);
+  */
 }
 
 void 

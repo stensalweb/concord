@@ -23,30 +23,8 @@ discord_channel_init()
 void
 discord_channel_destroy(discord_channel_st *channel)
 {
-  if (NULL != channel->last_message_id)
-    free(channel->last_message_id);
-  if (NULL != channel->owner_id)
-    free(channel->owner_id);
-  if (NULL != channel->application_id)
-    free(channel->application_id);
-  if (NULL != channel->last_pin_timestamp)
-    free(channel->last_pin_timestamp);
-  if (NULL != channel->id)
-    free(channel->id);
-  if (NULL != channel->guild_id)
-    free(channel->guild_id);
   if (NULL != channel->permission_overwrites)
     jsonc_destroy(channel->permission_overwrites);
-  if (NULL != channel->name)
-    free(channel->name);
-  if (NULL != channel->topic)
-    free(channel->topic);
-  if (NULL != channel->recipients)
-    jsonc_destroy(channel->recipients);
-  if (NULL != channel->icon)
-    free(channel->icon);
-  if (NULL != channel->parent_id)
-    free(channel->parent_id);
 
   curl_easy_cleanup(channel->easy_handle);
 
@@ -63,64 +41,49 @@ discord_get_channel(discord_channel_st* channel, char channel_id[])
   api_response_st buffer = {0};
   curl_easy_set_write(channel->easy_handle, &buffer);
 
-  jsonc_item_st *root = jsonc_parse(buffer.response);
-  assert(NULL != root);
+  jsonc_sscanf(
+      buffer.response,
+      "position%lld,nsfw%d,last_message_id%s,bitrate%lld,owner_id%s,application_id%s,last_pin_timestamp%s,id%s,type%lld,guild_id%s,permission_overwrites%p,name%s,topic%s,user_limit%lld,rate_limit_per_user%lld,recipients%p,icon%s,parent_id%s",
+      &channel->position,
+      (int*)&channel->nsfw,
+      channel->last_message_id,
+      &channel->bitrate,
+      channel->owner_id,
+      channel->application_id,
+      channel->last_pin_timestamp,
+      channel->id,
+      &channel->type,
+      channel->guild_id,
+      (void**)&channel->permission_overwrites,
+      channel->name,
+      channel->topic,
+      &channel->user_limit,
+      &channel->rate_limit_per_user,
+      (void**)&channel->recipients,
+      channel->icon,
+      channel->parent_id);
 
-  jsonc_item_st *tmp;
-
-  tmp = jsonc_get_branch(root,"position");
-  channel->position = jsonc_get_integer(tmp);
-
-  tmp = jsonc_get_branch(root,"nsfw");
-  channel->nsfw = jsonc_get_boolean(tmp);
-
-  tmp = jsonc_get_branch(root,"last_message_id");
-  channel->last_message_id = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"bitrate");
-  channel->bitrate = jsonc_get_integer(tmp);
-
-  tmp = jsonc_get_branch(root,"owner_id");
-  channel->owner_id = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"application_id");
-  channel->application_id = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"last_pin_timestamp");
-  channel->last_pin_timestamp = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"id");
-  channel->id = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"type");
-  channel->type = jsonc_get_integer(tmp);
-
-  tmp = jsonc_get_branch(root,"guild_id");
-  channel->guild_id = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"permission_overwrites");
-  channel->permission_overwrites = jsonc_clone(tmp);
-
-  tmp = jsonc_get_branch(root,"name");
-  channel->name = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"topic");
-  channel->topic = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"user_limit");
-  channel->user_limit = jsonc_get_integer(tmp);
-
-  tmp = jsonc_get_branch(root,"rate_limit_per_user");
-  channel->rate_limit_per_user = jsonc_get_integer(tmp);
-
-  tmp = jsonc_get_branch(root,"recipients");
-  channel->recipients = jsonc_clone(tmp);
-
-  tmp = jsonc_get_branch(root,"icon");
-  channel->icon = jsonc_strdup(tmp);
-
-  tmp = jsonc_get_branch(root,"parent_id");
-  channel->parent_id = jsonc_strdup(tmp);
-
-  jsonc_destroy(root);
+  /* UNCOMMENT FOR TESTING
+  fprintf(stdout,
+      "\njson: %s\nCHANNEL: %lld %d %s %lld %s %s %s %s %lld %s %p %s %s %lld %lld %p %s %s\n",
+      buffer.response,
+      channel->position,
+      channel->nsfw,
+      channel->last_message_id,
+      channel->bitrate,
+      channel->owner_id,
+      channel->application_id,
+      channel->last_pin_timestamp,
+      channel->id,
+      channel->type,
+      channel->guild_id,
+      (void*)channel->permission_overwrites,
+      channel->name,
+      channel->topic,
+      channel->user_limit,
+      channel->rate_limit_per_user,
+      (void*)channel->recipients,
+      channel->icon,
+      channel->parent_id);
+  */
 }
