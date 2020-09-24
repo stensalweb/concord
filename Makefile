@@ -8,7 +8,6 @@ EXEC = discordc
 
 OBJS = 	$(OBJDIR)/test.o \
 	$(OBJDIR)/REST.o \
-	$(OBJDIR)/global_config.o \
 	$(OBJDIR)/channel.o \
 	$(OBJDIR)/user.o \
 	$(OBJDIR)/guild.o \
