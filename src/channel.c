@@ -81,7 +81,7 @@ discord_get_channel(discord_st* discord, char channel_id[])
   discord_channel_st *channel = discord->channel;
   discord_request_get(channel->easy_handle, discord->utils);
 
-  jsonc_sscanf(
+  jsonc_scanf(
       discord->utils->response,
       "position%lld,nsfw%d,last_message_id%s,bitrate%lld,owner_id%s,application_id%s,last_pin_timestamp%s,id%s,type%lld,guild_id%s,permission_overwrites%p,name%s,topic%s,user_limit%lld,rate_limit_per_user%lld,recipients%p,icon%s,parent_id%s",
       &channel->position,

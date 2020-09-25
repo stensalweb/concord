@@ -70,7 +70,7 @@ discord_get_user(discord_st* discord, char user_id[])
   discord_user_st *user = discord->user;
   discord_request_get(user->easy_handle, discord->utils);
 
-  jsonc_sscanf(
+  jsonc_scanf(
       discord->utils->response,
       "id%s,username%s,discriminator%s,avatar%s,bot%d,system%d,mfa_enabled%d,locale%s,verified%d,email%s,flags%lld,premium_type%lld,public_flags%lld",
       user->id,

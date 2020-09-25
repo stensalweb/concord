@@ -114,7 +114,7 @@ discord_get_guild(discord_st *discord, char guild_id[])
   discord_guild_st *guild = discord->guild;
   discord_request_get(guild->easy_handle, discord->utils);
 
-  jsonc_sscanf(
+  jsonc_scanf(
       discord->utils->response,
       "id%s,name%s,icon%s,owner%d,permissions%lld,permissions_new%s",
       guild->id,
