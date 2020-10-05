@@ -41,7 +41,7 @@ void
 discord_user_destroy(discord_user_st *user)
 {
   if (NULL != user->guilds)
-    jsonc_destroy(user->guilds);
+    jscon_destroy(user->guilds);
 
   free(user->id);
   free(user->username);
@@ -70,9 +70,9 @@ discord_get_user(discord_st* discord, char user_id[])
   discord_user_st *user = discord->user;
   discord_request_get(user->easy_handle, discord->utils);
 
-  jsonc_scanf(
+  jscon_scanf(
       discord->utils->response,
-      "id%s,username%s,discriminator%s,avatar%s,bot%d,system%d,mfa_enabled%d,locale%s,verified%d,email%s,flags%lld,premium_type%lld,public_flags%lld",
+      "#id%js #username%js #discriminator%js #avatar%js #bot%jb #system%jb #mfa_enabled%jb #locale%js #verified%jb #email%js #flags%jd #premium_type%jd #public_flags%jd",
       user->id,
       user->username,
       user->discriminator,
@@ -115,6 +115,6 @@ discord_get_client_guilds(discord_st *discord){
   discord_user_st *client = discord->client;
   discord_request_get(client->easy_handle, discord->utils);
 
-  client->guilds = jsonc_parse(discord->utils->response);
+  client->guilds = jscon_parse(discord->utils->response);
   assert(NULL != client->guilds);
 }

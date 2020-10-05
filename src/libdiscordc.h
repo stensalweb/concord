@@ -3,7 +3,7 @@
 
 #include <curl/curl.h>
 
-#include "../JSONc/include/libjsonc.h"
+#include "../JSCON/include/libjscon.h"
 
 #define MAX_RESPONSE_LENGTH 1 << 15
 #define MAX_HEADER_LENGTH 1 << 9
@@ -44,24 +44,24 @@ typedef enum {
 /* CHANNEL OBJECT
 https://discord.com/developers/docs/resources/channel#channel-object-channel-structure */
 typedef struct {
-  jsonc_char_kt *id;
-  jsonc_integer_kt type;
-  jsonc_char_kt *guild_id;
-  jsonc_integer_kt position;
-  jsonc_item_st *permission_overwrites;
-  jsonc_char_kt *name;
-  jsonc_char_kt *topic;
-  jsonc_boolean_kt nsfw;
-  jsonc_char_kt *last_message_id;
-  jsonc_integer_kt bitrate;
-  jsonc_integer_kt user_limit;
-  jsonc_integer_kt rate_limit_per_user;
-  jsonc_item_st *recipients;
-  jsonc_char_kt *icon;
-  jsonc_char_kt *owner_id;
-  jsonc_char_kt *application_id;
-  jsonc_char_kt *parent_id;
-  jsonc_char_kt *last_pin_timestamp;
+  jscon_char_kt *id;
+  jscon_integer_kt type;
+  jscon_char_kt *guild_id;
+  jscon_integer_kt position;
+  jscon_item_st *permission_overwrites;
+  jscon_char_kt *name;
+  jscon_char_kt *topic;
+  jscon_boolean_kt nsfw;
+  jscon_char_kt *last_message_id;
+  jscon_integer_kt bitrate;
+  jscon_integer_kt user_limit;
+  jscon_integer_kt rate_limit_per_user;
+  jscon_item_st *recipients;
+  jscon_char_kt *icon;
+  jscon_char_kt *owner_id;
+  jscon_char_kt *application_id;
+  jscon_char_kt *parent_id;
+  jscon_char_kt *last_pin_timestamp;
 
   CURL *easy_handle;
 } discord_channel_st;
@@ -69,53 +69,53 @@ typedef struct {
 /* GUILD OBJECT
 https://discord.com/developers/docs/resources/guild#guild-object-guild-structure */
 typedef struct {
-  jsonc_char_kt *id;
-  jsonc_char_kt *name;
-  jsonc_char_kt *icon;
-  jsonc_char_kt *splash;
-  jsonc_char_kt *discovery_splash;
-  jsonc_boolean_kt owner;
-  jsonc_char_kt *owner_id;
-  jsonc_integer_kt permissions;
-  jsonc_char_kt *permissions_new;
-  jsonc_char_kt *region;
-  jsonc_char_kt *afk_channel_id;
-  jsonc_integer_kt afk_timeout;
-  jsonc_boolean_kt embed_enabled;
-  jsonc_char_kt *embed_channel_id;
-  jsonc_integer_kt verification_level;
-  jsonc_integer_kt default_message_notifications;
-  jsonc_integer_kt explicit_content_filter;
-  jsonc_item_st *roles;
-  jsonc_item_st *emojis;
-  jsonc_item_st *features;
-  jsonc_integer_kt mfa_level;
-  jsonc_char_kt *application_id;
-  jsonc_boolean_kt widget_enabled;
-  jsonc_char_kt *widget_channel_id;
-  jsonc_char_kt *system_channel_id;
-  jsonc_integer_kt system_channel_flags;
-  jsonc_char_kt *rules_channel_id;
-  jsonc_char_kt *joined_at;
-  jsonc_boolean_kt large;
-  jsonc_boolean_kt unavailable;
-  jsonc_integer_kt member_count;
-  jsonc_item_st *voice_states;
-  jsonc_item_st *members;
-  jsonc_item_st *channels;
-  jsonc_item_st *presences;
-  jsonc_integer_kt max_presences;
-  jsonc_integer_kt mas_members;
-  jsonc_char_kt *vanity_url_code;
-  jsonc_char_kt *description;
-  jsonc_char_kt *banner;
-  jsonc_integer_kt premium_tier;
-  jsonc_integer_kt premium_subscription_count;
-  jsonc_char_kt *preferred_locale;
-  jsonc_char_kt *public_updates_channel_id;
-  jsonc_integer_kt max_video_channel_users;
-  jsonc_integer_kt approximate_member_count;
-  jsonc_integer_kt approximate_presence_count;
+  jscon_char_kt *id;
+  jscon_char_kt *name;
+  jscon_char_kt *icon;
+  jscon_char_kt *splash;
+  jscon_char_kt *discovery_splash;
+  jscon_boolean_kt owner;
+  jscon_char_kt *owner_id;
+  jscon_integer_kt permissions;
+  jscon_char_kt *permissions_new;
+  jscon_char_kt *region;
+  jscon_char_kt *afk_channel_id;
+  jscon_integer_kt afk_timeout;
+  jscon_boolean_kt embed_enabled;
+  jscon_char_kt *embed_channel_id;
+  jscon_integer_kt verification_level;
+  jscon_integer_kt default_message_notifications;
+  jscon_integer_kt explicit_content_filter;
+  jscon_item_st *roles;
+  jscon_item_st *emojis;
+  jscon_item_st *features;
+  jscon_integer_kt mfa_level;
+  jscon_char_kt *application_id;
+  jscon_boolean_kt widget_enabled;
+  jscon_char_kt *widget_channel_id;
+  jscon_char_kt *system_channel_id;
+  jscon_integer_kt system_channel_flags;
+  jscon_char_kt *rules_channel_id;
+  jscon_char_kt *joined_at;
+  jscon_boolean_kt large;
+  jscon_boolean_kt unavailable;
+  jscon_integer_kt member_count;
+  jscon_item_st *voice_states;
+  jscon_item_st *members;
+  jscon_item_st *channels;
+  jscon_item_st *presences;
+  jscon_integer_kt max_presences;
+  jscon_integer_kt mas_members;
+  jscon_char_kt *vanity_url_code;
+  jscon_char_kt *description;
+  jscon_char_kt *banner;
+  jscon_integer_kt premium_tier;
+  jscon_integer_kt premium_subscription_count;
+  jscon_char_kt *preferred_locale;
+  jscon_char_kt *public_updates_channel_id;
+  jscon_integer_kt max_video_channel_users;
+  jscon_integer_kt approximate_member_count;
+  jscon_integer_kt approximate_presence_count;
 
   CURL *easy_handle;
 } discord_guild_st;
@@ -124,21 +124,21 @@ typedef struct {
 /* USER OBJECT
 https://discord.com/developers/docs/resources/user#user-object-user-structure */
 typedef struct {
-  jsonc_char_kt *id;
-  jsonc_char_kt *username;
-  jsonc_char_kt *discriminator;
-  jsonc_char_kt *avatar;
-  jsonc_boolean_kt bot;
-  jsonc_boolean_kt sys;
-  jsonc_boolean_kt mfa_enabled;
-  jsonc_char_kt *locale;
-  jsonc_boolean_kt verified;
-  jsonc_char_kt *email;
-  jsonc_integer_kt flags;
-  jsonc_integer_kt premium_type;
-  jsonc_integer_kt public_flags;
+  jscon_char_kt *id;
+  jscon_char_kt *username;
+  jscon_char_kt *discriminator;
+  jscon_char_kt *avatar;
+  jscon_boolean_kt bot;
+  jscon_boolean_kt sys;
+  jscon_boolean_kt mfa_enabled;
+  jscon_char_kt *locale;
+  jscon_boolean_kt verified;
+  jscon_char_kt *email;
+  jscon_integer_kt flags;
+  jscon_integer_kt premium_type;
+  jscon_integer_kt public_flags;
 
-  jsonc_item_st *guilds;
+  jscon_item_st *guilds;
 
   CURL *easy_handle;
 } discord_user_st;

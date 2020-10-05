@@ -53,7 +53,7 @@ void
 discord_channel_destroy(discord_channel_st *channel)
 {
   if (NULL != channel->permission_overwrites)
-    jsonc_destroy(channel->permission_overwrites);
+    jscon_destroy(channel->permission_overwrites);
 
   free(channel->id);
   free(channel->guild_id);
@@ -81,11 +81,11 @@ discord_get_channel(discord_st* discord, char channel_id[])
   discord_channel_st *channel = discord->channel;
   discord_request_get(channel->easy_handle, discord->utils);
 
-  jsonc_scanf(
+  jscon_scanf(
       discord->utils->response,
-      "position%lld,nsfw%d,last_message_id%s,bitrate%lld,owner_id%s,application_id%s,last_pin_timestamp%s,id%s,type%lld,guild_id%s,permission_overwrites%p,name%s,topic%s,user_limit%lld,rate_limit_per_user%lld,recipients%p,icon%s,parent_id%s",
+      "#position%jd #nsfw%jb #last_message_id%js #bitrate%jd #owner_id%js #application_id%js #last_pin_timestamp%js #id%js #type%jd #guild_id%js #permission_overwrites%ji #name%js #topic%js #user_limit%jd #rate_limit_per_user%jd #recipients%ji #icon%js #parent_id%js",
       &channel->position,
-      (int*)&channel->nsfw,
+      &channel->nsfw,
       channel->last_message_id,
       &channel->bitrate,
       channel->owner_id,
@@ -94,12 +94,12 @@ discord_get_channel(discord_st* discord, char channel_id[])
       channel->id,
       &channel->type,
       channel->guild_id,
-      (void**)&channel->permission_overwrites,
+      &channel->permission_overwrites,
       channel->name,
       channel->topic,
       &channel->user_limit,
       &channel->rate_limit_per_user,
-      (void**)&channel->recipients,
+      &channel->recipients,
       channel->icon,
       channel->parent_id);
 

@@ -1,5 +1,5 @@
 CFLAGS = -Wall -Werror -pedantic
-LDLIBS = -lcurl JSONc.a
+LDLIBS = -lcurl JSCON.a
 CC = gcc
 
 SRCDIR = src
@@ -20,11 +20,11 @@ MAIN_O = $(OBJDIR)/test.o
 
 all: $(EXEC)
 
-$(EXEC): JSONc.a build
+$(EXEC): JSCON.a build
 	$(CC) -o $@ $(OBJS) $(LDLIBS)
 
-JSONc.a:
-	ar rcs $@ JSONc/obj/*
+JSCON.a:
+	ar rcs $@ JSCON/obj/*
 
 build: mkdir $(MAIN_O) $(OBJS)
 
@@ -44,4 +44,4 @@ clean :
 	-rm -rf $(OBJDIR)
 
 purge : clean
-	-rm -rf $(EXEC) *.txt debug.out JSONc.a
+	-rm -rf $(EXEC) *.txt debug.out JSCON.a

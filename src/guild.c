@@ -114,13 +114,13 @@ discord_get_guild(discord_st *discord, char guild_id[])
   discord_guild_st *guild = discord->guild;
   discord_request_get(guild->easy_handle, discord->utils);
 
-  jsonc_scanf(
+  jscon_scanf(
       discord->utils->response,
-      "id%s,name%s,icon%s,owner%d,permissions%lld,permissions_new%s",
+      "#id%js #name%js #icon%js #owner%jb #permissions%jd #permissions_new%js",
       guild->id,
       guild->name,
       guild->icon,
-      (int*)&guild->owner,
+      &guild->owner,
       &guild->permissions,
       guild->permissions_new);
  
