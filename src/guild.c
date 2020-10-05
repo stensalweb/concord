@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "REST.h"
-#include "libdiscordc.h"
+#include "libconcord.h"
 
 discord_guild_st*
 discord_guild_init(discord_utils_st* utils)

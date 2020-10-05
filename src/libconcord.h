@@ -15,7 +15,7 @@ typedef enum {
   SNOWFLAKE_PROCESS_ID          = 17,
   SNOWFLAKE_INTERNAL_WORKER_ID  = 22,
   SNOWFLAKE_TIMESTAMP           = 64,
-} discordc_snowflake_et;
+} concord_snowflake_et;
 
 typedef enum {
   NAME_LENGTH           = 100,
@@ -27,7 +27,7 @@ typedef enum {
   MAX_LOCALE_LENGTH     = 15,
   MAX_EMAIL_LENGTH      = 254,
   MAX_REGION_LENGTH     = 15,
-} discordc_limits_et;
+} concord_limits_et;
 
 /* CHANNEL TYPES
 https://discord.com/developers/docs/resources/channel#channel-object-channel-types */
@@ -39,7 +39,7 @@ typedef enum {
   GUILD_CATEGORY        = 4,
   GUILD_NEWS            = 5,
   GUILD_STORE           = 6,
-} discordc_channel_types_et;
+} concord_channel_types_et;
 
 /* CHANNEL OBJECT
 https://discord.com/developers/docs/resources/channel#channel-object-channel-structure */

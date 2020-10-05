@@ -4,7 +4,7 @@ CC = gcc
 
 SRCDIR = src
 OBJDIR = obj
-EXEC = discordc
+EXEC = concord
 
 OBJS = 	$(OBJDIR)/test.o \
 	$(OBJDIR)/REST.o \

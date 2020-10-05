@@ -4,7 +4,7 @@
 #include <string.h>
 #include <curl/curl.h>
 
-#include "libdiscordc.h"
+#include "libconcord.h"
 
 
 static void

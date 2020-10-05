@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "REST.h"
-#include "libdiscordc.h"
+#include "libconcord.h"
 
 discord_channel_st*
 discord_channel_init(discord_utils_st *utils)

@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "libdiscordc.h"
+#include "libconcord.h"
 
 #define BASE_URL "https://discord.com/api"
 #define MAX_URL_LENGTH 1 << 9

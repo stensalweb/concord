@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "src/libdiscordc.h"
+#include "src/libconcord.h"
 
 #define BOT_TOKEN_LENGTH 256
 
