@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <string.h>
 
-#include "REST.h"
+#include "httpclient.h"
 #include "libconcord.h"
 
 discord_guild_st*
@@ -79,25 +79,47 @@ discord_guild_init(discord_utils_st* utils)
 void
 discord_guild_destroy(discord_guild_st *guild)
 {
-  free(guild->id);
-  free(guild->name);
-  free(guild->icon);
-  free(guild->discovery_splash);
-  free(guild->owner_id);
-  free(guild->permissions_new);
-  free(guild->region);
-  free(guild->afk_channel_id);
-  free(guild->embed_channel_id);
-  free(guild->application_id);
-  free(guild->widget_channel_id);
-  free(guild->system_channel_id);
-  free(guild->rules_channel_id);
-  free(guild->joined_at);
-  free(guild->vanity_url_code);
-  free(guild->description);
-  free(guild->banner);
-  free(guild->preferred_locale);
-  free(guild->public_updates_channel_id);
+  if (NULL != guild->id)
+    free(guild->id);
+  if (NULL != guild->name)
+    free(guild->name);
+  if (NULL != guild->icon)
+    free(guild->icon);
+  if (NULL != guild->discovery_splash)
+    free(guild->discovery_splash);
+  if (NULL != guild->owner_id)
+    free(guild->owner_id);
+  if (NULL != guild->permissions_new)
+    free(guild->permissions_new);
+  if (NULL != guild->region)
+    free(guild->region);
+  if (NULL != guild->afk_channel_id)
+    free(guild->afk_channel_id);
+  if (NULL != guild->embed_channel_id)
+    free(guild->embed_channel_id);
+  if (NULL != guild->application_id)
+    free(guild->application_id);
+  if (NULL != guild->widget_channel_id)
+    free(guild->widget_channel_id);
+  if (NULL != guild->system_channel_id)
+    free(guild->system_channel_id);
+  if (NULL != guild->rules_channel_id)
+    free(guild->rules_channel_id);
+  if (NULL != guild->joined_at)
+    free(guild->joined_at);
+  if (NULL != guild->vanity_url_code)
+    free(guild->vanity_url_code);
+  if (NULL != guild->description)
+    free(guild->description);
+  if (NULL != guild->banner)
+    free(guild->banner);
+  if (NULL != guild->preferred_locale)
+    free(guild->preferred_locale);
+  if (NULL != guild->public_updates_channel_id)
+    free(guild->public_updates_channel_id);
+
+  if (NULL != guild->channels)
+    jscon_destroy(guild->channels);
 
   curl_easy_cleanup(guild->easy_handle);
 
@@ -139,6 +161,29 @@ discord_get_guild(discord_st *discord, char guild_id[])
       guild->permissions,
       guild->permissions_new);
   */
+
+  free(response);
+  response = NULL;
+}
+
+void
+discord_get_guild_channels(discord_st *discord, char guild_id[])
+{
+  char url_route[256];
+  sprintf(url_route, "/guilds/%s/channels", guild_id);
+
+  // SET CURL_EASY DEFAULT CONFIG //
+  discord_guild_st *guild = discord->guild;
+  char *response = discord_request_get(guild->easy_handle, url_route);
+
+  fprintf(stdout, "%s\n", response);
+
+  if (NULL != guild->channels){
+    jscon_destroy(guild->channels);
+  }
+
+  guild->channels = jscon_parse(response);
+  assert(NULL != guild->channels);
 
   free(response);
   response = NULL;

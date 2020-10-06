@@ -165,6 +165,7 @@ void discord_get_channel(discord_st *discord, char channel_id[]);
 discord_guild_st* discord_guild_init();
 void discord_guild_destroy(discord_guild_st *guild);
 void discord_get_guild(discord_st *discord, char guild_id[]);
+void discord_get_guild_channels(discord_st *discord, char guild_id[]);
 
 discord_user_st* discord_user_init();
 void discord_user_destroy(discord_user_st *user);

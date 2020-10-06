@@ -4,7 +4,7 @@
 #include <curl/curl.h>
 #include <assert.h>
 
-#include "REST.h"
+#include "httpclient.h"
 
 /* TODO: do something safer, more like this:
 	https://curl.haxx.se/libcurl/c/CURLOPT_WRITEFUNCTION.html */

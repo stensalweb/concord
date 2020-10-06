@@ -4,6 +4,8 @@ This document describes features to be incorporated in the future.
 
 ## HIGH
 
+- Response is allocating too much unnecessary memory, make a better allocation prediction system
+- Curl write callback is unsafe, it should check for size
 
 ## MEDIUM
 

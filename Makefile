@@ -7,7 +7,7 @@ OBJDIR = obj
 EXEC = concord
 
 OBJS = 	$(OBJDIR)/test.o \
-	$(OBJDIR)/REST.o \
+	$(OBJDIR)/httpclient.o \
 	$(OBJDIR)/channel.o \
 	$(OBJDIR)/user.o \
 	$(OBJDIR)/guild.o \

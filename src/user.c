@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <string.h>
 
-#include "REST.h"
+#include "httpclient.h"
 #include "libconcord.h"
 
 discord_user_st*

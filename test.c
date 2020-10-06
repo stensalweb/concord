@@ -18,12 +18,14 @@ int main(void)
   discord_get_client_guilds(discord);
   discord_user_st *client = discord->client;
 
-  jscon_item_st *first_guild = jscon_get_byindex(client->guilds, 0);
-  char *first_guild_id = jscon_get_string(jscon_get_branch(first_guild, "id"));
-  assert(NULL != first_guild_id);
+  for (size_t i=0; i < jscon_size(client->guilds); ++i){
+    jscon_item_st *guild = jscon_get_byindex(client->guilds, i);
+    char *guild_id = jscon_get_string(jscon_get_branch(guild, "id"));
+    assert(NULL != guild_id);
 
-  discord_get_guild(discord, first_guild_id);
-  discord_get_channel(discord, first_guild_id);
+    discord_get_guild(discord, guild_id);
+    discord_get_guild_channels(discord, guild_id);
+  }
 
   discord_cleanup(discord);
   
