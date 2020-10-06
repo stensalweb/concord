@@ -6,6 +6,8 @@
 
 #include "REST.h"
 
+/* TODO: do something safer, more like this:
+	https://curl.haxx.se/libcurl/c/CURLOPT_WRITEFUNCTION.html */
 static size_t
 discord_utils_response_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
@@ -24,47 +26,60 @@ curl_easy_custom_init(discord_utils_st *utils)
   curl_easy_setopt(new_easy_handle, CURLOPT_FAILONERROR, 1L);
   curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
 
-  // SET CURL_EASY CALLBACK //
-  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &discord_utils_response_cb);
-  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, utils->response);
-
   return new_easy_handle;
 }
 
-void
-discord_request_get(CURL *easy_handle, discord_utils_st *utils)
+char*
+discord_request_get(CURL *easy_handle, char url_route[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
-  curl_easy_setopt(easy_handle, CURLOPT_URL, strcat(base_url, utils->url_route));
+
+  char *response = malloc(MAX_RESPONSE_LENGTH);
+  assert(NULL != response);
+  *response = '\0'; //initializing
+
+  curl_easy_setopt(easy_handle, CURLOPT_URL, strcat(base_url, url_route));
   curl_easy_setopt(easy_handle, CURLOPT_HTTPGET, 1L);
 
-  *utils->response = '\0';
+  // SET CURL_EASY CALLBACK //
+  curl_easy_setopt(easy_handle, CURLOPT_WRITEFUNCTION, &discord_utils_response_cb);
+  curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, response);
 
-  CURLcode response = curl_easy_perform(easy_handle);
-  if (CURLE_OK != response){
-    fprintf(stderr, "\n%s\n\n", curl_share_strerror(response));
+
+  CURLcode res = curl_easy_perform(easy_handle);
+  if (CURLE_OK != res){
+    fprintf(stderr, "\n%s\n\n", curl_share_strerror(res));
     exit(EXIT_FAILURE);
   }
 
   //UNCOMMENT TO SEE JSON RESPONSE
   //fprintf(stderr, "\n\n%s\n\n", utils->response);
+
+  return response;
 }
 
-void
-discord_request_post(CURL *easy_handle, discord_utils_st *utils)
+char*
+discord_request_post(CURL *easy_handle, char url_route[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
-  curl_easy_setopt(easy_handle, CURLOPT_URL, strcat(base_url, utils->url_route));
+  char *response = malloc(MAX_RESPONSE_LENGTH);
+  assert(NULL != response);
+
+  curl_easy_setopt(easy_handle, CURLOPT_URL, strcat(base_url, url_route));
   curl_easy_setopt(easy_handle, CURLOPT_POST, 1L);
 
-  *utils->response = '\0';
+  // SET CURL_EASY CALLBACK //
+  curl_easy_setopt(easy_handle, CURLOPT_WRITEFUNCTION, &discord_utils_response_cb);
+  curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, response);
 
-  CURLcode response = curl_easy_perform(easy_handle);
-  if (CURLE_OK != response){
-    fprintf(stderr, "\n%s\n\n", curl_share_strerror(response));
+  CURLcode res = curl_easy_perform(easy_handle);
+  if (CURLE_OK != res){
+    fprintf(stderr, "\n%s\n\n", curl_share_strerror(res));
     exit(EXIT_FAILURE);
   }
 
   //UNCOMMENT TO SEE JSON RESPONSE
   //fprintf(stderr, "\n\n%s\n\n", utils->response);
+
+  return response;
 }

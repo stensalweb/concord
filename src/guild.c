@@ -107,16 +107,20 @@ discord_guild_destroy(discord_guild_st *guild)
 void
 discord_get_guild(discord_st *discord, char guild_id[])
 {
-  strcpy(discord->utils->url_route, "/guilds/");
-  strcat(discord->utils->url_route, guild_id);
+  char url_route[256] = "/guilds/";
+  strcat(url_route, guild_id);
 
   // SET CURL_EASY DEFAULT CONFIG //
   discord_guild_st *guild = discord->guild;
-  discord_request_get(guild->easy_handle, discord->utils);
+  char *response = discord_request_get(guild->easy_handle, url_route);
 
-  jscon_scanf(
-      discord->utils->response,
-      "#id%js #name%js #icon%js #owner%jb #permissions%jd #permissions_new%js",
+  jscon_scanf(response,
+      "#id%js \
+      #name%js \
+      #icon%js \
+      #owner%jb \
+      #permissions%jd \
+      #permissions_new%js",
       guild->id,
       guild->name,
       guild->icon,
@@ -127,7 +131,7 @@ discord_get_guild(discord_st *discord, char guild_id[])
   /* UNCOMMENT FOR TESTING
   fprintf(stdout,
       "\njson: %s\nGUILD: %s %s %s %d %lld %s\n",
-      buffer.response,
+      response,
       guild->id,
       guild->name,
       guild->icon,
@@ -135,4 +139,7 @@ discord_get_guild(discord_st *discord, char guild_id[])
       guild->permissions,
       guild->permissions_new);
   */
+
+  free(response);
+  response = NULL;
 }

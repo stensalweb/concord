@@ -74,16 +74,32 @@ discord_channel_destroy(discord_channel_st *channel)
 void
 discord_get_channel(discord_st* discord, char channel_id[])
 {
-  strcpy(discord->utils->url_route, "/channels/");
-  strcat(discord->utils->url_route, channel_id);
+  char url_route[256] = "/channels/";
+  strcat(url_route, channel_id);
 
   // SET CURL_EASY DEFAULT CONFIG //
   discord_channel_st *channel = discord->channel;
-  discord_request_get(channel->easy_handle, discord->utils);
+  char *response = discord_request_get(channel->easy_handle, url_route);
 
-  jscon_scanf(
-      discord->utils->response,
-      "#position%jd #nsfw%jb #last_message_id%js #bitrate%jd #owner_id%js #application_id%js #last_pin_timestamp%js #id%js #type%jd #guild_id%js #permission_overwrites%ji #name%js #topic%js #user_limit%jd #rate_limit_per_user%jd #recipients%ji #icon%js #parent_id%js",
+  jscon_scanf(response,
+      "#position%jd \
+       #nsfw%jb \
+       #last_message_id%js \
+       #bitrate%jd \
+       #owner_id%js \
+       #application_id%js \
+       #last_pin_timestamp%js \
+       #id%js \
+       #type%jd \
+       #guild_id%js \
+       #permission_overwrites%ji \
+       #name%js \
+       #topic%js \
+       #user_limit%jd \
+       #rate_limit_per_user%jd \
+       #recipients%ji \
+       #icon%js \
+       #parent_id%js",
       &channel->position,
       &channel->nsfw,
       channel->last_message_id,
@@ -106,7 +122,7 @@ discord_get_channel(discord_st* discord, char channel_id[])
   /*//UNCOMMENT FOR TESTING
   fprintf(stdout,
       "\njson: %s\nCHANNEL: %lld %d %s %lld %s %s %s %s %lld %s %p %s %s %lld %lld %p %s %s\n",
-      buffer.response,
+      response,
       channel->position,
       channel->nsfw,
       channel->last_message_id,
@@ -126,4 +142,7 @@ discord_get_channel(discord_st* discord, char channel_id[])
       channel->icon,
       channel->parent_id);
   */
+  
+  free(response);
+  response = NULL;
 }

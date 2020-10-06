@@ -63,25 +63,36 @@ discord_get_client(discord_st* discord){
 void
 discord_get_user(discord_st* discord, char user_id[])
 {
-  strcpy(discord->utils->url_route, "/users/");
-  strcat(discord->utils->url_route, user_id);
+  char url_route[256] = "/users/";
+  strcat(url_route, user_id);
 
   // SET CURL_EASY DEFAULT CONFIG //
   discord_user_st *user = discord->user;
-  discord_request_get(user->easy_handle, discord->utils);
+  char *response = discord_request_get(user->easy_handle, url_route);
 
-  jscon_scanf(
-      discord->utils->response,
-      "#id%js #username%js #discriminator%js #avatar%js #bot%jb #system%jb #mfa_enabled%jb #locale%js #verified%jb #email%js #flags%jd #premium_type%jd #public_flags%jd",
+  jscon_scanf(response,
+      "#id%js \
+      #username%js \
+      #discriminator%js \
+      #avatar%js \
+      #bot%jb \
+      #system%jb \
+      #mfa_enabled%jb \
+      #locale%js \
+      #verified%jb \
+      #email%js \
+      #flags%jd \
+      #premium_type%jd \
+      #public_flags%jd",
       user->id,
       user->username,
       user->discriminator,
       user->avatar,
-      (int*)&user->bot,
-      (int*)&user->sys,
-      (int*)&user->mfa_enabled,
+      &user->bot,
+      &user->sys,
+      &user->mfa_enabled,
       user->locale,
-      (int*)&user->verified,
+      &user->verified,
       user->email,
       &user->flags,
       &user->premium_type,
@@ -90,7 +101,7 @@ discord_get_user(discord_st* discord, char user_id[])
   /* UNCOMMENT FOR TESTING
   fprintf(stdout,
       "\njson: %s\nUSER: %s %s %s %s %d %d %d %s %d %s %lld %lld %lld\n",
-      buffer.response,
+      response,
       user->id,
       user->username,
       user->discriminator,
@@ -105,16 +116,22 @@ discord_get_user(discord_st* discord, char user_id[])
       user->premium_type,
       user->public_flags);
   */
+
+  free(response);
+  response = NULL;
 }
 
 void 
 discord_get_client_guilds(discord_st *discord){
-  strcpy(discord->utils->url_route, "/users/@me/guilds");
+  char url_route[256] = "/users/@me/guilds";
 
   // SET CURL_EASY DEFAULT CONFIG //
   discord_user_st *client = discord->client;
-  discord_request_get(client->easy_handle, discord->utils);
+  char *response = discord_request_get(client->easy_handle, url_route);
 
-  client->guilds = jscon_parse(discord->utils->response);
+  client->guilds = jscon_parse(response);
   assert(NULL != client->guilds);
+
+  free(response);
+  response = NULL;
 }

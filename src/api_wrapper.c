@@ -39,8 +39,6 @@ discord_init(char *bot_token)
   /* TODO: create a utils init function */
   new_discord->utils = malloc(sizeof *new_discord->utils);
   assert(NULL != new_discord->utils);
-  new_discord->utils->response = malloc(MAX_RESPONSE_LENGTH);
-  assert(NULL != new_discord->utils);
   strncpy(new_discord->utils->bot_token, bot_token, 255);
   set_discord_request_header(new_discord->utils);
 
@@ -61,7 +59,6 @@ discord_cleanup(discord_st *discord)
   discord_user_destroy(discord->user);
   discord_user_destroy(discord->client);
 
-  free(discord->utils->response);
   curl_slist_free_all(discord->utils->header);
   free(discord->utils);
 
