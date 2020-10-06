@@ -10,29 +10,15 @@
 discord_user_st*
 discord_user_init(discord_utils_st *utils)
 {
-  discord_user_st *new_user = calloc(1, sizeof *new_user);
-  assert(NULL != new_user);
-
-  new_user->id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_user->id);
-
-  new_user->username = calloc(1, USERNAME_LENGTH);
-  assert(NULL != new_user->username);
-
-  new_user->discriminator = calloc(1, DISCRIMINATOR_LENGTH);
-  assert(NULL != new_user->discriminator);
-
-  new_user->avatar = calloc(1, MAX_HASH_LENGTH);
-  assert(NULL != new_user->avatar);
-
-  new_user->locale = calloc(1, MAX_LOCALE_LENGTH);
-  assert(NULL != new_user->locale);
-
-  new_user->email = calloc(1, MAX_EMAIL_LENGTH);
-  assert(NULL != new_user->email);
+  discord_user_st *new_user = discord_malloc(sizeof *new_user);
+  new_user->id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_user->username = discord_malloc(USERNAME_LENGTH);
+  new_user->discriminator = discord_malloc(DISCRIMINATOR_LENGTH);
+  new_user->avatar = discord_malloc(MAX_HASH_LENGTH);
+  new_user->locale = discord_malloc(MAX_LOCALE_LENGTH);
+  new_user->email = discord_malloc(MAX_EMAIL_LENGTH);
 
   new_user->easy_handle = curl_easy_custom_init(utils);
-  assert(NULL != new_user->easy_handle);
 
   return new_user;
 }
@@ -40,19 +26,20 @@ discord_user_init(discord_utils_st *utils)
 void
 discord_user_destroy(discord_user_st *user)
 {
-  if (NULL != user->guilds)
-    jscon_destroy(user->guilds);
+  discord_free(user->id);
+  discord_free(user->username);
+  discord_free(user->discriminator);
+  discord_free(user->avatar);
+  discord_free(user->locale);
+  discord_free(user->email);
 
-  free(user->id);
-  free(user->username);
-  free(user->discriminator);
-  free(user->avatar);
-  free(user->locale);
-  free(user->email);
+  if (NULL != user->guilds){
+    jscon_destroy(user->guilds);
+  }
 
   curl_easy_cleanup(user->easy_handle);
 
-  free(user);
+  discord_free(user);
 }
 
 void 
@@ -68,7 +55,7 @@ discord_get_user(discord_st* discord, char user_id[])
 
   // SET CURL_EASY DEFAULT CONFIG //
   discord_user_st *user = discord->user;
-  char *response = discord_request_get(user->easy_handle, url_route);
+  char *response = discord_request_get(discord, user->easy_handle, url_route);
 
   jscon_scanf(response,
       "#id%js \
@@ -117,8 +104,7 @@ discord_get_user(discord_st* discord, char user_id[])
       user->public_flags);
   */
 
-  free(response);
-  response = NULL;
+  discord_free(response);
 }
 
 void 
@@ -127,11 +113,9 @@ discord_get_client_guilds(discord_st *discord){
 
   // SET CURL_EASY DEFAULT CONFIG //
   discord_user_st *client = discord->client;
-  char *response = discord_request_get(client->easy_handle, url_route);
+  char *response = discord_request_get(discord, client->easy_handle, url_route);
 
   client->guilds = jscon_parse(response);
-  assert(NULL != client->guilds);
 
-  free(response);
-  response = NULL;
+  discord_free(response);
 }

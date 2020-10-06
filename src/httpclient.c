@@ -6,14 +6,27 @@
 
 #include "httpclient.h"
 
-/* TODO: do something safer, more like this:
-	https://curl.haxx.se/libcurl/c/CURLOPT_WRITEFUNCTION.html */
+struct memory_s {
+  char *response;
+  size_t size;
+};
+
 static size_t
-discord_utils_response_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
+_discord_utils_response_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
-  char *response = (char*)p_userdata;
-  strncat(response, content, size * nmemb);
-  return size * nmemb;
+  size_t realsize = size * nmemb;
+  struct memory_s *chunk = (struct memory_s*)p_userdata;
+
+  char *tmp = realloc(chunk->response, chunk->size + realsize + 1);
+
+  if (tmp == NULL) return 0;
+
+  chunk->response = tmp;
+  memcpy(&chunk->response[chunk->size], content, realsize);
+  chunk->size += realsize;
+  chunk->response[chunk->size] = '\0';
+
+  return realsize;
 }
 
 CURL*
@@ -30,20 +43,18 @@ curl_easy_custom_init(discord_utils_st *utils)
 }
 
 char*
-discord_request_get(CURL *easy_handle, char url_route[])
+discord_request_get(discord_st *discord, CURL *easy_handle, char url_route[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
 
-  char *response = malloc(MAX_RESPONSE_LENGTH);
-  assert(NULL != response);
-  *response = '\0'; //initializing
+  struct memory_s chunk = {NULL};
 
   curl_easy_setopt(easy_handle, CURLOPT_URL, strcat(base_url, url_route));
   curl_easy_setopt(easy_handle, CURLOPT_HTTPGET, 1L);
 
   // SET CURL_EASY CALLBACK //
-  curl_easy_setopt(easy_handle, CURLOPT_WRITEFUNCTION, &discord_utils_response_cb);
-  curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, response);
+  curl_easy_setopt(easy_handle, CURLOPT_WRITEFUNCTION, &_discord_utils_response_cb);
+  curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, &chunk);
 
 
   CURLcode res = curl_easy_perform(easy_handle);
@@ -51,26 +62,26 @@ discord_request_get(CURL *easy_handle, char url_route[])
     fprintf(stderr, "\n%s\n\n", curl_share_strerror(res));
     exit(EXIT_FAILURE);
   }
-
+  
   //UNCOMMENT TO SEE JSON RESPONSE
   //fprintf(stderr, "\n\n%s\n\n", utils->response);
 
-  return response;
+  return chunk.response;
 }
 
 char*
-discord_request_post(CURL *easy_handle, char url_route[])
+discord_request_post(discord_st *discord, CURL *easy_handle, char url_route[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
-  char *response = malloc(MAX_RESPONSE_LENGTH);
-  assert(NULL != response);
+
+  struct memory_s chunk = {NULL};
 
   curl_easy_setopt(easy_handle, CURLOPT_URL, strcat(base_url, url_route));
   curl_easy_setopt(easy_handle, CURLOPT_POST, 1L);
 
   // SET CURL_EASY CALLBACK //
-  curl_easy_setopt(easy_handle, CURLOPT_WRITEFUNCTION, &discord_utils_response_cb);
-  curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, response);
+  curl_easy_setopt(easy_handle, CURLOPT_WRITEFUNCTION, &_discord_utils_response_cb);
+  curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, &chunk);
 
   CURLcode res = curl_easy_perform(easy_handle);
   if (CURLE_OK != res){
@@ -81,5 +92,5 @@ discord_request_post(CURL *easy_handle, char url_route[])
   //UNCOMMENT TO SEE JSON RESPONSE
   //fprintf(stderr, "\n\n%s\n\n", utils->response);
 
-  return response;
+  return chunk.response;
 }

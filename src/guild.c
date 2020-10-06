@@ -10,68 +10,27 @@
 discord_guild_st*
 discord_guild_init(discord_utils_st* utils)
 {
-  discord_guild_st *new_guild = calloc(1, sizeof *new_guild);
-  assert(NULL != new_guild);
-
-  new_guild->id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_guild->id);
-
-  new_guild->name = calloc(1, NAME_LENGTH);
-  assert(NULL != new_guild->name);
-
-  new_guild->icon = calloc(1, MAX_HASH_LENGTH);
-  assert(NULL != new_guild->icon);
-
-  new_guild->discovery_splash = calloc(1, MAX_HASH_LENGTH);
-  assert(NULL != new_guild->discovery_splash);
-
-  new_guild->owner_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_guild->owner_id);
-
-  new_guild->permissions_new = calloc(1, SNOWFLAKE_INCREMENT);
-  assert(NULL != new_guild->permissions_new);
-
-  new_guild->region = calloc(1, MAX_REGION_LENGTH);
-  assert(NULL != new_guild->region);
-
-  new_guild->afk_channel_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_guild->afk_channel_id);
-
-  new_guild->embed_channel_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_guild->embed_channel_id);
-
-  new_guild->application_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_guild->application_id);
-
-  new_guild->widget_channel_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_guild->widget_channel_id);
-
-  new_guild->system_channel_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_guild->system_channel_id);
-
-  new_guild->rules_channel_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_guild->rules_channel_id);
-
-  new_guild->joined_at = calloc(1, SNOWFLAKE_TIMESTAMP);
-  assert(NULL != new_guild->joined_at);
-
-  new_guild->vanity_url_code = calloc(1, SNOWFLAKE_INCREMENT);
-  assert(NULL != new_guild->vanity_url_code);
-
-  new_guild->description = calloc(1, DESCRIPTION_LENGTH);
-  assert(NULL != new_guild->description);
-
-  new_guild->banner = calloc(1, MAX_HASH_LENGTH);
-  assert(NULL != new_guild->banner);
-
-  new_guild->preferred_locale = calloc(1, MAX_LOCALE_LENGTH);
-  assert(NULL != new_guild->preferred_locale);
-
-  new_guild->public_updates_channel_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_guild->public_updates_channel_id);
-
+  discord_guild_st *new_guild = discord_malloc(sizeof *new_guild);
+  new_guild->id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->name = discord_malloc(NAME_LENGTH);
+  new_guild->icon = discord_malloc(MAX_HASH_LENGTH);
+  new_guild->discovery_splash = discord_malloc(MAX_HASH_LENGTH);
+  new_guild->owner_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->permissions_new = discord_malloc(SNOWFLAKE_INCREMENT);
+  new_guild->region = discord_malloc(MAX_REGION_LENGTH);
+  new_guild->afk_channel_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->embed_channel_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->application_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->widget_channel_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->system_channel_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->rules_channel_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->joined_at = discord_malloc(SNOWFLAKE_TIMESTAMP);
+  new_guild->vanity_url_code = discord_malloc(SNOWFLAKE_INCREMENT);
+  new_guild->description = discord_malloc(DESCRIPTION_LENGTH);
+  new_guild->banner = discord_malloc(MAX_HASH_LENGTH);
+  new_guild->preferred_locale = discord_malloc(MAX_LOCALE_LENGTH);
+  new_guild->public_updates_channel_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_guild->easy_handle = curl_easy_custom_init(utils);
-  assert(NULL != new_guild->easy_handle);
 
   return new_guild;
 }
@@ -79,51 +38,33 @@ discord_guild_init(discord_utils_st* utils)
 void
 discord_guild_destroy(discord_guild_st *guild)
 {
-  if (NULL != guild->id)
-    free(guild->id);
-  if (NULL != guild->name)
-    free(guild->name);
-  if (NULL != guild->icon)
-    free(guild->icon);
-  if (NULL != guild->discovery_splash)
-    free(guild->discovery_splash);
-  if (NULL != guild->owner_id)
-    free(guild->owner_id);
-  if (NULL != guild->permissions_new)
-    free(guild->permissions_new);
-  if (NULL != guild->region)
-    free(guild->region);
-  if (NULL != guild->afk_channel_id)
-    free(guild->afk_channel_id);
-  if (NULL != guild->embed_channel_id)
-    free(guild->embed_channel_id);
-  if (NULL != guild->application_id)
-    free(guild->application_id);
-  if (NULL != guild->widget_channel_id)
-    free(guild->widget_channel_id);
-  if (NULL != guild->system_channel_id)
-    free(guild->system_channel_id);
-  if (NULL != guild->rules_channel_id)
-    free(guild->rules_channel_id);
-  if (NULL != guild->joined_at)
-    free(guild->joined_at);
-  if (NULL != guild->vanity_url_code)
-    free(guild->vanity_url_code);
-  if (NULL != guild->description)
-    free(guild->description);
-  if (NULL != guild->banner)
-    free(guild->banner);
-  if (NULL != guild->preferred_locale)
-    free(guild->preferred_locale);
-  if (NULL != guild->public_updates_channel_id)
-    free(guild->public_updates_channel_id);
+  discord_free(guild->id);
+  discord_free(guild->name);
+  discord_free(guild->icon);
+  discord_free(guild->discovery_splash);
+  discord_free(guild->owner_id);
+  discord_free(guild->permissions_new);
+  discord_free(guild->region);
+  discord_free(guild->afk_channel_id);
+  discord_free(guild->embed_channel_id);
+  discord_free(guild->application_id);
+  discord_free(guild->widget_channel_id);
+  discord_free(guild->system_channel_id);
+  discord_free(guild->rules_channel_id);
+  discord_free(guild->joined_at);
+  discord_free(guild->vanity_url_code);
+  discord_free(guild->description);
+  discord_free(guild->banner);
+  discord_free(guild->preferred_locale);
+  discord_free(guild->public_updates_channel_id);
 
-  if (NULL != guild->channels)
+  if (NULL != guild->channels){
     jscon_destroy(guild->channels);
+  }
 
   curl_easy_cleanup(guild->easy_handle);
 
-  free(guild);
+  discord_free(guild);
 }
 
 void
@@ -134,7 +75,7 @@ discord_get_guild(discord_st *discord, char guild_id[])
 
   // SET CURL_EASY DEFAULT CONFIG //
   discord_guild_st *guild = discord->guild;
-  char *response = discord_request_get(guild->easy_handle, url_route);
+  char *response = discord_request_get(discord, guild->easy_handle, url_route);
 
   jscon_scanf(response,
       "#id%js \
@@ -162,8 +103,7 @@ discord_get_guild(discord_st *discord, char guild_id[])
       guild->permissions_new);
   */
 
-  free(response);
-  response = NULL;
+  discord_free(response);
 }
 
 void
@@ -174,17 +114,13 @@ discord_get_guild_channels(discord_st *discord, char guild_id[])
 
   // SET CURL_EASY DEFAULT CONFIG //
   discord_guild_st *guild = discord->guild;
-  char *response = discord_request_get(guild->easy_handle, url_route);
-
-  fprintf(stdout, "%s\n", response);
+  char *response = discord_request_get(discord, guild->easy_handle, url_route);
 
   if (NULL != guild->channels){
     jscon_destroy(guild->channels);
   }
 
   guild->channels = jscon_parse(response);
-  assert(NULL != guild->channels);
 
-  free(response);
-  response = NULL;
+  discord_free(response);
 }

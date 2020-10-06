@@ -6,9 +6,33 @@
 
 #include "libconcord.h"
 
+void
+discord_free(void *ptr)
+{
+  if(NULL != ptr){
+    free(ptr);
+    ptr = NULL;
+  } 
+}
+
+/* @todo instead of exit(), it should throw the error
+    somewhere */
+void*
+__discord_malloc(size_t size, unsigned long line)
+{
+  void *ptr = calloc(1, size);
+
+  if (NULL == ptr){
+    fprintf(stderr, "[%s:%lu] Out of memory(%lu bytes)\n",
+              __FILE__, line, (unsigned long)size);
+    exit(EXIT_FAILURE);
+  }
+
+  return ptr;
+}
 
 static void
-set_discord_request_header(discord_utils_st *utils)
+_discord_init_request_header(discord_utils_st *utils)
 {
   char auth_header[MAX_HEADER_LENGTH] = "Authorization: Bot "; 
 
@@ -33,20 +57,21 @@ discord_init(char *bot_token)
 {
   curl_global_init(CURL_GLOBAL_DEFAULT);
 
-  discord_st *new_discord = malloc(sizeof *new_discord);
-  assert(NULL != new_discord);
+  discord_st *new_discord = discord_malloc(sizeof *new_discord);
 
-  /* TODO: create a utils init function */
-  new_discord->utils = malloc(sizeof *new_discord->utils);
-  assert(NULL != new_discord->utils);
+  /* @todo create a utils init function */
+  new_discord->utils = discord_malloc(sizeof *new_discord->utils);
+
   strncpy(new_discord->utils->bot_token, bot_token, 255);
-  set_discord_request_header(new_discord->utils);
+  _discord_init_request_header(new_discord->utils);
 
 
   new_discord->channel = discord_channel_init(new_discord->utils);
   new_discord->guild = discord_guild_init(new_discord->utils);
   new_discord->user = discord_user_init(new_discord->utils);
   new_discord->client = discord_user_init(new_discord->utils);
+
+  new_discord->multi_handle = curl_multi_init();
 
   return new_discord;
 }
@@ -60,9 +85,12 @@ discord_cleanup(discord_st *discord)
   discord_user_destroy(discord->client);
 
   curl_slist_free_all(discord->utils->header);
-  free(discord->utils);
 
-  free(discord);
+  discord_free(discord->utils);
+
+  curl_multi_cleanup(discord->multi_handle);
+
+  discord_free(discord);
 
   curl_global_cleanup();
 }

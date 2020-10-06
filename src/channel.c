@@ -10,41 +10,18 @@
 discord_channel_st*
 discord_channel_init(discord_utils_st *utils)
 {
-  discord_channel_st *new_channel = calloc(1, sizeof *new_channel);
-  assert(NULL != new_channel);
-
-  new_channel->id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_channel->id);
-
-  new_channel->guild_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_channel->guild_id);
-
-  new_channel->name = calloc(1, NAME_LENGTH);
-  assert(NULL != new_channel->name);
-  
-  new_channel->topic = calloc(1, TOPIC_LENGTH);
-  assert(NULL != new_channel->topic);
-  
-  new_channel->last_message_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_channel->last_message_id);
-  
-  new_channel->icon = calloc(1, MAX_HASH_LENGTH);
-  assert(NULL != new_channel->icon);
-  
-  new_channel->owner_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_channel->owner_id);
-  
-  new_channel->application_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_channel->application_id);
-  
-  new_channel->parent_id = calloc(1, SNOWFLAKE_INTERNAL_WORKER_ID);
-  assert(NULL != new_channel->parent_id);
-  
-  new_channel->last_pin_timestamp = calloc(1, SNOWFLAKE_TIMESTAMP);
-  assert(NULL != new_channel->last_pin_timestamp);
-  
+  discord_channel_st *new_channel = discord_malloc(sizeof *new_channel);
+  new_channel->id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->guild_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->name = discord_malloc(NAME_LENGTH);
+  new_channel->topic = discord_malloc(TOPIC_LENGTH);
+  new_channel->last_message_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->icon = discord_malloc(MAX_HASH_LENGTH);
+  new_channel->owner_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->application_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->parent_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->last_pin_timestamp = discord_malloc(SNOWFLAKE_TIMESTAMP);
   new_channel->easy_handle = curl_easy_custom_init(utils);
-  assert(NULL != new_channel->easy_handle);
 
   return new_channel;
 }
@@ -52,23 +29,24 @@ discord_channel_init(discord_utils_st *utils)
 void
 discord_channel_destroy(discord_channel_st *channel)
 {
-  if (NULL != channel->permission_overwrites)
-    jscon_destroy(channel->permission_overwrites);
+  discord_free(channel->id);
+  discord_free(channel->guild_id);
+  discord_free(channel->name);
+  discord_free(channel->topic);
+  discord_free(channel->last_message_id);
+  discord_free(channel->icon);
+  discord_free(channel->owner_id);
+  discord_free(channel->application_id);
+  discord_free(channel->parent_id);
+  discord_free(channel->last_pin_timestamp);
 
-  free(channel->id);
-  free(channel->guild_id);
-  free(channel->name);
-  free(channel->topic);
-  free(channel->last_message_id);
-  free(channel->icon);
-  free(channel->owner_id);
-  free(channel->application_id);
-  free(channel->parent_id);
-  free(channel->last_pin_timestamp);
+  if (NULL != channel->permission_overwrites){
+    jscon_destroy(channel->permission_overwrites);
+  }
 
   curl_easy_cleanup(channel->easy_handle);
 
-  free(channel);
+  discord_free(channel);
 }
 
 void
@@ -79,7 +57,7 @@ discord_get_channel(discord_st* discord, char channel_id[])
 
   // SET CURL_EASY DEFAULT CONFIG //
   discord_channel_st *channel = discord->channel;
-  char *response = discord_request_get(channel->easy_handle, url_route);
+  char *response = discord_request_get(discord, channel->easy_handle, url_route);
 
   jscon_scanf(response,
       "#position%jd \
@@ -143,6 +121,5 @@ discord_get_channel(discord_st* discord, char channel_id[])
       channel->parent_id);
   */
   
-  free(response);
-  response = NULL;
+  discord_free(response);
 }
