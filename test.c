@@ -2,9 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "src/libconcord.h"
-
-#define BOT_TOKEN_LENGTH 256
+#include "libconcord.h"
 
 int main(void)
 {
@@ -14,6 +12,7 @@ int main(void)
   fclose(f_bot_token);
 
   discord_st *discord = discord_init(bot_token);
+  
 
   discord_get_client_guilds(discord);
   discord_user_st *client = discord->client;

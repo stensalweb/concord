@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <string.h>
 
-#include "httpclient.h"
 #include "libconcord.h"
 
 discord_guild_st*
@@ -30,7 +29,7 @@ discord_guild_init(discord_utils_st* utils)
   new_guild->banner = discord_malloc(MAX_HASH_LENGTH);
   new_guild->preferred_locale = discord_malloc(MAX_LOCALE_LENGTH);
   new_guild->public_updates_channel_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->easy_handle = curl_easy_custom_init(utils);
+  new_guild->easy_handle = discord_easy_default_init(utils);
 
   return new_guild;
 }
@@ -78,7 +77,7 @@ discord_get_guild(discord_st *discord, char guild_id[])
   char *response = discord_request_get(discord, guild->easy_handle, url_route);
 
   jscon_scanf(response,
-      "#id%js \
+     "#id%js \
       #name%js \
       #icon%js \
       #owner%jb \

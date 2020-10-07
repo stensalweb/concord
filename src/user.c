@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <string.h>
 
-#include "httpclient.h"
 #include "libconcord.h"
 
 discord_user_st*
@@ -18,7 +17,7 @@ discord_user_init(discord_utils_st *utils)
   new_user->locale = discord_malloc(MAX_LOCALE_LENGTH);
   new_user->email = discord_malloc(MAX_EMAIL_LENGTH);
 
-  new_user->easy_handle = curl_easy_custom_init(utils);
+  new_user->easy_handle = discord_easy_default_init(utils);
 
   return new_user;
 }
@@ -58,7 +57,7 @@ discord_get_user(discord_st* discord, char user_id[])
   char *response = discord_request_get(discord, user->easy_handle, url_route);
 
   jscon_scanf(response,
-      "#id%js \
+     "#id%js \
       #username%js \
       #discriminator%js \
       #avatar%js \

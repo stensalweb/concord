@@ -5,8 +5,12 @@
 
 #include "../JSCON/include/libjscon.h"
 
+#define BASE_URL "https://discord.com/api"
+#define MAX_URL_LENGTH 1 << 9
+
 #define MAX_RESPONSE_LENGTH 1 << 15
 #define MAX_HEADER_LENGTH 1 << 9
+#define BOT_TOKEN_LENGTH 256
 
 /* SNOWFLAKES
 https://discord.com/developers/docs/reference#snowflakes */
@@ -148,20 +152,31 @@ typedef struct {
   struct curl_slist *header;
 } discord_utils_st;
 
-typedef struct {
+typedef enum {
+  ASYNC = 1,
+  SYNC  = 2,
+} discord_request_method_et;
+
+typedef struct discord_s {
   discord_channel_st *channel;
   discord_user_st *user;
   discord_user_st *client;
   discord_guild_st *guild;
 
   discord_utils_st *utils;
+  char* (*request_method)(struct discord_s*, CURL*);
 
   CURLM *multi_handle;
 } discord_st;
 
+
 void discord_free(void*);
 void* __discord_malloc(size_t size, unsigned long line);
 #define discord_malloc(n) __discord_malloc(n, __LINE__);
+
+CURL* discord_easy_default_init(discord_utils_st *utils);
+char* discord_request_get(discord_st *discord, CURL *easy_handle, char url_route[]);
+char* discord_request_post(discord_st *discord, CURL *easy_handle, char url_route[]);
 
 discord_channel_st* discord_channel_init();
 void discord_channel_destroy(discord_channel_st *channel);

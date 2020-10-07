@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <string.h>
 
-#include "httpclient.h"
 #include "libconcord.h"
 
 discord_channel_st*
@@ -21,7 +20,8 @@ discord_channel_init(discord_utils_st *utils)
   new_channel->application_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_channel->parent_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_channel->last_pin_timestamp = discord_malloc(SNOWFLAKE_TIMESTAMP);
-  new_channel->easy_handle = curl_easy_custom_init(utils);
+  
+  new_channel->easy_handle = discord_easy_default_init(utils);
 
   return new_channel;
 }
@@ -60,24 +60,24 @@ discord_get_channel(discord_st* discord, char channel_id[])
   char *response = discord_request_get(discord, channel->easy_handle, url_route);
 
   jscon_scanf(response,
-      "#position%jd \
-       #nsfw%jb \
-       #last_message_id%js \
-       #bitrate%jd \
-       #owner_id%js \
-       #application_id%js \
-       #last_pin_timestamp%js \
-       #id%js \
-       #type%jd \
-       #guild_id%js \
-       #permission_overwrites%ji \
-       #name%js \
-       #topic%js \
-       #user_limit%jd \
-       #rate_limit_per_user%jd \
-       #recipients%ji \
-       #icon%js \
-       #parent_id%js",
+     "#position%jd \
+      #nsfw%jb \
+      #last_message_id%js \
+      #bitrate%jd \
+      #owner_id%js \
+      #application_id%js \
+      #last_pin_timestamp%js \
+      #id%js \
+      #type%jd \
+      #guild_id%js \
+      #permission_overwrites%ji \
+      #name%js \
+      #topic%js \
+      #user_limit%jd \
+      #rate_limit_per_user%jd \
+      #recipients%ji \
+      #icon%js \
+      #parent_id%js",
       &channel->position,
       &channel->nsfw,
       channel->last_message_id,
