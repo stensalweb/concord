@@ -68,8 +68,10 @@ discord_guild_destroy(discord_guild_st *guild)
 }
 
 static void
-_discord_get_guild_apply(discord_guild_st *guild, struct curl_memory_s *chunk)
+_discord_ld_guild(void *ptr, struct curl_memory_s *chunk)
 {
+  discord_guild_st *guild = ptr;
+
   jscon_scanf(chunk->response,
      "#id%js \
       #name%js \
@@ -113,12 +115,14 @@ discord_get_guild(discord_st *discord, char guild_id[])
 
   if (ASYNC == discord->utils->method) return;
 
-  _discord_get_guild_apply(guild, &conn_list->chunk);
+  _discord_ld_guild(guild, &conn_list->chunk);
 }
 
 static void
-_discord_get_guild_channels_apply(discord_guild_st *guild, struct curl_memory_s *chunk)
+_discord_ld_guild_channels(void *ptr, struct curl_memory_s *chunk)
 {
+  discord_guild_st *guild = ptr;
+
   if (NULL != guild->channels){
     jscon_destroy(guild->channels);
   }
@@ -142,5 +146,5 @@ discord_get_guild_channels(discord_st *discord, char guild_id[])
 
   if (ASYNC == discord->utils->method) return;
 
-  _discord_get_guild_channels_apply(guild, &conn_list->chunk);
+  _discord_ld_guild_channels(guild, &conn_list->chunk);
 }

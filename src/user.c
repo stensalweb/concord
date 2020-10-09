@@ -42,8 +42,10 @@ discord_user_destroy(discord_user_st *user)
 }
 
 static void
-_discord_get_user_apply(discord_user_st *user, struct curl_memory_s *chunk)
+_discord_ld_user(void *ptr, struct curl_memory_s *chunk)
 {
+  discord_user_st *user = ptr;
+
   jscon_scanf(chunk->response,
      "#id%js \
       #username%js \
@@ -113,12 +115,14 @@ discord_get_user(discord_st* discord, char user_id[])
 
   if (ASYNC == discord->utils->method) return;
 
-  _discord_get_user_apply(user, &conn_list->chunk);
+  _discord_ld_user(user, &conn_list->chunk);
 }
 
 static void
-_discord_get_client_guilds_apply(discord_user_st *client, struct curl_memory_s *chunk)
+_discord_ld_client_guilds(void *ptr, struct curl_memory_s *chunk)
 {
+  discord_user_st *client = ptr;
+
   if (NULL != client->guilds){
     jscon_destroy(client->guilds);
   }
@@ -140,5 +144,5 @@ discord_get_client_guilds(discord_st *discord){
 
   if (ASYNC == discord->utils->method) return;
 
-  _discord_get_client_guilds_apply(client, &conn_list->chunk);
+  _discord_ld_client_guilds(client, &conn_list->chunk);
 }

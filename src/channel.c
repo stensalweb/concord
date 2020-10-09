@@ -50,8 +50,10 @@ discord_channel_destroy(discord_channel_st *channel)
 }
 
 static void
-_discord_get_channel_apply(discord_channel_st *channel, struct curl_memory_s *chunk)
+_discord_ld_channel(void *ptr, struct curl_memory_s *chunk)
 {
+  discord_channel_st *channel = ptr;
+
   jscon_scanf(chunk->response,
      "#position%jd \
       #nsfw%jb \
@@ -130,5 +132,5 @@ discord_get_channel(discord_st* discord, char channel_id[])
 
   if (ASYNC == discord->utils->method) return;
 
-  _discord_get_channel_apply(channel, &conn_list->chunk);
+  _discord_ld_channel(channel, &conn_list->chunk);
 }

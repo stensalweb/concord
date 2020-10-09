@@ -4,6 +4,7 @@
 #include <curl/curl.h>
 
 #include "../JSCON/include/libjscon.h"
+#include "hashtable.h"
 
 #define BASE_URL "https://discord.com/api"
 #define MAX_URL_LENGTH 1 << 9
@@ -33,6 +34,20 @@ typedef enum {
   MAX_REGION_LENGTH     = 15,
 } discord_limits_et;
 
+struct curl_memory_s {
+  char *response;
+  size_t size;
+};
+
+struct discord_clist_s {
+  CURL *easy_handle;
+  _Bool state; //true(active, waiting for transfer) and false(inactive, transfer concluded)
+  void (*load_cb)(void *ptr, struct curl_memory_s*);
+
+  struct curl_memory_s chunk;
+  struct discord_clist_s *next;
+};
+
 /* CHANNEL TYPES
 https://discord.com/developers/docs/resources/channel#channel-object-channel-types */
 typedef enum {
@@ -44,17 +59,6 @@ typedef enum {
   GUILD_NEWS            = 5,
   GUILD_STORE           = 6,
 } discord_channel_types_et;
-
-struct curl_memory_s {
-  char *response;
-  size_t size;
-};
-
-struct discord_clist_s {
-  CURL *easy_handle;
-  struct curl_memory_s chunk;
-  struct discord_clist_s *next;
-};
 
 /* CHANNEL OBJECT
 https://discord.com/developers/docs/resources/channel#channel-object-channel-structure */
