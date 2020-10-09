@@ -21,7 +21,8 @@ discord_channel_init(discord_utils_st *utils)
   new_channel->parent_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_channel->last_pin_timestamp = discord_malloc(SNOWFLAKE_TIMESTAMP);
   
-  new_channel->conn_list = discord_clist_append(utils, new_channel->conn_list);
+  new_channel->hashtable = hashtable_init();
+  hashtable_build(new_channel->hashtable, CLIST_HASHTABLE_SIZE);
 
   return new_channel;
 }
@@ -44,6 +45,7 @@ discord_channel_destroy(discord_channel_st *channel)
     jscon_destroy(channel->permission_overwrites);
   }
 
+  hashtable_destroy(channel->hashtable);
   discord_clist_free_all(channel->conn_list);
 
   discord_free(channel);
@@ -127,10 +129,16 @@ discord_get_channel(discord_st* discord, char channel_id[])
   strcat(url_route, channel_id);
 
   discord_channel_st *channel = discord->channel;
-  struct discord_clist_s *conn_list = channel->conn_list;
-  discord_request_get(discord->utils, conn_list, url_route);
+  struct discord_clist_s *conn = discord_get_conn(
+                                    discord,
+                                    "GetChannel",
+                                    channel->hashtable,
+                                    &channel->conn_list,
+                                    &_discord_ld_channel);
 
-  if (ASYNC == discord->utils->method) return;
+  discord_request_get(discord->utils, conn, url_route);
 
-  _discord_ld_channel(channel, &conn_list->chunk);
+  if (SYNC == discord->utils->method){
+    (*conn->load_cb)(channel, &conn->chunk);
+  }
 }

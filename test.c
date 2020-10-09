@@ -16,7 +16,7 @@ int main(void)
 
   discord_get_client_guilds(discord);
 
-  /* EXECUTE ON HOLD IF ASYNC */
+  // EXECUTE ON HOLD IF ASYNC
   discord_user_st *client = discord->client;
   for (long i=0; i < jscon_size(client->guilds); ++i){
     jscon_item_st *guild = jscon_get_byindex(client->guilds, i);
@@ -25,7 +25,7 @@ int main(void)
 
     discord_get_guild(discord, guild_id);
     discord_get_guild_channels(discord, guild_id);
-    /* EXECUTE ON HOLD IF ASYNC */
+    // EXECUTE ON HOLD IF ASYNC
   }
 
   discord_cleanup(discord);

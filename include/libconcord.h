@@ -13,6 +13,9 @@
 #define MAX_HEADER_LENGTH 1 << 9
 #define BOT_TOKEN_LENGTH 256
 
+#define UTILS_HASHTABLE_SIZE 50
+#define CLIST_HASHTABLE_SIZE 15
+
 /* SNOWFLAKES
 https://discord.com/developers/docs/reference#snowflakes */
 typedef enum {
@@ -39,10 +42,13 @@ struct curl_memory_s {
   size_t size;
 };
 
+typedef void (discord_load_ft)(void *ptr, struct curl_memory_s*);
+
 struct discord_clist_s {
-  CURL *easy_handle;
+  char *key;
+  CURL *easy_handle; //its address will also serve as hashtable tag
   _Bool state; //true(active, waiting for transfer) and false(inactive, transfer concluded)
-  void (*load_cb)(void *ptr, struct curl_memory_s*);
+  discord_load_ft* load_cb;
 
   struct curl_memory_s chunk;
   struct discord_clist_s *next;
@@ -82,6 +88,7 @@ typedef struct {
   char *parent_id;
   char *last_pin_timestamp;
 
+  hashtable_st *hashtable;
   struct discord_clist_s *conn_list;
 } discord_channel_st;
 
@@ -136,6 +143,7 @@ typedef struct {
   long long approximate_member_count;
   long long approximate_presence_count;
 
+  hashtable_st *hashtable;
   struct discord_clist_s *conn_list;
 } discord_guild_st;
 
@@ -158,6 +166,7 @@ typedef struct {
   long long public_flags;
   jscon_item_st *guilds;
 
+  hashtable_st *hashtable;
   struct discord_clist_s *conn_list;
 } discord_user_st;
 
@@ -170,6 +179,7 @@ typedef struct discord_utils_s {
   char bot_token[256];
   struct curl_slist *header;
   discord_request_method_et method;
+  hashtable_st *hashtable;
   void (*method_cb)(struct discord_utils_s*, struct discord_clist_s*);
   CURLM *multi_handle;
 } discord_utils_st;
@@ -192,8 +202,9 @@ void* __discord_malloc(size_t size, unsigned long line);
 void discord_request_method(discord_st *discord, discord_request_method_et method);
 void discord_request_get(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[]);
 void discord_request_post(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[]);
-struct discord_clist_s* discord_clist_append(discord_utils_st *utils, struct discord_clist_s *conn_list);
+struct discord_clist_s* discord_clist_append(discord_utils_st *utils, struct discord_clist_s *conn_list, struct discord_clist_s **p_new_node);
 void discord_clist_free_all(struct discord_clist_s *conn_list);
+struct discord_clist_s* discord_get_conn(discord_st *discord, char key[], hashtable_st *hashtable, struct discord_clist_s **conn_list, discord_load_ft *load_cb);
 
 discord_channel_st* discord_channel_init();
 void discord_channel_destroy(discord_channel_st *channel);

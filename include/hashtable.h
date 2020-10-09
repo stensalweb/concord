@@ -23,6 +23,7 @@
 #ifndef HASHTABLE_H
 #define HASHTABLE_H
 
+/* GENERAL PURPOSE FUNCTIONS */
 typedef struct hashtable_entry_s {
   char *key; //this entry key tag
   void *value; //this entry value

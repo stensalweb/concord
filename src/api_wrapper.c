@@ -82,14 +82,16 @@ _discord_clist_get_last(struct discord_clist_s *conn_list)
 }
 
 static struct discord_clist_s*
-_discord_clist_append_nodup(discord_utils_st *utils, struct discord_clist_s *conn_list)
+_discord_clist_append_nodup(discord_utils_st *utils, struct discord_clist_s *conn_list, struct discord_clist_s **p_new_node)
 {
   struct discord_clist_s *last;
-  struct discord_clist_s *new_node;
-
-  new_node = discord_malloc(sizeof *new_node);
+  struct discord_clist_s *new_node = discord_malloc(sizeof *new_node);
 
   new_node->easy_handle = _discord_curl_easy_init(utils, &new_node->chunk);
+
+  if (NULL != p_new_node){
+    *p_new_node = new_node;
+  }
 
   if (!conn_list) return new_node;
 
@@ -100,11 +102,8 @@ _discord_clist_append_nodup(discord_utils_st *utils, struct discord_clist_s *con
 }
 
 struct discord_clist_s*
-discord_clist_append(discord_utils_st *utils, struct discord_clist_s *conn_list)
-{
-  conn_list = _discord_clist_append_nodup(utils, conn_list);
-
-  return conn_list;
+discord_clist_append(discord_utils_st *utils, struct discord_clist_s *conn_list, struct discord_clist_s **p_new_node){
+  return _discord_clist_append_nodup(utils, conn_list, p_new_node);
 }
 
 void
@@ -117,9 +116,40 @@ discord_clist_free_all(struct discord_clist_s *conn_list)
   do {
     next = node->next;
     curl_easy_cleanup(node->easy_handle);
+    discord_free(node->key);
     discord_free(node);
     node = next;
   } while (next);
+}
+
+struct discord_clist_s*
+discord_get_conn(
+  discord_st *discord, 
+  char key[], 
+  hashtable_st *hashtable, 
+  struct discord_clist_s **conn_list, 
+  discord_load_ft *load_cb)
+{
+  struct discord_clist_s *node = hashtable_get(hashtable, key);
+
+  if (NULL != node) return node;
+
+  struct discord_clist_s *new_node;
+  node = discord_clist_append(discord->utils, *conn_list, &new_node);
+  assert(NULL != node && NULL != new_node);
+
+  new_node->key = strdup(key);
+  assert(NULL != new_node->key);
+
+  new_node->load_cb = load_cb;
+  assert(NULL != new_node->load_cb);
+
+  hashtable_set(hashtable, new_node->key, new_node);
+  if (NULL == *conn_list){ 
+    *conn_list = new_node;
+  }
+
+  return new_node;
 }
 
 static void
@@ -216,6 +246,9 @@ _discord_utils_init(char bot_token[])
   new_utils->method = SYNC;
   new_utils->method_cb = &_discord_request_easy;
 
+  new_utils->hashtable = hashtable_init();
+  hashtable_build(new_utils->hashtable, UTILS_HASHTABLE_SIZE);
+
   new_utils->multi_handle = curl_multi_init();
 
   return new_utils;
@@ -226,6 +259,7 @@ _discord_utils_destroy(discord_utils_st *utils)
 {
   curl_slist_free_all(utils->header);
   curl_multi_cleanup(utils->multi_handle);
+  hashtable_destroy(utils->hashtable);
 
   discord_free(utils);
 }

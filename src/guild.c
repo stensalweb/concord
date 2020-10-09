@@ -30,7 +30,8 @@ discord_guild_init(discord_utils_st* utils)
   new_guild->preferred_locale = discord_malloc(MAX_LOCALE_LENGTH);
   new_guild->public_updates_channel_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
 
-  new_guild->conn_list = discord_clist_append(utils, new_guild->conn_list);
+  new_guild->hashtable = hashtable_init();
+  hashtable_build(new_guild->hashtable, CLIST_HASHTABLE_SIZE);
 
   return new_guild;
 }
@@ -62,6 +63,7 @@ discord_guild_destroy(discord_guild_st *guild)
     jscon_destroy(guild->channels);
   }
 
+  hashtable_destroy(guild->hashtable);
   discord_clist_free_all(guild->conn_list);
 
   discord_free(guild);
@@ -108,14 +110,19 @@ discord_get_guild(discord_st *discord, char guild_id[])
   char url_route[256] = "/guilds/";
   strcat(url_route, guild_id);
 
-  // SET CURL_EASY DEFAULT CONFIG //
   discord_guild_st *guild = discord->guild;
-  struct discord_clist_s *conn_list = guild->conn_list;
-  discord_request_get(discord->utils, conn_list, url_route);
+  struct discord_clist_s *conn = discord_get_conn(
+                                    discord,
+                                    "GetGuild",
+                                    guild->hashtable,
+                                    &guild->conn_list,
+                                    &_discord_ld_guild);
 
-  if (ASYNC == discord->utils->method) return;
+  discord_request_get(discord->utils, conn, url_route);
 
-  _discord_ld_guild(guild, &conn_list->chunk);
+  if (SYNC == discord->utils->method){
+    (*conn->load_cb)(guild, &conn->chunk);
+  }
 }
 
 static void
@@ -139,12 +146,17 @@ discord_get_guild_channels(discord_st *discord, char guild_id[])
   char url_route[256];
   sprintf(url_route, "/guilds/%s/channels", guild_id);
 
-  // SET CURL_EASY DEFAULT CONFIG //
   discord_guild_st *guild = discord->guild;
-  struct discord_clist_s *conn_list = guild->conn_list;
-  discord_request_get(discord->utils, conn_list, url_route);
+  struct discord_clist_s *conn = discord_get_conn(
+                                    discord,
+                                    "GetGuildChannels",
+                                    guild->hashtable,
+                                    &guild->conn_list,
+                                    &_discord_ld_guild_channels);
 
-  if (ASYNC == discord->utils->method) return;
+  discord_request_get(discord->utils, conn, url_route);
 
-  _discord_ld_guild_channels(guild, &conn_list->chunk);
+  if (SYNC == discord->utils->method){
+    (*conn->load_cb)(guild, &conn->chunk);
+  }
 }
