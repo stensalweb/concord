@@ -17,7 +17,7 @@ discord_user_init(discord_utils_st *utils)
   new_user->locale = discord_malloc(MAX_LOCALE_LENGTH);
   new_user->email = discord_malloc(MAX_EMAIL_LENGTH);
 
-  new_user->easy_handle = discord_easy_default_init(utils);
+  new_user->conn_list = discord_clist_append(utils, new_user->conn_list);
 
   return new_user;
 }
@@ -36,27 +36,15 @@ discord_user_destroy(discord_user_st *user)
     jscon_destroy(user->guilds);
   }
 
-  curl_easy_cleanup(user->easy_handle);
+  discord_clist_free_all(user->conn_list);
 
   discord_free(user);
 }
 
-void 
-discord_get_client(discord_st* discord){
-  discord_get_user(discord, "@me");
-}
-
-void
-discord_get_user(discord_st* discord, char user_id[])
+static void
+_discord_get_user_apply(discord_user_st *user, struct curl_memory_s *chunk)
 {
-  char url_route[256] = "/users/";
-  strcat(url_route, user_id);
-
-  // SET CURL_EASY DEFAULT CONFIG //
-  discord_user_st *user = discord->user;
-  char *response = discord_request_get(discord, user->easy_handle, url_route);
-
-  jscon_scanf(response,
+  jscon_scanf(chunk->response,
      "#id%js \
       #username%js \
       #discriminator%js \
@@ -103,7 +91,42 @@ discord_get_user(discord_st* discord, char user_id[])
       user->public_flags);
   */
 
-  discord_free(response);
+  chunk->size = 0;
+  discord_free(chunk->response);
+}
+
+void 
+discord_get_client(discord_st* discord){
+  discord_get_user(discord, "@me");
+}
+
+void
+discord_get_user(discord_st* discord, char user_id[])
+{
+  char url_route[256] = "/users/";
+  strcat(url_route, user_id);
+
+  // SET CURL_EASY DEFAULT CONFIG //
+  discord_user_st *user = discord->user;
+  struct discord_clist_s *conn_list = user->conn_list;
+  discord_request_get(discord->utils, conn_list, url_route);
+
+  if (ASYNC == discord->utils->method) return;
+
+  _discord_get_user_apply(user, &conn_list->chunk);
+}
+
+static void
+_discord_get_client_guilds_apply(discord_user_st *client, struct curl_memory_s *chunk)
+{
+  if (NULL != client->guilds){
+    jscon_destroy(client->guilds);
+  }
+
+  client->guilds = jscon_parse(chunk->response);
+
+  chunk->size = 0;
+  discord_free(chunk->response);
 }
 
 void 
@@ -112,9 +135,10 @@ discord_get_client_guilds(discord_st *discord){
 
   // SET CURL_EASY DEFAULT CONFIG //
   discord_user_st *client = discord->client;
-  char *response = discord_request_get(discord, client->easy_handle, url_route);
+  struct discord_clist_s *conn_list = client->conn_list;
+  discord_request_get(discord->utils, conn_list, url_route);
 
-  client->guilds = jscon_parse(response);
+  if (ASYNC == discord->utils->method) return;
 
-  discord_free(response);
+  _discord_get_client_guilds_apply(client, &conn_list->chunk);
 }

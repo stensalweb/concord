@@ -45,6 +45,17 @@ typedef enum {
   GUILD_STORE           = 6,
 } discord_channel_types_et;
 
+struct curl_memory_s {
+  char *response;
+  size_t size;
+};
+
+struct discord_clist_s {
+  CURL *easy_handle;
+  struct curl_memory_s chunk;
+  struct discord_clist_s *next;
+};
+
 /* CHANNEL OBJECT
 https://discord.com/developers/docs/resources/channel#channel-object-channel-structure */
 typedef struct {
@@ -67,7 +78,7 @@ typedef struct {
   char *parent_id;
   char *last_pin_timestamp;
 
-  CURL *easy_handle;
+  struct discord_clist_s *conn_list;
 } discord_channel_st;
 
 /* GUILD OBJECT
@@ -121,7 +132,7 @@ typedef struct {
   long long approximate_member_count;
   long long approximate_presence_count;
 
-  CURL *easy_handle;
+  struct discord_clist_s *conn_list;
 } discord_guild_st;
 
 
@@ -141,21 +152,23 @@ typedef struct {
   long long flags;
   long long premium_type;
   long long public_flags;
-
   jscon_item_st *guilds;
 
-  CURL *easy_handle;
+  struct discord_clist_s *conn_list;
 } discord_user_st;
-
-typedef struct {
-  char bot_token[256];
-  struct curl_slist *header;
-} discord_utils_st;
 
 typedef enum {
   ASYNC = 1,
   SYNC  = 2,
 } discord_request_method_et;
+
+typedef struct discord_utils_s {
+  char bot_token[256];
+  struct curl_slist *header;
+  discord_request_method_et method;
+  void (*method_cb)(struct discord_utils_s*, struct discord_clist_s*);
+  CURLM *multi_handle;
+} discord_utils_st;
 
 typedef struct discord_s {
   discord_channel_st *channel;
@@ -164,19 +177,19 @@ typedef struct discord_s {
   discord_guild_st *guild;
 
   discord_utils_st *utils;
-  char* (*request_method)(struct discord_s*, CURL*);
-
-  CURLM *multi_handle;
 } discord_st;
 
 
-void discord_free(void*);
+void __discord_free(void **p_ptr);
+#define discord_free(n) __discord_free((void**)&n)
 void* __discord_malloc(size_t size, unsigned long line);
-#define discord_malloc(n) __discord_malloc(n, __LINE__);
+#define discord_malloc(n) __discord_malloc(n, __LINE__)
 
-CURL* discord_easy_default_init(discord_utils_st *utils);
-char* discord_request_get(discord_st *discord, CURL *easy_handle, char url_route[]);
-char* discord_request_post(discord_st *discord, CURL *easy_handle, char url_route[]);
+void discord_request_method(discord_st *discord, discord_request_method_et method);
+void discord_request_get(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[]);
+void discord_request_post(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[]);
+struct discord_clist_s* discord_clist_append(discord_utils_st *utils, struct discord_clist_s *conn_list);
+void discord_clist_free_all(struct discord_clist_s *conn_list);
 
 discord_channel_st* discord_channel_init();
 void discord_channel_destroy(discord_channel_st *channel);

@@ -6,20 +6,6 @@
 
 #include "libconcord.h"
 
-struct memory_s {
-  char *response;
-  size_t size;
-};
-
-void
-discord_free(void *ptr)
-{
-  if(NULL != ptr){
-    free(ptr);
-    ptr = NULL;
-  } 
-}
-
 /* @todo instead of exit(), it should throw the error
     somewhere */
 //this is redefined as a macro
@@ -37,18 +23,28 @@ __discord_malloc(size_t size, unsigned long line)
   return ptr;
 }
 
+//this is redefined as a macro
+void
+__discord_free(void **p_ptr)
+{
+  if(NULL != p_ptr){
+    free(*p_ptr);
+    *p_ptr = NULL;
+  } 
+}
+
 static size_t
-_discord_utils_response_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
+_discord_curl_response_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   size_t realsize = size * nmemb;
-  struct memory_s *chunk = (struct memory_s*)p_userdata;
+  struct curl_memory_s *chunk = (struct curl_memory_s*)p_userdata;
 
   char *tmp = realloc(chunk->response, chunk->size + realsize + 1);
 
   if (tmp == NULL) return 0;
 
   chunk->response = tmp;
-  memcpy(&chunk->response[chunk->size], content, realsize);
+  memcpy((char*)chunk->response + chunk->size, content, realsize);
   chunk->size += realsize;
   chunk->response[chunk->size] = '\0';
 
@@ -56,7 +52,7 @@ _discord_utils_response_cb(char *content, size_t size, size_t nmemb, void *p_use
 }
 
 CURL*
-discord_easy_default_init(discord_utils_st *utils)
+_discord_curl_easy_init(discord_utils_st *utils, struct curl_memory_s *chunk)
 {
   CURL *new_easy_handle = curl_easy_init();
   assert(NULL != new_easy_handle);
@@ -65,36 +61,86 @@ discord_easy_default_init(discord_utils_st *utils)
   curl_easy_setopt(new_easy_handle, CURLOPT_FAILONERROR, 1L);
   curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
 
+  // SET CURL_EASY CALLBACK //
+  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_discord_curl_response_cb);
+  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, (void*)chunk);
+
   return new_easy_handle;
 }
 
-static char*
-_discord_request_easy(discord_st *discord, CURL *easy_handle)
+static struct discord_clist_s*
+_discord_clist_get_last(struct discord_clist_s *conn_list)
 {
-  struct memory_s chunk = {NULL};
+  if (!conn_list) return NULL;
 
-  // SET CURL_EASY CALLBACK //
-  curl_easy_setopt(easy_handle, CURLOPT_WRITEFUNCTION, &_discord_utils_response_cb);
-  curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, &chunk);
+  struct discord_clist_s *iter = conn_list;
+  while (NULL != iter->next){
+    iter = iter->next;
+  }
 
-  CURLcode res = curl_easy_perform(easy_handle);
+  return iter;
+}
+
+static struct discord_clist_s*
+_discord_clist_append_nodup(discord_utils_st *utils, struct discord_clist_s *conn_list)
+{
+  struct discord_clist_s *last;
+  struct discord_clist_s *new_node;
+
+  new_node = discord_malloc(sizeof *new_node);
+
+  new_node->easy_handle = _discord_curl_easy_init(utils, &new_node->chunk);
+
+  if (!conn_list) return new_node;
+
+  last = _discord_clist_get_last(conn_list);
+  last->next = new_node;
+
+  return conn_list;
+}
+
+struct discord_clist_s*
+discord_clist_append(discord_utils_st *utils, struct discord_clist_s *conn_list)
+{
+  conn_list = _discord_clist_append_nodup(utils, conn_list);
+
+  return conn_list;
+}
+
+void
+discord_clist_free_all(struct discord_clist_s *conn_list)
+{
+  if (!conn_list) return;
+
+  struct discord_clist_s *node = conn_list;
+  struct discord_clist_s *next;
+  do {
+    next = node->next;
+    curl_easy_cleanup(node->easy_handle);
+    discord_free(node);
+    node = next;
+  } while (next);
+}
+
+static void
+_discord_request_easy(discord_utils_st *utils, struct discord_clist_s *conn_list)
+{
+  CURLcode res = curl_easy_perform(conn_list->easy_handle);
   if (CURLE_OK != res){
     fprintf(stderr, "\n%s\n\n", curl_share_strerror(res));
     exit(EXIT_FAILURE);
   }
-
-  //UNCOMMENT TO SEE JSON RESPONSE
-  //fprintf(stderr, "\n\n%s\n\n", utils->response);
-
-  return chunk.response;
 }
 
-static char*
-_discord_request_multi(discord_st *discord, CURL *easy_handle)
+/* @todo make this append a new clist to existing one */
+static void
+_discord_request_multi(discord_utils_st *utils, struct discord_clist_s *conn_list)
 {
-  curl_multi_add_handle(discord->multi_handle, easy_handle);
+  CURL *easy_handle_clone = conn_list->easy_handle;
 
-  return NULL;
+  if (NULL != easy_handle_clone){
+    curl_multi_add_handle(utils->multi_handle, easy_handle_clone);
+  }
 }
 
 void
@@ -102,10 +148,12 @@ discord_request_method(discord_st *discord, discord_request_method_et method)
 {
   switch (method){
   case ASYNC:
-      discord->request_method = &_discord_request_multi;
+      discord->utils->method = ASYNC;
+      discord->utils->method_cb = &_discord_request_multi;
       break;
   case SYNC:
-      discord->request_method = &_discord_request_easy;
+      discord->utils->method = SYNC;
+      discord->utils->method_cb = &_discord_request_easy;
       break;
   default:
       fprintf(stderr, "\nERROR: undefined request method\n");
@@ -113,28 +161,26 @@ discord_request_method(discord_st *discord, discord_request_method_et method)
   }
 }
 
-char*
-discord_request_get(discord_st *discord, CURL *easy_handle, char url_route[])
+void
+discord_request_get(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
 
-  curl_easy_setopt(easy_handle, CURLOPT_URL, strcat(base_url, url_route));
-  curl_easy_setopt(easy_handle, CURLOPT_HTTPGET, 1L);
-  char *response = (*discord->request_method)(discord, easy_handle);
+  curl_easy_setopt(conn_list->easy_handle, CURLOPT_URL, strcat(base_url, url_route));
+  curl_easy_setopt(conn_list->easy_handle, CURLOPT_HTTPGET, 1L);
 
-  return response;
+  (*utils->method_cb)(utils, conn_list);
 }
 
-char*
-discord_request_post(discord_st *discord, CURL *easy_handle, char url_route[])
+void
+discord_request_post(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
 
-  curl_easy_setopt(easy_handle, CURLOPT_URL, strcat(base_url, url_route));
-  curl_easy_setopt(easy_handle, CURLOPT_POST, 1L);
-  char *response = (*discord->request_method)(discord, easy_handle);
+  curl_easy_setopt(conn_list->easy_handle, CURLOPT_URL, strcat(base_url, url_route));
+  curl_easy_setopt(conn_list->easy_handle, CURLOPT_POST, 1L);
 
-  return response;
+  (*utils->method_cb)(utils, conn_list);
 }
 
 /* @todo create distinction between bot and user token */
@@ -167,7 +213,21 @@ _discord_utils_init(char bot_token[])
 
   new_utils->header = _discord_init_request_header(new_utils);
 
+  new_utils->method = SYNC;
+  new_utils->method_cb = &_discord_request_easy;
+
+  new_utils->multi_handle = curl_multi_init();
+
   return new_utils;
+}
+
+static void
+_discord_utils_destroy(discord_utils_st *utils)
+{
+  curl_slist_free_all(utils->header);
+  curl_multi_cleanup(utils->multi_handle);
+
+  discord_free(utils);
 }
 
 discord_st*
@@ -184,10 +244,6 @@ discord_init(char bot_token[])
   new_discord->user = discord_user_init(new_discord->utils);
   new_discord->client = discord_user_init(new_discord->utils);
 
-  new_discord->request_method = &_discord_request_easy;
-
-  new_discord->multi_handle = curl_multi_init();
-
   return new_discord;
 }
 
@@ -198,12 +254,7 @@ discord_cleanup(discord_st *discord)
   discord_guild_destroy(discord->guild);
   discord_user_destroy(discord->user);
   discord_user_destroy(discord->client);
-
-  curl_slist_free_all(discord->utils->header);
-
-  discord_free(discord->utils);
-
-  curl_multi_cleanup(discord->multi_handle);
+  _discord_utils_destroy(discord->utils);
 
   discord_free(discord);
 
