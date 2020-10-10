@@ -14,7 +14,7 @@ int main(void)
   discord_st *discord = discord_init(bot_token);
   discord_request_method(discord, ASYNC);
 
-  discord_get_client_guilds(discord);
+  discord_get_client_guilds(discord, NULL);
   
   discord_async_perform(discord);
   discord_user_st *client = discord->client;
@@ -23,9 +23,10 @@ int main(void)
     char *guild_id = jscon_get_string(jscon_get_branch(guild, "id"));
     assert(NULL != guild_id);
 
-    discord_get_guild(discord, guild_id);
-    discord_get_guild_channels(discord, guild_id);
-    discord_async_perform(discord);
+    discord_get_guild(discord, guild_id, NULL);
+    discord_get_guild_channels(discord, guild_id, NULL);
   }
+  discord_async_perform(discord);
+
   discord_cleanup(discord);
 }

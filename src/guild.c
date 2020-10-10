@@ -30,9 +30,6 @@ discord_guild_init(discord_utils_st* utils)
   new_guild->preferred_locale = discord_malloc(MAX_LOCALE_LENGTH);
   new_guild->public_updates_channel_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
 
-  new_guild->hashtable = hashtable_init();
-  hashtable_build(new_guild->hashtable, CLIST_HASHTABLE_SIZE);
-
   return new_guild;
 }
 
@@ -63,16 +60,13 @@ discord_guild_destroy(discord_guild_st *guild)
     jscon_destroy(guild->channels);
   }
 
-  hashtable_destroy(guild->hashtable);
-  discord_clist_free_all(guild->conn_list);
-
   discord_free(guild);
 }
 
 static void
-_discord_ld_guild(discord_st *discord, struct curl_memory_s *chunk)
+_discord_ld_guild(void **p_guild, struct curl_memory_s *chunk)
 {
-  discord_guild_st *guild = discord->guild;
+  discord_guild_st *guild = *p_guild;
 
   jscon_scanf(chunk->response,
      "#id%js \
@@ -91,7 +85,7 @@ _discord_ld_guild(discord_st *discord, struct curl_memory_s *chunk)
   /* UNCOMMENT FOR TESTING
   fprintf(stdout,
       "\njson: %s\nGUILD: %s %s %s %d %lld %s\n",
-      response,
+      chunk->response,
       guild->id,
       guild->name,
       guild->icon,
@@ -100,35 +94,39 @@ _discord_ld_guild(discord_st *discord, struct curl_memory_s *chunk)
       guild->permissions_new);
   */
 
+  *p_guild = guild;
+
   chunk->size = 0;
   discord_free(chunk->response);
 }
 
 void
-discord_get_guild(discord_st *discord, char guild_id[])
+discord_get_guild(discord_st *discord, char guild_id[], discord_guild_st **p_guild)
 {
   char url_route[256] = "/guilds/";
   strcat(url_route, guild_id);
 
-  discord_guild_st *guild = discord->guild;
+  if (NULL == p_guild){
+    p_guild = &discord->guild;
+  }
+
   struct discord_clist_s *conn = discord_get_conn(
                                     discord->utils,
-                                    "GetGuild",
-                                    guild->hashtable,
-                                    &guild->conn_list,
+                                    url_route,
                                     &_discord_ld_guild);
 
+  conn->p_object = (void**)p_guild;
   discord_request_get(discord->utils, conn, url_route);
 
   if (SYNC == discord->utils->method){
-    (*conn->load_cb)(discord, &conn->chunk);
+    _discord_ld_guild((void**)p_guild, &conn->chunk);
   }
 }
 
 static void
-_discord_ld_guild_channels(discord_st *discord, struct curl_memory_s *chunk)
+_discord_ld_guild_channels(void **p_guild, struct curl_memory_s *chunk)
 {
-  discord_guild_st *guild = discord->guild;
+  discord_guild_st *guild = *p_guild;
 
   if (NULL != guild->channels){
     jscon_destroy(guild->channels);
@@ -136,27 +134,31 @@ _discord_ld_guild_channels(discord_st *discord, struct curl_memory_s *chunk)
 
   guild->channels = jscon_parse(chunk->response);
 
+  *p_guild = guild;
+
   chunk->size = 0;
   discord_free(chunk->response);
 }
 
 void
-discord_get_guild_channels(discord_st *discord, char guild_id[])
+discord_get_guild_channels(discord_st *discord, char guild_id[], discord_guild_st **p_guild)
 {
   char url_route[256];
   sprintf(url_route, "/guilds/%s/channels", guild_id);
 
-  discord_guild_st *guild = discord->guild;
+  if (NULL == p_guild){
+    p_guild = &discord->guild;
+  }
+
   struct discord_clist_s *conn = discord_get_conn(
                                     discord->utils,
-                                    "GetGuildChannels",
-                                    guild->hashtable,
-                                    &guild->conn_list,
+                                    url_route,
                                     &_discord_ld_guild_channels);
 
+  conn->p_object = (void**)p_guild;
   discord_request_get(discord->utils, conn, url_route);
 
   if (SYNC == discord->utils->method){
-    (*conn->load_cb)(discord, &conn->chunk);
+    _discord_ld_guild_channels((void**)p_guild, &conn->chunk);
   }
 }

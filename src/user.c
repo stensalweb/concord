@@ -17,9 +17,6 @@ discord_user_init(discord_utils_st *utils)
   new_user->locale = discord_malloc(MAX_LOCALE_LENGTH);
   new_user->email = discord_malloc(MAX_EMAIL_LENGTH);
 
-  new_user->hashtable = hashtable_init();
-  hashtable_build(new_user->hashtable, CLIST_HASHTABLE_SIZE);
-
   return new_user;
 }
 
@@ -37,16 +34,13 @@ discord_user_destroy(discord_user_st *user)
     jscon_destroy(user->guilds);
   }
 
-  hashtable_destroy(user->hashtable);
-  discord_clist_free_all(user->conn_list);
-
   discord_free(user);
 }
 
 static void
-_discord_ld_user(discord_st *discord, struct curl_memory_s *chunk)
+_discord_ld_user(void **p_user, struct curl_memory_s *chunk)
 {
-  discord_user_st *user = discord->user;
+  discord_user_st *user = *p_user;
 
   jscon_scanf(chunk->response,
      "#id%js \
@@ -95,35 +89,39 @@ _discord_ld_user(discord_st *discord, struct curl_memory_s *chunk)
       user->public_flags);
   */
 
+  *p_user = user;
+
   chunk->size = 0;
   discord_free(chunk->response);
 }
 
 void
-discord_get_user(discord_st* discord, char user_id[])
+discord_get_user(discord_st *discord, char user_id[], discord_user_st **p_user)
 {
   char url_route[256] = "/users/";
   strcat(url_route, user_id);
 
-  discord_user_st *user = discord->user;
+  if (NULL == p_user){
+    p_user = &discord->user;
+  }
+
   struct discord_clist_s *conn = discord_get_conn(
                                     discord->utils,
-                                    "GetUser",
-                                    user->hashtable,
-                                    &user->conn_list,
+                                    url_route,
                                     &_discord_ld_user);
 
+  conn->p_object = (void**)p_user;
   discord_request_get(discord->utils, conn, url_route);
 
   if (SYNC == discord->utils->method){
-    (*conn->load_cb)(discord, &conn->chunk);
+    _discord_ld_user((void**)p_user, &conn->chunk);
   }
 }
 
 static void
-_discord_ld_client(discord_st *discord, struct curl_memory_s *chunk)
+_discord_ld_client(void **p_client, struct curl_memory_s *chunk)
 {
-  discord_user_st *client = discord->client;
+  discord_user_st *client = *p_client;
 
   jscon_scanf(chunk->response,
      "#id%js \
@@ -172,34 +170,38 @@ _discord_ld_client(discord_st *discord, struct curl_memory_s *chunk)
       client->public_flags);
   */
 
+  *p_client = client;
+
   chunk->size = 0;
   discord_free(chunk->response);
 }
 
 void 
-discord_get_client(discord_st* discord)
+discord_get_client(discord_st *discord, discord_user_st **p_client)
 {
   char url_route[256] = "/users/@me";
 
-  discord_user_st *client = discord->client;
+  if (NULL == p_client){
+    p_client = &discord->client;
+  }
+
   struct discord_clist_s *conn = discord_get_conn(
                                     discord->utils,
-                                    "GetClient",
-                                    client->hashtable,
-                                    &client->conn_list,
+                                    url_route,
                                     &_discord_ld_client);
 
+  conn->p_object = (void**)p_client;
   discord_request_get(discord->utils, conn, url_route);
 
   if (SYNC == discord->utils->method){
-    (*conn->load_cb)(discord, &conn->chunk);
+    _discord_ld_client((void**)p_client, &conn->chunk);
   }
 }
 
 static void
-_discord_ld_client_guilds(discord_st *discord, struct curl_memory_s *chunk)
+_discord_ld_client_guilds(void **p_client, struct curl_memory_s *chunk)
 {
-  discord_user_st *client = discord->client;
+  discord_user_st *client = *p_client;
 
   if (NULL != client->guilds){
     jscon_destroy(client->guilds);
@@ -207,26 +209,30 @@ _discord_ld_client_guilds(discord_st *discord, struct curl_memory_s *chunk)
 
   client->guilds = jscon_parse(chunk->response);
 
+  *p_client = client;
+
   chunk->size = 0;
   discord_free(chunk->response);
 }
 
 void 
-discord_get_client_guilds(discord_st *discord)
+discord_get_client_guilds(discord_st *discord, discord_user_st **p_client)
 {
   char url_route[256] = "/users/@me/guilds";
 
-  discord_user_st *client = discord->client;
+  if (NULL == p_client){
+    p_client = &discord->client;
+  }
+
   struct discord_clist_s *conn = discord_get_conn(
                                     discord->utils,
-                                    "GetClientGuilds",
-                                    client->hashtable,
-                                    &client->conn_list,
+                                    url_route,
                                     &_discord_ld_client_guilds);
 
+  conn->p_object = (void**)p_client;
   discord_request_get(discord->utils, conn, url_route);
 
   if (SYNC == discord->utils->method){
-    (*conn->load_cb)(discord, &conn->chunk);
+    _discord_ld_client_guilds((void**)p_client, &conn->chunk);
   }
 }

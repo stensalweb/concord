@@ -20,9 +20,6 @@ discord_channel_init(discord_utils_st *utils)
   new_channel->application_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_channel->parent_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_channel->last_pin_timestamp = discord_malloc(SNOWFLAKE_TIMESTAMP);
-  
-  new_channel->hashtable = hashtable_init();
-  hashtable_build(new_channel->hashtable, CLIST_HASHTABLE_SIZE);
 
   return new_channel;
 }
@@ -45,16 +42,13 @@ discord_channel_destroy(discord_channel_st *channel)
     jscon_destroy(channel->permission_overwrites);
   }
 
-  hashtable_destroy(channel->hashtable);
-  discord_clist_free_all(channel->conn_list);
-
   discord_free(channel);
 }
 
 static void
-_discord_ld_channel(discord_st *discord, struct curl_memory_s *chunk)
+_discord_ld_channel(void **p_channel, struct curl_memory_s *chunk)
 {
-  discord_channel_st *channel = discord->channel;
+  discord_channel_st *channel = *p_channel;
 
   jscon_scanf(chunk->response,
      "#position%jd \
@@ -117,28 +111,32 @@ _discord_ld_channel(discord_st *discord, struct curl_memory_s *chunk)
       channel->icon,
       channel->parent_id);
   */
+
+  *p_channel = channel;
   
   chunk->size = 0;
   discord_free(chunk->response);
 }
 
 void
-discord_get_channel(discord_st* discord, char channel_id[])
+discord_get_channel(discord_st* discord, char channel_id[], discord_channel_st **p_channel)
 {
   char url_route[256] = "/channels/";
   strcat(url_route, channel_id);
 
-  discord_channel_st *channel = discord->channel;
+  if (NULL == p_channel){
+    *p_channel = discord_channel_init(discord->utils);
+  }
+
   struct discord_clist_s *conn = discord_get_conn(
                                     discord->utils,
-                                    "GetChannel",
-                                    channel->hashtable,
-                                    &channel->conn_list,
+                                    url_route,
                                     &_discord_ld_channel);
 
+  conn->p_object = (void**)p_channel;
   discord_request_get(discord->utils, conn, url_route);
 
   if (SYNC == discord->utils->method){
-    (*conn->load_cb)(discord, &conn->chunk);
+    _discord_ld_channel((void**)p_channel, &conn->chunk);
   }
 }

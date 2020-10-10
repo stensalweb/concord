@@ -15,7 +15,7 @@ OBJS = 	$(OBJDIR)/test.o \
 	$(OBJDIR)/guild.o \
 	$(OBJDIR)/api_wrapper.o
 
-MAIN = test.c
+MAIN = test2.c
 MAIN_O = $(OBJDIR)/test.o
 
 .PHONY : clean all debug
