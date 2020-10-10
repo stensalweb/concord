@@ -52,9 +52,9 @@ discord_channel_destroy(discord_channel_st *channel)
 }
 
 static void
-_discord_ld_channel(void *ptr, struct curl_memory_s *chunk)
+_discord_ld_channel(discord_st *discord, struct curl_memory_s *chunk)
 {
-  discord_channel_st *channel = ptr;
+  discord_channel_st *channel = discord->channel;
 
   jscon_scanf(chunk->response,
      "#position%jd \
@@ -139,6 +139,6 @@ discord_get_channel(discord_st* discord, char channel_id[])
   discord_request_get(discord->utils, conn, url_route);
 
   if (SYNC == discord->utils->method){
-    (*conn->load_cb)(channel, &conn->chunk);
+    (*conn->load_cb)(discord, &conn->chunk);
   }
 }

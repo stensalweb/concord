@@ -12,11 +12,11 @@ int main(void)
   fclose(f_bot_token);
 
   discord_st *discord = discord_init(bot_token);
-  //discord_request_method(discord, SYNC);
+  discord_request_method(discord, ASYNC);
 
   discord_get_client_guilds(discord);
-
-  // EXECUTE ON HOLD IF ASYNC
+  
+  discord_async_perform(discord);
   discord_user_st *client = discord->client;
   for (long i=0; i < jscon_size(client->guilds); ++i){
     jscon_item_st *guild = jscon_get_byindex(client->guilds, i);
@@ -25,8 +25,7 @@ int main(void)
 
     discord_get_guild(discord, guild_id);
     discord_get_guild_channels(discord, guild_id);
-    // EXECUTE ON HOLD IF ASYNC
+    discord_async_perform(discord);
   }
-
   discord_cleanup(discord);
 }

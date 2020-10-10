@@ -2,6 +2,11 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+
+/* somewhat unix-specific */
+#include <sys/time.h>
+#include <unistd.h>
+
 #include <curl/curl.h>
 
 #include "libconcord.h"
@@ -119,7 +124,8 @@ discord_clist_free_all(struct discord_clist_s *conn_list)
   do {
     next = node->next;
     curl_easy_cleanup(node->easy_handle);
-    discord_free(node->key);
+    discord_free(node->primary_key);
+    discord_free(node->secondary_key);
     discord_free(node);
     node = next;
   } while (next);
@@ -135,19 +141,32 @@ discord_get_conn(
 {
   struct discord_clist_s *node = hashtable_get(hashtable, key);
 
+  /* found connection node, return it */
   if (NULL != node) return node;
 
+  /* didn't find connection node, create a new one and return it */
   struct discord_clist_s *new_node;
   node = discord_clist_append(utils, conn_list, &new_node);
   assert(NULL != node && NULL != new_node);
 
-  new_node->key = strdup(key);
-  assert(NULL != new_node->key);
-
   new_node->load_cb = load_cb;
   assert(NULL != new_node->load_cb);
 
-  hashtable_set(hashtable, new_node->key, new_node);
+  new_node->primary_key = strdup(key);
+  assert(NULL != new_node->primary_key);
+  /* this stores connection node inside object's specific hashtable
+      using the node key (given at this function parameter) */
+  hashtable_set(hashtable, new_node->primary_key, new_node);
+
+  /* this stores connection node inside discord's general hashtable
+      using easy handle's memory address converted to string as key.
+     will be used when checking for multi_perform completed transfers */
+  char addr_key[18];
+  sprintf(addr_key, "%p", new_node->easy_handle);
+  new_node->secondary_key = strdup(addr_key);
+  assert(NULL != new_node->secondary_key);
+
+  hashtable_set(utils->hashtable, new_node->secondary_key, new_node);
 
   return new_node;
 }
@@ -162,14 +181,110 @@ _discord_request_easy(discord_utils_st *utils, struct discord_clist_s *conn_list
   }
 }
 
-/* @todo make this append a new clist to existing one */
 static void
 _discord_request_multi(discord_utils_st *utils, struct discord_clist_s *conn_list)
 {
-  CURL *easy_handle_clone = conn_list->easy_handle;
+  if (NULL != conn_list->easy_handle){
+    curl_multi_add_handle(utils->multi_handle, conn_list->easy_handle);
+    conn_list->state = ON_HOLD;
+  }
+}
 
-  if (NULL != easy_handle_clone){
-    curl_multi_add_handle(utils->multi_handle, easy_handle_clone);
+/* wrapper around curl_multi_perform() */
+void
+discord_async_perform(discord_st *discord)
+{
+  discord_utils_st *utils = discord->utils;
+
+  int still_running = 0; /* keep number of running handles */
+
+  /* we start some action by calling perform right away */
+  curl_multi_perform(utils->multi_handle, &still_running);
+  while (still_running) {
+    int rc; /* select() return code */
+
+    fd_set fdread;
+    fd_set fdwrite;
+    fd_set fdexcep;
+    int maxfd = -1;
+
+    long curl_timeo = -1;
+
+    FD_ZERO(&fdread);
+    FD_ZERO(&fdwrite);
+    FD_ZERO(&fdexcep);
+
+    /* set a suitable timeout to play around with */
+    struct timeval timeout = {.tv_sec = 1, .tv_usec = 0};
+
+    curl_multi_timeout(utils->multi_handle, &curl_timeo);
+    if (curl_timeo >= 0){
+      timeout.tv_sec = curl_timeo / 1000;
+      if (timeout.tv_sec > 1){
+        timeout.tv_sec = 1;
+      } else {
+        timeout.tv_usec = (curl_timeo % 1000) * 1000;
+      }
+    }
+
+    /*curl_multi_fdset() return code, get file descriptor from the
+        transfers*/
+    CURLMcode mc = curl_multi_fdset(utils->multi_handle, &fdread, &fdwrite, &fdexcep, &maxfd);
+
+    if (CURLM_OK != mc){
+      fprintf(stderr, "curl_multi_fdset() failed, code %d.\n", mc);
+      break;
+    }
+
+    /* On success the value of maxfd is guaranteed to be >= -1. We call
+        select(maxfd+1, ...); specially in case of (maxfd == -1) there
+        are no fds ready yet so we call select(0, ...) --or Sleep() on
+        Windows-- to sleep 100ms, which is the minimum suggested value
+        in curl_multi_fdset() doc. */
+
+    if (-1 == maxfd){
+#ifdef _WIN32
+      Sleep(100);
+      rc = 0;
+#else
+      /* Portable sleep for platforms other than Windows. */
+      struct timeval wait = { 0, 100 * 1000 }; /* 100ms */
+      rc = select(0, NULL, NULL, NULL, &wait);
+#endif
+    } else {
+      /* Note that ons some platforms 'timeout' may be modified by
+          select(). If you need access to the original value save a
+          copy beforehand */
+      rc = select(maxfd + 1, &fdread, &fdwrite, &fdexcep, &timeout);
+    }
+
+    switch(rc) {
+    case -1:
+        /* select error */
+        break;
+    case 0: /* timeout */
+    default: /* action */
+        curl_multi_perform(utils->multi_handle, &still_running);
+        break;
+    }
+  }
+
+  /* See how the transfers went */
+  CURLMsg *msg; /* for picking up messages with the transfer status */
+  int msgs_left; /*how many messages are left */
+  while (NULL != (msg = curl_multi_info_read(utils->multi_handle, &msgs_left))){
+    if (CURLMSG_DONE != msg->msg){
+      continue;
+    }
+
+    /* Find out which handle this message is about */
+    char addr_key[18];
+    sprintf(addr_key, "%p", msg->easy_handle);
+    struct discord_clist_s *conn = hashtable_get(utils->hashtable, addr_key);
+    assert (NULL != conn);
+
+    (*conn->load_cb)(discord, &conn->chunk); /* load object */
+    conn->state = DONE; /* mark transfer as complete */
   }
 }
 

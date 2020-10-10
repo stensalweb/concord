@@ -70,9 +70,9 @@ discord_guild_destroy(discord_guild_st *guild)
 }
 
 static void
-_discord_ld_guild(void *ptr, struct curl_memory_s *chunk)
+_discord_ld_guild(discord_st *discord, struct curl_memory_s *chunk)
 {
-  discord_guild_st *guild = ptr;
+  discord_guild_st *guild = discord->guild;
 
   jscon_scanf(chunk->response,
      "#id%js \
@@ -121,14 +121,14 @@ discord_get_guild(discord_st *discord, char guild_id[])
   discord_request_get(discord->utils, conn, url_route);
 
   if (SYNC == discord->utils->method){
-    (*conn->load_cb)(guild, &conn->chunk);
+    (*conn->load_cb)(discord, &conn->chunk);
   }
 }
 
 static void
-_discord_ld_guild_channels(void *ptr, struct curl_memory_s *chunk)
+_discord_ld_guild_channels(discord_st *discord, struct curl_memory_s *chunk)
 {
-  discord_guild_st *guild = ptr;
+  discord_guild_st *guild = discord->guild;
 
   if (NULL != guild->channels){
     jscon_destroy(guild->channels);
@@ -157,6 +157,6 @@ discord_get_guild_channels(discord_st *discord, char guild_id[])
   discord_request_get(discord->utils, conn, url_route);
 
   if (SYNC == discord->utils->method){
-    (*conn->load_cb)(guild, &conn->chunk);
+    (*conn->load_cb)(discord, &conn->chunk);
   }
 }

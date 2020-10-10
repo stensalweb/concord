@@ -42,13 +42,19 @@ struct curl_memory_s {
   size_t size;
 };
 
-typedef void (discord_load_ft)(void *ptr, struct curl_memory_s*);
+#define ON_HOLD 1
+#define DONE 0
+
+struct discord_s; //forward declaration
+
+typedef void (discord_load_ft)(struct discord_s *discord, struct curl_memory_s*);
 
 struct discord_clist_s {
-  char *key;
-  CURL *easy_handle; //its address will also serve as hashtable tag
-  _Bool state; //true(active, waiting for transfer) and false(inactive, transfer concluded)
-  discord_load_ft* load_cb;
+  char *primary_key; //the object specific hashtable
+  char *secondary_key; //utils hashtable
+  CURL *easy_handle; //its address will be used as secondary key for utils hashtable
+  _Bool state; //ON_HOLD(1, waiting for transfer) and DONE(0, transfer concluded), used for curl_multi transfers
+  discord_load_ft *load_cb;
 
   struct curl_memory_s chunk;
   struct discord_clist_s *next;
@@ -205,6 +211,7 @@ void discord_request_post(discord_utils_st *utils, struct discord_clist_s *conn_
 struct discord_clist_s* discord_clist_append(discord_utils_st *utils, struct discord_clist_s **conn_list, struct discord_clist_s **p_new_node);
 void discord_clist_free_all(struct discord_clist_s *conn_list);
 struct discord_clist_s* discord_get_conn(discord_utils_st *utils, char key[], hashtable_st *hashtable, struct discord_clist_s **conn_list, discord_load_ft *load_cb);
+void discord_async_perform(discord_st *discord);
 
 discord_channel_st* discord_channel_init();
 void discord_channel_destroy(discord_channel_st *channel);

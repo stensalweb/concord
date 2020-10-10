@@ -44,9 +44,9 @@ discord_user_destroy(discord_user_st *user)
 }
 
 static void
-_discord_ld_user(void *ptr, struct curl_memory_s *chunk)
+_discord_ld_user(discord_st *discord, struct curl_memory_s *chunk)
 {
-  discord_user_st *user = ptr;
+  discord_user_st *user = discord->user;
 
   jscon_scanf(chunk->response,
      "#id%js \
@@ -99,11 +99,6 @@ _discord_ld_user(void *ptr, struct curl_memory_s *chunk)
   discord_free(chunk->response);
 }
 
-void 
-discord_get_client(discord_st* discord){
-  discord_get_user(discord, "@me");
-}
-
 void
 discord_get_user(discord_st* discord, char user_id[])
 {
@@ -121,14 +116,90 @@ discord_get_user(discord_st* discord, char user_id[])
   discord_request_get(discord->utils, conn, url_route);
 
   if (SYNC == discord->utils->method){
-    (*conn->load_cb)(user, &conn->chunk);
+    (*conn->load_cb)(discord, &conn->chunk);
   }
 }
 
 static void
-_discord_ld_client_guilds(void *ptr, struct curl_memory_s *chunk)
+_discord_ld_client(discord_st *discord, struct curl_memory_s *chunk)
 {
-  discord_user_st *client = ptr;
+  discord_user_st *client = discord->client;
+
+  jscon_scanf(chunk->response,
+     "#id%js \
+      #username%js \
+      #discriminator%js \
+      #avatar%js \
+      #bot%jb \
+      #system%jb \
+      #mfa_enabled%jb \
+      #locale%js \
+      #verified%jb \
+      #email%js \
+      #flags%jd \
+      #premium_type%jd \
+      #public_flags%jd",
+      client->id,
+      client->username,
+      client->discriminator,
+      client->avatar,
+      &client->bot,
+      &client->sys,
+      &client->mfa_enabled,
+      client->locale,
+      &client->verified,
+      client->email,
+      &client->flags,
+      &client->premium_type,
+      &client->public_flags);
+
+  /* UNCOMMENT FOR TESTING
+  fprintf(stdout,
+      "\njson: %s\nCLIENT: %s %s %s %s %d %d %d %s %d %s %lld %lld %lld\n",
+      response,
+      client->id,
+      client->username,
+      client->discriminator,
+      client->avatar,
+      client->bot,
+      client->sys,
+      client->mfa_enabled,
+      client->locale,
+      client->verified,
+      client->email,
+      client->flags,
+      client->premium_type,
+      client->public_flags);
+  */
+
+  chunk->size = 0;
+  discord_free(chunk->response);
+}
+
+void 
+discord_get_client(discord_st* discord)
+{
+  char url_route[256] = "/users/@me";
+
+  discord_user_st *client = discord->client;
+  struct discord_clist_s *conn = discord_get_conn(
+                                    discord->utils,
+                                    "GetClient",
+                                    client->hashtable,
+                                    &client->conn_list,
+                                    &_discord_ld_client);
+
+  discord_request_get(discord->utils, conn, url_route);
+
+  if (SYNC == discord->utils->method){
+    (*conn->load_cb)(discord, &conn->chunk);
+  }
+}
+
+static void
+_discord_ld_client_guilds(discord_st *discord, struct curl_memory_s *chunk)
+{
+  discord_user_st *client = discord->client;
 
   if (NULL != client->guilds){
     jscon_destroy(client->guilds);
@@ -156,6 +227,6 @@ discord_get_client_guilds(discord_st *discord)
   discord_request_get(discord->utils, conn, url_route);
 
   if (SYNC == discord->utils->method){
-    (*conn->load_cb)(client, &conn->chunk);
+    (*conn->load_cb)(discord, &conn->chunk);
   }
 }
