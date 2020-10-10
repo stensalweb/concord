@@ -131,10 +131,12 @@ discord_get_channel(discord_st* discord, char channel_id[], discord_channel_st *
   struct discord_clist_s *conn = discord_get_conn(
                                     discord->utils,
                                     url_route,
-                                    &_discord_ld_channel);
+                                    &_discord_ld_channel,
+                                    &discord_GET);
 
   conn->p_object = (void**)p_channel;
-  discord_request_get(discord->utils, conn, url_route);
+
+  (*discord->utils->method_cb)(discord->utils, conn);
 
   if (SYNC == discord->utils->method){
     _discord_ld_channel((void**)p_channel, &conn->chunk);

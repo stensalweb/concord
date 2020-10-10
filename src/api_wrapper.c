@@ -39,7 +39,7 @@ __discord_free(void **p_ptr)
 }
 
 static size_t
-_discord_curl_response_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
+_discord_curl_write_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   size_t realsize = size * nmemb;
   struct curl_memory_s *chunk = (struct curl_memory_s*)p_userdata;
@@ -56,6 +56,7 @@ _discord_curl_response_cb(char *content, size_t size, size_t nmemb, void *p_user
   return realsize;
 }
 
+/* init easy handle with some default opt */
 CURL*
 _discord_curl_easy_init(discord_utils_st *utils, struct curl_memory_s *chunk)
 {
@@ -67,8 +68,8 @@ _discord_curl_easy_init(discord_utils_st *utils, struct curl_memory_s *chunk)
   curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
 
   // SET CURL_EASY CALLBACK //
-  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_discord_curl_response_cb);
-  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, (void*)chunk);
+  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_discord_curl_write_cb);
+  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, chunk);
 
   return new_easy_handle;
 }
@@ -87,83 +88,79 @@ _discord_clist_get_last(struct discord_clist_s *conn_list)
 }
 
 static struct discord_clist_s*
-_discord_clist_append_nodup(discord_utils_st *utils, struct discord_clist_s **p_new_node)
+_discord_clist_append(discord_utils_st *utils, struct discord_clist_s **p_new_conn, curl_request_ft *request_cb, char url_route[])
 {
   struct discord_clist_s *last;
-  struct discord_clist_s *new_node = discord_malloc(sizeof *new_node);
+  struct discord_clist_s *new_conn = discord_malloc(sizeof *new_conn);
 
-  new_node->easy_handle = _discord_curl_easy_init(utils, &new_node->chunk);
+  new_conn->easy_handle = _discord_curl_easy_init(utils, &new_conn->chunk);
+  (*request_cb)(utils, new_conn, url_route);
 
-  if (NULL != p_new_node){
-    *p_new_node = new_node;
+
+  if (NULL != p_new_conn){
+    *p_new_conn = new_conn;
   }
 
   if (NULL == utils->conn_list){
-    utils->conn_list = new_node;
-    return new_node;
+    utils->conn_list = new_conn;
+    return new_conn;
   }
 
   last = _discord_clist_get_last(utils->conn_list);
-  last->next = new_node;
+  last->next = new_conn;
 
   return utils->conn_list;
 }
 
-struct discord_clist_s*
-discord_clist_append(discord_utils_st *utils, struct discord_clist_s **p_new_node){
-  return _discord_clist_append_nodup(utils, p_new_node);
-}
-
 void
-discord_clist_free_all(struct discord_clist_s *conn_list)
+_discord_clist_free_all(struct discord_clist_s *conn)
 {
-  if (!conn_list) return;
+  if (!conn) return;
 
-  struct discord_clist_s *node = conn_list;
-  struct discord_clist_s *next;
+  struct discord_clist_s *next_conn;
   do {
-    next = node->next;
-    curl_easy_cleanup(node->easy_handle);
-    discord_free(node->primary_key);
-    discord_free(node->secondary_key);
-    discord_free(node);
-    node = next;
-  } while (next);
+    next_conn = conn->next;
+    curl_easy_cleanup(conn->easy_handle);
+    discord_free(conn->primary_key);
+    discord_free(conn->secondary_key);
+    discord_free(conn);
+    conn = next_conn;
+  } while (next_conn);
 }
 
 struct discord_clist_s*
-discord_get_conn( discord_utils_st *utils, char key[], discord_load_ft *load_cb)
+discord_get_conn(discord_utils_st *utils, char url_route[], discord_load_ft *load_cb, curl_request_ft *request_cb)
 {
-  struct discord_clist_s *node = hashtable_get(utils->conn_hashtable, key);
+  struct discord_clist_s *conn = hashtable_get(utils->conn_hashtable, url_route);
 
   /* found connection node, return it */
-  if (NULL != node) return node;
+  if (NULL != conn) return conn;
 
   /* didn't find connection node, create a new one and return it */
-  struct discord_clist_s *new_node;
-  node = discord_clist_append(utils, &new_node);
-  assert(NULL != node && NULL != new_node);
+  struct discord_clist_s *new_conn;
+  conn = _discord_clist_append(utils, &new_conn, request_cb, url_route);
+  assert(NULL != conn && NULL != new_conn);
 
-  new_node->load_cb = load_cb;
-  assert(NULL != new_node->load_cb);
+  new_conn->load_cb = load_cb;
+  assert(NULL != new_conn->load_cb);
 
-  new_node->primary_key = strdup(key);
-  assert(NULL != new_node->primary_key);
+  new_conn->primary_key = strdup(url_route);
+  assert(NULL != new_conn->primary_key);
   /* this stores connection node inside object's specific hashtable
       using the node key (given at this function parameter) */
-  hashtable_set(utils->conn_hashtable, new_node->primary_key, new_node);
+  hashtable_set(utils->conn_hashtable, new_conn->primary_key, new_conn);
 
   /* this stores connection node inside discord's general hashtable
       using easy handle's memory address converted to string as key.
      will be used when checking for multi_perform completed transfers */
   char addr_key[18];
-  sprintf(addr_key, "%p", new_node->easy_handle);
-  new_node->secondary_key = strdup(addr_key);
-  assert(NULL != new_node->secondary_key);
+  sprintf(addr_key, "%p", new_conn->easy_handle);
+  new_conn->secondary_key = strdup(addr_key);
+  assert(NULL != new_conn->secondary_key);
 
-  hashtable_set(utils->easy_hashtable, new_node->secondary_key, new_node);
+  hashtable_set(utils->easy_hashtable, new_conn->secondary_key, new_conn);
 
-  return new_node;
+  return new_conn;
 }
 
 static void
@@ -303,25 +300,21 @@ discord_request_method(discord_st *discord, discord_request_method_et method)
 }
 
 void
-discord_request_get(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[])
+discord_GET(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
 
   curl_easy_setopt(conn_list->easy_handle, CURLOPT_URL, strcat(base_url, url_route));
   curl_easy_setopt(conn_list->easy_handle, CURLOPT_HTTPGET, 1L);
-
-  (*utils->method_cb)(utils, conn_list);
 }
 
 void
-discord_request_post(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[])
+discord_POST(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
 
   curl_easy_setopt(conn_list->easy_handle, CURLOPT_URL, strcat(base_url, url_route));
   curl_easy_setopt(conn_list->easy_handle, CURLOPT_POST, 1L);
-
-  (*utils->method_cb)(utils, conn_list);
 }
 
 /* @todo create distinction between bot and user token */
@@ -375,7 +368,7 @@ _discord_utils_destroy(discord_utils_st *utils)
   curl_multi_cleanup(utils->multi_handle);
   hashtable_destroy(utils->easy_hashtable);
   hashtable_destroy(utils->conn_hashtable);
-  discord_clist_free_all(utils->conn_list);
+  _discord_clist_free_all(utils->conn_list);
 
   discord_free(utils);
 }
@@ -383,8 +376,6 @@ _discord_utils_destroy(discord_utils_st *utils)
 discord_st*
 discord_init(char bot_token[])
 {
-  curl_global_init(CURL_GLOBAL_DEFAULT);
-
   discord_st *new_discord = discord_malloc(sizeof *new_discord);
 
   new_discord->utils = _discord_utils_init(bot_token);
@@ -407,6 +398,14 @@ discord_cleanup(discord_st *discord)
   _discord_utils_destroy(discord->utils);
 
   discord_free(discord);
+}
 
+void
+discord_global_init(){
+  curl_global_init(CURL_GLOBAL_DEFAULT);
+}
+
+void
+discord_global_cleanup(){
   curl_global_cleanup();
 }

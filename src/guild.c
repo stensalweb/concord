@@ -113,10 +113,12 @@ discord_get_guild(discord_st *discord, char guild_id[], discord_guild_st **p_gui
   struct discord_clist_s *conn = discord_get_conn(
                                     discord->utils,
                                     url_route,
-                                    &_discord_ld_guild);
+                                    &_discord_ld_guild,
+                                    &discord_GET);
 
   conn->p_object = (void**)p_guild;
-  discord_request_get(discord->utils, conn, url_route);
+
+  (*discord->utils->method_cb)(discord->utils, conn);
 
   if (SYNC == discord->utils->method){
     _discord_ld_guild((void**)p_guild, &conn->chunk);
@@ -153,10 +155,12 @@ discord_get_guild_channels(discord_st *discord, char guild_id[], discord_guild_s
   struct discord_clist_s *conn = discord_get_conn(
                                     discord->utils,
                                     url_route,
-                                    &_discord_ld_guild_channels);
+                                    &_discord_ld_guild_channels,
+                                    &discord_GET);
 
   conn->p_object = (void**)p_guild;
-  discord_request_get(discord->utils, conn, url_route);
+
+  (*discord->utils->method_cb)(discord->utils, conn);
 
   if (SYNC == discord->utils->method){
     _discord_ld_guild_channels((void**)p_guild, &conn->chunk);

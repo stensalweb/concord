@@ -108,10 +108,12 @@ discord_get_user(discord_st *discord, char user_id[], discord_user_st **p_user)
   struct discord_clist_s *conn = discord_get_conn(
                                     discord->utils,
                                     url_route,
-                                    &_discord_ld_user);
+                                    &_discord_ld_user,
+                                    &discord_GET);
 
   conn->p_object = (void**)p_user;
-  discord_request_get(discord->utils, conn, url_route);
+
+  (*discord->utils->method_cb)(discord->utils, conn);
 
   if (SYNC == discord->utils->method){
     _discord_ld_user((void**)p_user, &conn->chunk);
@@ -188,10 +190,12 @@ discord_get_client(discord_st *discord, discord_user_st **p_client)
   struct discord_clist_s *conn = discord_get_conn(
                                     discord->utils,
                                     url_route,
-                                    &_discord_ld_client);
+                                    &_discord_ld_client,
+                                    &discord_GET);
 
   conn->p_object = (void**)p_client;
-  discord_request_get(discord->utils, conn, url_route);
+
+  (*discord->utils->method_cb)(discord->utils, conn);
 
   if (SYNC == discord->utils->method){
     _discord_ld_client((void**)p_client, &conn->chunk);
@@ -227,10 +231,12 @@ discord_get_client_guilds(discord_st *discord, discord_user_st **p_client)
   struct discord_clist_s *conn = discord_get_conn(
                                     discord->utils,
                                     url_route,
-                                    &_discord_ld_client_guilds);
+                                    &_discord_ld_client_guilds,
+                                    &discord_GET);
 
   conn->p_object = (void**)p_client;
-  discord_request_get(discord->utils, conn, url_route);
+
+  (*discord->utils->method_cb)(discord->utils, conn);
 
   if (SYNC == discord->utils->method){
     _discord_ld_client_guilds((void**)p_client, &conn->chunk);

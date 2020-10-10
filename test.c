@@ -11,6 +11,8 @@ int main(void)
   fgets(bot_token,BOT_TOKEN_LENGTH-1,f_bot_token);
   fclose(f_bot_token);
 
+  discord_global_init();
+
   discord_st *discord = discord_init(bot_token);
   discord_request_method(discord, SCHEDULE);
 
@@ -29,4 +31,5 @@ int main(void)
   discord_dispatch(discord);
 
   discord_cleanup(discord);
+  discord_global_cleanup();
 }

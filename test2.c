@@ -11,8 +11,10 @@ int main(void)
   fgets(bot_token,BOT_TOKEN_LENGTH-1,f_bot_token);
   fclose(f_bot_token);
 
+  discord_global_init();
+
   discord_st *s_discord = discord_init(bot_token); //synced
-  discord_request_method(t_discord, SYNC);// < not necessary, as its sync by default
+  discord_request_method(s_discord, SYNC);// < not necessary, sync is default 
 
   discord_st *t_discord = discord_init(bot_token); //scheduler
   discord_request_method(t_discord, SCHEDULE);
@@ -40,4 +42,5 @@ int main(void)
   discord_user_destroy(client);
   discord_cleanup(t_discord);
   discord_cleanup(s_discord);
+  discord_global_cleanup();
 }

@@ -177,8 +177,10 @@ typedef struct discord_utils_s {
   struct discord_clist_s *conn_list;
 
   discord_request_method_et method;
-  void (*method_cb)(struct discord_utils_s*, struct discord_clist_s*);
+  void (*method_cb)(struct discord_utils_s *utils, struct discord_clist_s *conn);
 } discord_utils_st;
+
+typedef void (curl_request_ft)(discord_utils_st *utils, struct discord_clist_s *conn, char url_route[]);
 
 typedef struct discord_s {
   discord_channel_st *channel;
@@ -195,12 +197,13 @@ void __discord_free(void **p_ptr);
 void* __discord_malloc(size_t size, unsigned long line);
 #define discord_malloc(n) __discord_malloc(n, __LINE__)
 
+void discord_global_init();
+void discord_global_cleanup();
+
 void discord_request_method(discord_st *discord, discord_request_method_et method);
-void discord_request_get(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[]);
-void discord_request_post(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[]);
-struct discord_clist_s* discord_clist_append(discord_utils_st *utils, struct discord_clist_s **p_new_node);
-void discord_clist_free_all(struct discord_clist_s *conn_list);
-struct discord_clist_s* discord_get_conn(discord_utils_st *utils, char key[], discord_load_ft *load_cb);
+void discord_GET(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[]);
+void discord_POST(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[]);
+struct discord_clist_s* discord_get_conn(discord_utils_st *utils, char url_route[], discord_load_ft *load_cb, curl_request_ft *request_cb);
 void discord_dispatch(discord_st *discord);
 
 discord_channel_st* discord_channel_init();
