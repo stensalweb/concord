@@ -130,7 +130,7 @@ discord_get_channel(discord_st* discord, char channel_id[])
 
   discord_channel_st *channel = discord->channel;
   struct discord_clist_s *conn = discord_get_conn(
-                                    discord,
+                                    discord->utils,
                                     "GetChannel",
                                     channel->hashtable,
                                     &channel->conn_list,

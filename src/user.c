@@ -112,7 +112,7 @@ discord_get_user(discord_st* discord, char user_id[])
 
   discord_user_st *user = discord->user;
   struct discord_clist_s *conn = discord_get_conn(
-                                    discord,
+                                    discord->utils,
                                     "GetUser",
                                     user->hashtable,
                                     &user->conn_list,
@@ -147,7 +147,7 @@ discord_get_client_guilds(discord_st *discord)
 
   discord_user_st *client = discord->client;
   struct discord_clist_s *conn = discord_get_conn(
-                                    discord,
+                                    discord->utils,
                                     "GetClientGuilds",
                                     client->hashtable,
                                     &client->conn_list,

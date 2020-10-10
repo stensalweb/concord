@@ -82,7 +82,7 @@ _discord_clist_get_last(struct discord_clist_s *conn_list)
 }
 
 static struct discord_clist_s*
-_discord_clist_append_nodup(discord_utils_st *utils, struct discord_clist_s *conn_list, struct discord_clist_s **p_new_node)
+_discord_clist_append_nodup(discord_utils_st *utils, struct discord_clist_s **conn_list, struct discord_clist_s **p_new_node)
 {
   struct discord_clist_s *last;
   struct discord_clist_s *new_node = discord_malloc(sizeof *new_node);
@@ -93,16 +93,19 @@ _discord_clist_append_nodup(discord_utils_st *utils, struct discord_clist_s *con
     *p_new_node = new_node;
   }
 
-  if (!conn_list) return new_node;
+  if (NULL == *conn_list){
+    *conn_list = new_node;
+    return new_node;
+  }
 
-  last = _discord_clist_get_last(conn_list);
+  last = _discord_clist_get_last(*conn_list);
   last->next = new_node;
 
-  return conn_list;
+  return *conn_list;
 }
 
 struct discord_clist_s*
-discord_clist_append(discord_utils_st *utils, struct discord_clist_s *conn_list, struct discord_clist_s **p_new_node){
+discord_clist_append(discord_utils_st *utils, struct discord_clist_s **conn_list, struct discord_clist_s **p_new_node){
   return _discord_clist_append_nodup(utils, conn_list, p_new_node);
 }
 
@@ -124,7 +127,7 @@ discord_clist_free_all(struct discord_clist_s *conn_list)
 
 struct discord_clist_s*
 discord_get_conn(
-  discord_st *discord, 
+  discord_utils_st *utils, 
   char key[], 
   hashtable_st *hashtable, 
   struct discord_clist_s **conn_list, 
@@ -135,7 +138,7 @@ discord_get_conn(
   if (NULL != node) return node;
 
   struct discord_clist_s *new_node;
-  node = discord_clist_append(discord->utils, *conn_list, &new_node);
+  node = discord_clist_append(utils, conn_list, &new_node);
   assert(NULL != node && NULL != new_node);
 
   new_node->key = strdup(key);
@@ -145,9 +148,6 @@ discord_get_conn(
   assert(NULL != new_node->load_cb);
 
   hashtable_set(hashtable, new_node->key, new_node);
-  if (NULL == *conn_list){ 
-    *conn_list = new_node;
-  }
 
   return new_node;
 }

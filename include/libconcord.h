@@ -202,9 +202,9 @@ void* __discord_malloc(size_t size, unsigned long line);
 void discord_request_method(discord_st *discord, discord_request_method_et method);
 void discord_request_get(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[]);
 void discord_request_post(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[]);
-struct discord_clist_s* discord_clist_append(discord_utils_st *utils, struct discord_clist_s *conn_list, struct discord_clist_s **p_new_node);
+struct discord_clist_s* discord_clist_append(discord_utils_st *utils, struct discord_clist_s **conn_list, struct discord_clist_s **p_new_node);
 void discord_clist_free_all(struct discord_clist_s *conn_list);
-struct discord_clist_s* discord_get_conn(discord_st *discord, char key[], hashtable_st *hashtable, struct discord_clist_s **conn_list, discord_load_ft *load_cb);
+struct discord_clist_s* discord_get_conn(discord_utils_st *utils, char key[], hashtable_st *hashtable, struct discord_clist_s **conn_list, discord_load_ft *load_cb);
 
 discord_channel_st* discord_channel_init();
 void discord_channel_destroy(discord_channel_st *channel);

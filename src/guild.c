@@ -112,7 +112,7 @@ discord_get_guild(discord_st *discord, char guild_id[])
 
   discord_guild_st *guild = discord->guild;
   struct discord_clist_s *conn = discord_get_conn(
-                                    discord,
+                                    discord->utils,
                                     "GetGuild",
                                     guild->hashtable,
                                     &guild->conn_list,
@@ -148,7 +148,7 @@ discord_get_guild_channels(discord_st *discord, char guild_id[])
 
   discord_guild_st *guild = discord->guild;
   struct discord_clist_s *conn = discord_get_conn(
-                                    discord,
+                                    discord->utils,
                                     "GetGuildChannels",
                                     guild->hashtable,
                                     &guild->conn_list,
