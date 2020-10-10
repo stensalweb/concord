@@ -4,14 +4,9 @@ This document describes features to be incorporated in the future.
 
 ## HIGH
 
-- Append a new clist everytime a function is called for its first time, the new clist should hold information regarding that function for easy reuse, also identification and search via hashtable.
-- Add multi option for non-blocking requests
-- Response is allocating too much unnecessary memory, make a better allocation prediction system
-- Curl write callback is unsafe, it should check for size
+- Implement a prediction system for auto-performing async requests which hold a dependency
 
 ## MEDIUM
-
-- Bunch of unnecessary callocs, replace with mallocs
 
 ## LOW
 
