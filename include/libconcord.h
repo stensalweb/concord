@@ -144,8 +144,8 @@ typedef struct {
 } discord_user_st;
 
 typedef enum {
-  ASYNC = 1,
-  SYNC  = 2,
+  SYNC  = 0,
+  SCHEDULE = 1,
 } discord_request_method_et;
 
 struct curl_memory_s {
@@ -201,7 +201,7 @@ void discord_request_post(discord_utils_st *utils, struct discord_clist_s *conn_
 struct discord_clist_s* discord_clist_append(discord_utils_st *utils, struct discord_clist_s **p_new_node);
 void discord_clist_free_all(struct discord_clist_s *conn_list);
 struct discord_clist_s* discord_get_conn(discord_utils_st *utils, char key[], discord_load_ft *load_cb);
-void discord_async_perform(discord_st *discord);
+void discord_dispatch(discord_st *discord);
 
 discord_channel_st* discord_channel_init();
 void discord_channel_destroy(discord_channel_st *channel);

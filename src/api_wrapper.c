@@ -167,7 +167,7 @@ discord_get_conn( discord_utils_st *utils, char key[], discord_load_ft *load_cb)
 }
 
 static void
-_discord_request_easy(discord_utils_st *utils, struct discord_clist_s *conn_list)
+_discord_set_curl_easy(discord_utils_st *utils, struct discord_clist_s *conn_list)
 {
   CURLcode res = curl_easy_perform(conn_list->easy_handle);
   if (CURLE_OK != res){
@@ -177,7 +177,7 @@ _discord_request_easy(discord_utils_st *utils, struct discord_clist_s *conn_list
 }
 
 static void
-_discord_request_multi(discord_utils_st *utils, struct discord_clist_s *conn_list)
+_discord_set_curl_multi(discord_utils_st *utils, struct discord_clist_s *conn_list)
 {
   if (NULL != conn_list->easy_handle){
     curl_multi_add_handle(utils->multi_handle, conn_list->easy_handle);
@@ -186,7 +186,7 @@ _discord_request_multi(discord_utils_st *utils, struct discord_clist_s *conn_lis
 
 /* wrapper around curl_multi_perform() */
 void
-discord_async_perform(discord_st *discord)
+discord_dispatch(discord_st *discord)
 {
   discord_utils_st *utils = discord->utils;
 
@@ -288,13 +288,13 @@ void
 discord_request_method(discord_st *discord, discord_request_method_et method)
 {
   switch (method){
-  case ASYNC:
-      discord->utils->method = ASYNC;
-      discord->utils->method_cb = &_discord_request_multi;
+  case SCHEDULE:
+      discord->utils->method = SCHEDULE;
+      discord->utils->method_cb = &_discord_set_curl_multi;
       break;
   case SYNC:
       discord->utils->method = SYNC;
-      discord->utils->method_cb = &_discord_request_easy;
+      discord->utils->method_cb = &_discord_set_curl_easy;
       break;
   default:
       fprintf(stderr, "\nERROR: undefined request method\n");
@@ -355,7 +355,7 @@ _discord_utils_init(char bot_token[])
   new_utils->header = _discord_init_request_header(new_utils);
 
   new_utils->method = SYNC;
-  new_utils->method_cb = &_discord_request_easy;
+  new_utils->method_cb = &_discord_set_curl_easy;
 
   new_utils->easy_hashtable = hashtable_init();
   hashtable_build(new_utils->easy_hashtable, UTILS_HASHTABLE_SIZE);
