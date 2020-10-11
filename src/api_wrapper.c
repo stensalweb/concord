@@ -10,33 +10,7 @@
 #include <curl/curl.h>
 
 #include "libconcord.h"
-
-/* @todo instead of exit(), it should throw the error
-    somewhere */
-//this is redefined as a macro
-void*
-__discord_malloc(size_t size, unsigned long line)
-{
-  void *ptr = calloc(1, size);
-
-  if (NULL == ptr){
-    fprintf(stderr, "[%s:%lu] Out of memory(%lu bytes)\n",
-              __FILE__, line, (unsigned long)size);
-    exit(EXIT_FAILURE);
-  }
-
-  return ptr;
-}
-
-//this is redefined as a macro
-void
-__discord_free(void **p_ptr)
-{
-  if(NULL != p_ptr){
-    free(*p_ptr);
-    *p_ptr = NULL;
-  } 
-}
+#include "api_wrapper_private.h"
 
 static size_t
 _discord_curl_write_cb(char *content, size_t size, size_t nmemb, void *p_userdata)

@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "libconcord.h"
+#include "api_wrapper_private.h"
 
 discord_channel_st*
 discord_channel_init(discord_utils_st *utils)

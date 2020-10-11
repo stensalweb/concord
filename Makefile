@@ -10,6 +10,7 @@ LIB = $(LIBDIR)/libconcord.a
 EXEC = concord
 
 OBJS = 	$(OBJDIR)/test.o \
+	$(OBJDIR)/memory.o \
 	$(OBJDIR)/channel.o \
 	$(OBJDIR)/user.o \
 	$(OBJDIR)/guild.o \

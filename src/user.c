@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "libconcord.h"
+#include "api_wrapper_private.h"
 
 discord_user_st*
 discord_user_init(discord_utils_st *utils)
