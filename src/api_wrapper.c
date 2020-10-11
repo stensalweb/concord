@@ -61,15 +61,15 @@ _concord_clist_get_last(struct concord_clist_s *conn_list)
   return iter;
 }
 
-static struct concord_clist_s*
+static void
 _concord_clist_append(concord_utils_st *utils, struct concord_clist_s **p_new_conn, curl_request_ft *request_cb, char endpoint[])
 {
   struct concord_clist_s *last;
   struct concord_clist_s *new_conn = concord_malloc(sizeof *new_conn);
 
   new_conn->easy_handle = _concord_curl_easy_init(utils, &new_conn->chunk);
-  (*request_cb)(utils, new_conn, endpoint);
 
+  (*request_cb)(utils, new_conn, endpoint); //register desired request to new easy_handle
 
   if (NULL != p_new_conn){
     *p_new_conn = new_conn;
@@ -77,13 +77,11 @@ _concord_clist_append(concord_utils_st *utils, struct concord_clist_s **p_new_co
 
   if (NULL == utils->conn_list){
     utils->conn_list = new_conn;
-    return new_conn;
+    return;
   }
 
   last = _concord_clist_get_last(utils->conn_list);
   last->next = new_conn;
-
-  return utils->conn_list;
 }
 
 void
@@ -95,55 +93,64 @@ _concord_clist_free_all(struct concord_clist_s *conn)
   do {
     next_conn = conn->next;
     curl_easy_cleanup(conn->easy_handle);
-    concord_free(conn->endpoint_key);
-    concord_free(conn->easyaddr_key);
+    concord_free(conn->request_key);
+    concord_free(conn->addr_key);
     concord_free(conn);
     conn = next_conn;
   } while (next_conn);
 }
 
 struct concord_clist_s*
-Concord_get_conn(concord_utils_st *utils, char endpoint[], concord_ld_object_ft *load_cb, curl_request_ft *request_cb)
+Concord_get_conn(
+  concord_utils_st *utils,
+  char request_key[],
+  char endpoint[],
+  concord_ld_object_ft *load_cb,
+  curl_request_ft *request_cb)
 {
-  struct concord_clist_s *conn = hashtable_get(utils->conn_hashtable, endpoint);
+  struct concord_clist_s *conn = hashtable_get(utils->conn_hashtable, request_key);
 
-  /* found connection node, return it */
-  if (NULL != conn) return conn;
+  /* found connection node, set new URL and return it */
+  if (NULL != conn){
+    char base_url[MAX_URL_LENGTH] = BASE_URL;
+    curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
+    return conn;
+  }
 
   /* didn't find connection node, create a new one and return it */
   struct concord_clist_s *new_conn;
-  conn = _concord_clist_append(utils, &new_conn, request_cb, endpoint);
-  assert(NULL != conn && NULL != new_conn);
+  _concord_clist_append(utils, &new_conn, request_cb, endpoint);
+  assert(NULL != new_conn);
 
   new_conn->load_cb = load_cb;
   assert(NULL != new_conn->load_cb);
 
-  new_conn->endpoint_key = strdup(endpoint);
-  assert(NULL != new_conn->endpoint_key);
+  new_conn->request_key = strdup(request_key);
+  assert(NULL != new_conn->request_key);
 
   /* this stores the connection node inside a hashtable
-      where entries keys are the endpoint used when creating this
-      new connection.
+      where entries keys are the requests within each
+      function
     this allows for easy_handles reusability */
-  hashtable_set(utils->conn_hashtable, new_conn->endpoint_key, new_conn);
+  hashtable_set(utils->conn_hashtable, new_conn->request_key, new_conn);
 
   /* this stores connection node inside a hashtable where entries
       keys are easy handle memory address converted to string
      will be used when checking for multi_perform completed transfers */
   char addr_key[18];
   sprintf(addr_key, "%p", new_conn->easy_handle);
-  new_conn->easyaddr_key = strdup(addr_key);
-  assert(NULL != new_conn->easyaddr_key);
+  new_conn->addr_key = strdup(addr_key);
+  assert(NULL != new_conn->addr_key);
 
-  hashtable_set(utils->easy_hashtable, new_conn->easyaddr_key, new_conn);
+  hashtable_set(utils->easy_hashtable, new_conn->addr_key, new_conn);
 
   return new_conn;
 }
 
 static void
-_concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn_list)
+_concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
 {
-  CURLcode res = curl_easy_perform(conn_list->easy_handle);
+  CURLcode res = curl_easy_perform(conn->easy_handle);
   if (CURLE_OK != res){
     fprintf(stderr, "\n%s\n\n", curl_share_strerror(res));
     exit(EXIT_FAILURE);
@@ -151,10 +158,10 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn_lis
 }
 
 static void
-_concord_set_curl_multi(concord_utils_st *utils, struct concord_clist_s *conn_list)
+_concord_set_curl_multi(concord_utils_st *utils, struct concord_clist_s *conn)
 {
-  if (NULL != conn_list->easy_handle){
-    curl_multi_add_handle(utils->multi_handle, conn_list->easy_handle);
+  if (NULL != conn->easy_handle){
+    curl_multi_add_handle(utils->multi_handle, conn->easy_handle);
   }
 }
 
@@ -277,21 +284,21 @@ concord_request_method(concord_st *concord, concord_request_method_et method)
 }
 
 void
-Concord_GET(concord_utils_st *utils, struct concord_clist_s *conn_list, char endpoint[])
+Concord_GET(concord_utils_st *utils, struct concord_clist_s *conn, char endpoint[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
 
-  curl_easy_setopt(conn_list->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
-  curl_easy_setopt(conn_list->easy_handle, CURLOPT_HTTPGET, 1L);
+  curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
+  curl_easy_setopt(conn->easy_handle, CURLOPT_HTTPGET, 1L);
 }
 
 void
-Concord_POST(concord_utils_st *utils, struct concord_clist_s *conn_list, char endpoint[])
+Concord_POST(concord_utils_st *utils, struct concord_clist_s *conn, char endpoint[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
 
-  curl_easy_setopt(conn_list->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
-  curl_easy_setopt(conn_list->easy_handle, CURLOPT_POST, 1L);
+  curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
+  curl_easy_setopt(conn->easy_handle, CURLOPT_POST, 1L);
 }
 
 /* @todo create distinction between bot and user token */
@@ -354,18 +361,30 @@ void
 Concord_request_perform(
   concord_utils_st *utils, 
   void **p_object, 
+  char request_key[],
   char endpoint[], 
   concord_ld_object_ft *load_cb, 
   curl_request_ft *request_cb)
 {
   struct concord_clist_s *conn = Concord_get_conn(
                                     utils,
+                                    request_key,
                                     endpoint,
                                     load_cb,
                                     request_cb);
-  conn->p_object = p_object;
-  (*utils->method_cb)(utils, conn);
 
+  /* if method is SCHEDULE, holding the object until discord_dispatch()
+      is called is necessary, so that it knows where to perform loads */
+  conn->p_object = p_object;
+  
+  /* if method is SYNC (default), then exec current conn's easy_handle with
+      easy_perform() in a blocking manner.
+
+     if method is SCHEDULE, then add current's conn easy_handle to the multi stack,
+      and wait until concord_dispatch() is called for asynchronous execution */
+  (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
+
+  /* if method is SYNC (default), then perform load on object at once */
   if (SYNC == utils->method){
     (*load_cb)(p_object, &conn->chunk);
   }

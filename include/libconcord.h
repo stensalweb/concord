@@ -159,8 +159,8 @@ struct curl_memory_s {
 typedef void (concord_ld_object_ft)(void **p_object, struct curl_memory_s*);
 
 struct concord_clist_s {
-  char *endpoint_key; //conn_hashtable key
-  char *easyaddr_key; //easy_hashtable key
+  char *request_key; //conn_hashtable key
+  char *addr_key; //easy_hashtable key
 
   CURL *easy_handle; //its address will be used as secondary key for utils hashtable
   concord_ld_object_ft *load_cb;

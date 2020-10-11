@@ -138,6 +138,7 @@ concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st *
   Concord_request_perform( 
     concord->utils,
     (void**)p_channel,
+    "GetChannel",
     endpoint,
     &_concord_ld_channel,
     &Concord_GET);
@@ -175,6 +176,7 @@ concord_get_channel_messages(concord_st *concord, char channel_id[], concord_cha
   Concord_request_perform( 
     concord->utils,
     (void**)p_channel,
+    "GetChannelMessages",
     endpoint,
     &_concord_ld_channel_messages,
     &Concord_GET);

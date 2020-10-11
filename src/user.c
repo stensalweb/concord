@@ -111,6 +111,7 @@ concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user)
   Concord_request_perform( 
     concord->utils,
     (void**)p_user,
+    "GetUser",
     endpoint,
     &_concord_ld_user,
     &Concord_GET);
@@ -188,6 +189,7 @@ concord_get_client(concord_st *concord, concord_user_st **p_client)
   Concord_request_perform( 
     concord->utils,
     (void**)p_client,
+    "GetClient",
     endpoint,
     &_concord_ld_client,
     &Concord_GET);
@@ -224,6 +226,7 @@ concord_get_client_guilds(concord_st *concord, concord_user_st **p_client)
   Concord_request_perform( 
     concord->utils,
     (void**)p_client,
+    "GetClientGuilds",
     endpoint,
     &_concord_ld_client_guilds,
     &Concord_GET);

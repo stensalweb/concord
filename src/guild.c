@@ -123,6 +123,7 @@ concord_get_guild(concord_st *concord, char guild_id[], concord_guild_st **p_gui
   Concord_request_perform( 
     concord->utils,
     (void**)p_guild,
+    "GetGuild",
     endpoint,
     &_concord_ld_guild,
     &Concord_GET);
@@ -160,6 +161,7 @@ concord_get_guild_channels(concord_st *concord, char guild_id[], concord_guild_s
   Concord_request_perform( 
     concord->utils,
     (void**)p_guild,
+    "GetGuildChannels",
     endpoint,
     &_concord_ld_guild_channels,
     &Concord_GET);
