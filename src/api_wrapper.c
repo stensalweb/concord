@@ -347,6 +347,27 @@ _discord_utils_destroy(discord_utils_st *utils)
   discord_free(utils);
 }
 
+void
+Discord_request_perform(
+  discord_utils_st *utils, 
+  void **p_object, 
+  char url_route[], 
+  discord_load_ft *load_cb, 
+  curl_request_ft *request_cb)
+{
+  struct discord_clist_s *conn = Discord_get_conn(
+                                    utils,
+                                    url_route,
+                                    load_cb,
+                                    request_cb);
+  conn->p_object = p_object;
+  (*utils->method_cb)(utils, conn);
+
+  if (SYNC == utils->method){
+    (*load_cb)(p_object, &conn->chunk);
+  }
+}
+
 discord_st*
 discord_init(char bot_token[])
 {

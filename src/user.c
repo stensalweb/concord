@@ -106,19 +106,14 @@ discord_get_user(discord_st *discord, char user_id[], discord_user_st **p_user)
     p_user = &discord->user;
   }
 
-  struct discord_clist_s *conn = Discord_get_conn(
-                                    discord->utils,
-                                    url_route,
-                                    &_discord_ld_user,
-                                    &Discord_GET);
-
-  conn->p_object = (void**)p_user;
-
-  (*discord->utils->method_cb)(discord->utils, conn);
-
-  if (SYNC == discord->utils->method){
-    _discord_ld_user((void**)p_user, &conn->chunk);
-  }
+  /* this is a template common to every function that deals with
+      sending a request to the Discord API */
+  Discord_request_perform( 
+    discord->utils,
+    (void**)p_user,
+    url_route,
+    &_discord_ld_user,
+    &Discord_GET);
 }
 
 static void
@@ -188,19 +183,14 @@ discord_get_client(discord_st *discord, discord_user_st **p_client)
     p_client = &discord->client;
   }
 
-  struct discord_clist_s *conn = Discord_get_conn(
-                                    discord->utils,
-                                    url_route,
-                                    &_discord_ld_client,
-                                    &Discord_GET);
-
-  conn->p_object = (void**)p_client;
-
-  (*discord->utils->method_cb)(discord->utils, conn);
-
-  if (SYNC == discord->utils->method){
-    _discord_ld_client((void**)p_client, &conn->chunk);
-  }
+  /* this is a template common to every function that deals with
+      sending a request to the Discord API */
+  Discord_request_perform( 
+    discord->utils,
+    (void**)p_client,
+    url_route,
+    &_discord_ld_client,
+    &Discord_GET);
 }
 
 static void
@@ -229,17 +219,12 @@ discord_get_client_guilds(discord_st *discord, discord_user_st **p_client)
     p_client = &discord->client;
   }
 
-  struct discord_clist_s *conn = Discord_get_conn(
-                                    discord->utils,
-                                    url_route,
-                                    &_discord_ld_client_guilds,
-                                    &Discord_GET);
-
-  conn->p_object = (void**)p_client;
-
-  (*discord->utils->method_cb)(discord->utils, conn);
-
-  if (SYNC == discord->utils->method){
-    _discord_ld_client_guilds((void**)p_client, &conn->chunk);
-  }
+  /* this is a template common to every function that deals with
+      sending a request to the Discord API */
+  Discord_request_perform( 
+    discord->utils,
+    (void**)p_client,
+    url_route,
+    &_discord_ld_client_guilds,
+    &Discord_GET);
 }

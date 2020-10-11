@@ -111,19 +111,14 @@ discord_get_guild(discord_st *discord, char guild_id[], discord_guild_st **p_gui
     p_guild = &discord->guild;
   }
 
-  struct discord_clist_s *conn = Discord_get_conn(
-                                    discord->utils,
-                                    url_route,
-                                    &_discord_ld_guild,
-                                    &Discord_GET);
-
-  conn->p_object = (void**)p_guild;
-
-  (*discord->utils->method_cb)(discord->utils, conn);
-
-  if (SYNC == discord->utils->method){
-    _discord_ld_guild((void**)p_guild, &conn->chunk);
-  }
+  /* this is a template common to every function that deals with
+      sending a request to the Discord API */
+  Discord_request_perform( 
+    discord->utils,
+    (void**)p_guild,
+    url_route,
+    &_discord_ld_guild,
+    &Discord_GET);
 }
 
 static void
@@ -153,17 +148,12 @@ discord_get_guild_channels(discord_st *discord, char guild_id[], discord_guild_s
     p_guild = &discord->guild;
   }
 
-  struct discord_clist_s *conn = Discord_get_conn(
-                                    discord->utils,
-                                    url_route,
-                                    &_discord_ld_guild_channels,
-                                    &Discord_GET);
-
-  conn->p_object = (void**)p_guild;
-
-  (*discord->utils->method_cb)(discord->utils, conn);
-
-  if (SYNC == discord->utils->method){
-    _discord_ld_guild_channels((void**)p_guild, &conn->chunk);
-  }
+  /* this is a template common to every function that deals with
+      sending a request to the Discord API */
+  Discord_request_perform( 
+    discord->utils,
+    (void**)p_guild,
+    url_route,
+    &_discord_ld_guild_channels,
+    &Discord_GET);
 }

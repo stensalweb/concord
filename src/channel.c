@@ -129,17 +129,12 @@ discord_get_channel(discord_st* discord, char channel_id[], discord_channel_st *
     *p_channel = discord_channel_init(discord->utils);
   }
 
-  struct discord_clist_s *conn = Discord_get_conn(
-                                    discord->utils,
-                                    url_route,
-                                    &_discord_ld_channel,
-                                    &Discord_GET);
-
-  conn->p_object = (void**)p_channel;
-
-  (*discord->utils->method_cb)(discord->utils, conn);
-
-  if (SYNC == discord->utils->method){
-    _discord_ld_channel((void**)p_channel, &conn->chunk);
-  }
+  /* this is a template common to every function that deals with
+      sending a request to the Discord API */
+  Discord_request_perform( 
+    discord->utils,
+    (void**)p_channel,
+    url_route,
+    &_discord_ld_channel,
+    &Discord_GET);
 }
