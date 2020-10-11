@@ -46,7 +46,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 $(LIB):
 	-ar rcs $@ $(OBJS)
 
-debug : $(MAIN) $(SRCDIR)/*.c
+debug : $(EXEC) $(MAIN) $(SRCDIR)/*.c
 	$(CC) -g -I$(INCLUDEDIR) $(MAIN) $(SRCDIR)/*.c -o debug.out $(CFLAGS) $(LDLIBS)
 
 clean :
