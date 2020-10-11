@@ -13,15 +13,13 @@ int main(void)
 
   discord_global_init();
 
-  discord_st *s_discord = discord_init(bot_token); //synced
-  discord_request_method(s_discord, SYNC);// < not necessary, sync is default 
+  discord_st *discord = discord_init(bot_token); //scheduler
+  discord_request_method(discord, SCHEDULE);
 
-  discord_st *t_discord = discord_init(bot_token); //scheduler
-  discord_request_method(t_discord, SCHEDULE);
+  discord_get_client_guilds(discord, NULL);
+  discord_dispatch(discord);
 
-  discord_user_st *client = discord_user_init();
-  discord_get_client_guilds(s_discord, &client);
-
+  discord_user_st *client = discord->client;
   discord_guild_st **guild = discord_malloc(jscon_size(client->guilds) * sizeof *guild);
   for (long i=0; i < jscon_size(client->guilds); ++i){
     jscon_item_st *item_guild = jscon_get_byindex(client->guilds, i);
@@ -29,18 +27,16 @@ int main(void)
     assert(NULL != guild_id);
 
     guild[i] = discord_guild_init();
-    discord_get_guild(s_discord, guild_id, guild+i);
-    discord_get_guild_channels(t_discord, guild_id, guild+i);
+    discord_get_guild(discord, guild_id, guild+i);
+    discord_get_guild_channels(discord, guild_id, guild+i);
   }
-  discord_dispatch(t_discord);
+  discord_dispatch(discord);
 
   for (long i=0; i < jscon_size(client->guilds); ++i){
     discord_guild_destroy(guild[i]);
   }
   discord_free(guild);
 
-  discord_user_destroy(client);
-  discord_cleanup(t_discord);
-  discord_cleanup(s_discord);
+  discord_cleanup(discord);
   discord_global_cleanup();
 }
