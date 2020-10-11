@@ -7,7 +7,7 @@
     somewhere */
 //this is redefined as a macro
 void*
-__discord_malloc(size_t size, unsigned long line)
+__concord_malloc(size_t size, unsigned long line)
 {
   void *ptr = calloc(1, size);
 
@@ -22,7 +22,7 @@ __discord_malloc(size_t size, unsigned long line)
 
 //this is redefined as a macro
 void
-__discord_free(void **p_ptr)
+__concord_free(void **p_ptr)
 {
   if(NULL != p_ptr){
     free(*p_ptr);

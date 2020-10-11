@@ -7,7 +7,7 @@ OBJDIR = obj
 INCLUDEDIR = include
 LIBDIR = lib
 LIB = $(LIBDIR)/libconcord.a
-EXEC = concord
+EXEC = run
 
 OBJS = 	$(OBJDIR)/test.o \
 	$(OBJDIR)/memory.o \
@@ -16,7 +16,7 @@ OBJS = 	$(OBJDIR)/test.o \
 	$(OBJDIR)/guild.o \
 	$(OBJDIR)/api_wrapper.o
 
-MAIN = test2.c
+MAIN = test.c
 MAIN_O = $(OBJDIR)/test.o
 
 .PHONY : clean all debug

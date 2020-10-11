@@ -1,6 +1,12 @@
+#ifndef LIBCONCORD_API_WRAPPER_H_
+#define LIBCONCORD_API_WRAPPER_H_
 //#include "libconcord.h" (implicit) 
 
-void Discord_GET(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[]);
-void Discord_POST(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[]);
-void Discord_request_perform(discord_utils_st *utils, void **p_object, char url_route[], discord_load_ft *load_cb, curl_request_ft *request_cb);
-struct discord_clist_s* Discord_get_conn(discord_utils_st *utils, char url_route[], discord_load_ft *load_cb, curl_request_ft *request_cb);
+void Concord_GET(concord_utils_st *utils, struct concord_clist_s *conn_list, char url_route[]);
+void Concord_POST(concord_utils_st *utils, struct concord_clist_s *conn_list, char url_route[]);
+
+struct concord_clist_s* Concord_get_conn(concord_utils_st *utils, char url_route[], concord_load_ft *load_cb, curl_request_ft *request_cb);
+
+void Concord_request_perform(concord_utils_st *utils, void **p_object, char url_route[], concord_load_ft *load_cb, curl_request_ft *request_cb);
+
+#endif

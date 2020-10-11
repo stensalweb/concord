@@ -7,49 +7,49 @@
 #include "libconcord.h"
 #include "api_wrapper_private.h"
 
-discord_channel_st*
-discord_channel_init(discord_utils_st *utils)
+concord_channel_st*
+concord_channel_init(concord_utils_st *utils)
 {
-  discord_channel_st *new_channel = discord_malloc(sizeof *new_channel);
-  new_channel->id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->guild_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->name = discord_malloc(NAME_LENGTH);
-  new_channel->topic = discord_malloc(TOPIC_LENGTH);
-  new_channel->last_message_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->icon = discord_malloc(MAX_HASH_LENGTH);
-  new_channel->owner_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->application_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->parent_id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->last_pin_timestamp = discord_malloc(SNOWFLAKE_TIMESTAMP);
+  concord_channel_st *new_channel = concord_malloc(sizeof *new_channel);
+  new_channel->id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->guild_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->name = concord_malloc(NAME_LENGTH);
+  new_channel->topic = concord_malloc(TOPIC_LENGTH);
+  new_channel->last_message_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->icon = concord_malloc(MAX_HASH_LENGTH);
+  new_channel->owner_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->application_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->parent_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->last_pin_timestamp = concord_malloc(SNOWFLAKE_TIMESTAMP);
 
   return new_channel;
 }
 
 void
-discord_channel_destroy(discord_channel_st *channel)
+concord_channel_destroy(concord_channel_st *channel)
 {
-  discord_free(channel->id);
-  discord_free(channel->guild_id);
-  discord_free(channel->name);
-  discord_free(channel->topic);
-  discord_free(channel->last_message_id);
-  discord_free(channel->icon);
-  discord_free(channel->owner_id);
-  discord_free(channel->application_id);
-  discord_free(channel->parent_id);
-  discord_free(channel->last_pin_timestamp);
+  concord_free(channel->id);
+  concord_free(channel->guild_id);
+  concord_free(channel->name);
+  concord_free(channel->topic);
+  concord_free(channel->last_message_id);
+  concord_free(channel->icon);
+  concord_free(channel->owner_id);
+  concord_free(channel->application_id);
+  concord_free(channel->parent_id);
+  concord_free(channel->last_pin_timestamp);
 
   if (NULL != channel->permission_overwrites){
     jscon_destroy(channel->permission_overwrites);
   }
 
-  discord_free(channel);
+  concord_free(channel);
 }
 
 static void
-_discord_ld_channel(void **p_channel, struct curl_memory_s *chunk)
+_concord_ld_channel(void **p_channel, struct curl_memory_s *chunk)
 {
-  discord_channel_st *channel = *p_channel;
+  concord_channel_st *channel = *p_channel;
 
   jscon_scanf(chunk->response,
      "#position%jd \
@@ -116,25 +116,25 @@ _discord_ld_channel(void **p_channel, struct curl_memory_s *chunk)
   *p_channel = channel;
   
   chunk->size = 0;
-  discord_free(chunk->response);
+  concord_free(chunk->response);
 }
 
 void
-discord_get_channel(discord_st* discord, char channel_id[], discord_channel_st **p_channel)
+concord_get_channel(concord_st* concord, char channel_id[], concord_channel_st **p_channel)
 {
   char url_route[256] = "/channels/";
   strcat(url_route, channel_id);
 
   if (NULL == p_channel){
-    *p_channel = discord_channel_init(discord->utils);
+    *p_channel = concord_channel_init(concord->utils);
   }
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Discord_request_perform( 
-    discord->utils,
+  Concord_request_perform( 
+    concord->utils,
     (void**)p_channel,
     url_route,
-    &_discord_ld_channel,
-    &Discord_GET);
+    &_concord_ld_channel,
+    &Concord_GET);
 }

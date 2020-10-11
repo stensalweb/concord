@@ -22,7 +22,7 @@ typedef enum {
   SNOWFLAKE_PROCESS_ID          = 17,
   SNOWFLAKE_INTERNAL_WORKER_ID  = 22,
   SNOWFLAKE_TIMESTAMP           = 64,
-} discord_snowflake_et;
+} concord_snowflake_et;
 
 typedef enum {
   NAME_LENGTH           = 100,
@@ -34,7 +34,7 @@ typedef enum {
   MAX_LOCALE_LENGTH     = 15,
   MAX_EMAIL_LENGTH      = 254,
   MAX_REGION_LENGTH     = 15,
-} discord_limits_et;
+} concord_limits_et;
 
 /* CHANNEL TYPES
 https://discord.com/developers/docs/resources/channel#channel-object-channel-types */
@@ -46,7 +46,7 @@ typedef enum {
   GUILD_CATEGORY        = 4,
   GUILD_NEWS            = 5,
   GUILD_STORE           = 6,
-} discord_channel_types_et;
+} concord_channel_types_et;
 
 /* CHANNEL OBJECT
 https://discord.com/developers/docs/resources/channel#channel-object-channel-structure */
@@ -69,7 +69,7 @@ typedef struct {
   char *application_id;
   char *parent_id;
   char *last_pin_timestamp;
-} discord_channel_st;
+} concord_channel_st;
 
 /* GUILD OBJECT
 https://discord.com/developers/docs/resources/guild#guild-object-guild-structure */
@@ -121,7 +121,7 @@ typedef struct {
   long long max_video_channel_users;
   long long approximate_member_count;
   long long approximate_presence_count;
-} discord_guild_st;
+} concord_guild_st;
 
 
 /* USER OBJECT
@@ -141,84 +141,84 @@ typedef struct {
   long long premium_type;
   long long public_flags;
   jscon_item_st *guilds;
-} discord_user_st;
+} concord_user_st;
 
 typedef enum {
   SYNC  = 0,
   SCHEDULE = 1,
-} discord_request_method_et;
+} concord_request_method_et;
 
 struct curl_memory_s {
   char *response;
   size_t size;
 };
 
-typedef void (discord_load_ft)(void **p_object, struct curl_memory_s*);
+typedef void (concord_load_ft)(void **p_object, struct curl_memory_s*);
 
-struct discord_clist_s {
+struct concord_clist_s {
   char *primary_key; //conn_hashtable key
   char *secondary_key; //easy_hashtable key
 
   CURL *easy_handle; //its address will be used as secondary key for utils hashtable
-  discord_load_ft *load_cb;
+  concord_load_ft *load_cb;
 
   struct curl_memory_s chunk;
   void **p_object; //object to be created
-  struct discord_clist_s *next;
+  struct concord_clist_s *next;
 };
 
-typedef struct discord_utils_s {
+typedef struct concord_utils_s {
   char bot_token[256];
   struct curl_slist *header;
 
   hashtable_st *easy_hashtable;
   CURLM *multi_handle;
   hashtable_st *conn_hashtable;
-  struct discord_clist_s *conn_list;
+  struct concord_clist_s *conn_list;
 
-  discord_request_method_et method;
-  void (*method_cb)(struct discord_utils_s *utils, struct discord_clist_s *conn);
-} discord_utils_st;
+  concord_request_method_et method;
+  void (*method_cb)(struct concord_utils_s *utils, struct concord_clist_s *conn);
+} concord_utils_st;
 
-typedef void (curl_request_ft)(discord_utils_st *utils, struct discord_clist_s *conn, char url_route[]);
+typedef void (curl_request_ft)(concord_utils_st *utils, struct concord_clist_s *conn, char url_route[]);
 
-typedef struct discord_s {
-  discord_channel_st *channel;
-  discord_user_st *user;
-  discord_user_st *client;
-  discord_guild_st *guild;
+typedef struct concord_s {
+  concord_channel_st *channel;
+  concord_user_st *user;
+  concord_user_st *client;
+  concord_guild_st *guild;
 
-  discord_utils_st *utils;
-} discord_st;
+  concord_utils_st *utils;
+} concord_st;
 
 
-void __discord_free(void **p_ptr);
-#define discord_free(n) __discord_free((void**)&n)
-void* __discord_malloc(size_t size, unsigned long line);
-#define discord_malloc(n) __discord_malloc(n, __LINE__)
+void __concord_free(void **p_ptr);
+#define concord_free(n) __concord_free((void**)&n)
+void* __concord_malloc(size_t size, unsigned long line);
+#define concord_malloc(n) __concord_malloc(n, __LINE__)
 
-void discord_request_method(discord_st *discord, discord_request_method_et method);
-void discord_dispatch(discord_st *discord);
+void concord_request_method(concord_st *concord, concord_request_method_et method);
+void concord_dispatch(concord_st *concord);
 
-void discord_global_init();
-void discord_global_cleanup();
+void concord_global_init();
+void concord_global_cleanup();
 
-discord_channel_st* discord_channel_init();
-void discord_channel_destroy(discord_channel_st *channel);
-void discord_get_channel(discord_st *discord, char channel_id[], discord_channel_st **p_channel);
+concord_channel_st* concord_channel_init();
+void concord_channel_destroy(concord_channel_st *channel);
+void concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st **p_channel);
 
-discord_guild_st* discord_guild_init();
-void discord_guild_destroy(discord_guild_st *guild);
-void discord_get_guild(discord_st *discord, char guild_id[], discord_guild_st **p_guild);
-void discord_get_guild_channels(discord_st *discord, char guild_id[], discord_guild_st **p_guild);
+concord_guild_st* concord_guild_init();
+void concord_guild_destroy(concord_guild_st *guild);
+void concord_get_guild(concord_st *concord, char guild_id[], concord_guild_st **p_guild);
+void concord_get_guild_channels(concord_st *concord, char guild_id[], concord_guild_st **p_guild);
 
-discord_user_st* discord_user_init();
-void discord_user_destroy(discord_user_st *user);
-void discord_get_client(discord_st *discord, discord_user_st **p_client);
-void discord_get_user(discord_st *discord, char user_id[], discord_user_st **p_user);
-void discord_get_client_guilds(discord_st* discord, discord_user_st **p_client);
+concord_user_st* concord_user_init();
+void concord_user_destroy(concord_user_st *user);
+void concord_get_client(concord_st *concord, concord_user_st **p_client);
+void concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user);
+void concord_get_client_guilds(concord_st* concord, concord_user_st **p_client);
 
-discord_st* discord_init(char *bot_token);
-void discord_cleanup(discord_st* discord);
+concord_st* concord_init(char *bot_token);
+void concord_cleanup(concord_st* concord);
 
 #endif

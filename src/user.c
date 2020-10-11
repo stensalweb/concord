@@ -7,41 +7,41 @@
 #include "libconcord.h"
 #include "api_wrapper_private.h"
 
-discord_user_st*
-discord_user_init(discord_utils_st *utils)
+concord_user_st*
+concord_user_init(concord_utils_st *utils)
 {
-  discord_user_st *new_user = discord_malloc(sizeof *new_user);
-  new_user->id = discord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_user->username = discord_malloc(USERNAME_LENGTH);
-  new_user->discriminator = discord_malloc(DISCRIMINATOR_LENGTH);
-  new_user->avatar = discord_malloc(MAX_HASH_LENGTH);
-  new_user->locale = discord_malloc(MAX_LOCALE_LENGTH);
-  new_user->email = discord_malloc(MAX_EMAIL_LENGTH);
+  concord_user_st *new_user = concord_malloc(sizeof *new_user);
+  new_user->id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_user->username = concord_malloc(USERNAME_LENGTH);
+  new_user->discriminator = concord_malloc(DISCRIMINATOR_LENGTH);
+  new_user->avatar = concord_malloc(MAX_HASH_LENGTH);
+  new_user->locale = concord_malloc(MAX_LOCALE_LENGTH);
+  new_user->email = concord_malloc(MAX_EMAIL_LENGTH);
 
   return new_user;
 }
 
 void
-discord_user_destroy(discord_user_st *user)
+concord_user_destroy(concord_user_st *user)
 {
-  discord_free(user->id);
-  discord_free(user->username);
-  discord_free(user->discriminator);
-  discord_free(user->avatar);
-  discord_free(user->locale);
-  discord_free(user->email);
+  concord_free(user->id);
+  concord_free(user->username);
+  concord_free(user->discriminator);
+  concord_free(user->avatar);
+  concord_free(user->locale);
+  concord_free(user->email);
 
   if (NULL != user->guilds){
     jscon_destroy(user->guilds);
   }
 
-  discord_free(user);
+  concord_free(user);
 }
 
 static void
-_discord_ld_user(void **p_user, struct curl_memory_s *chunk)
+_concord_ld_user(void **p_user, struct curl_memory_s *chunk)
 {
-  discord_user_st *user = *p_user;
+  concord_user_st *user = *p_user;
 
   jscon_scanf(chunk->response,
      "#id%js \
@@ -93,33 +93,33 @@ _discord_ld_user(void **p_user, struct curl_memory_s *chunk)
   *p_user = user;
 
   chunk->size = 0;
-  discord_free(chunk->response);
+  concord_free(chunk->response);
 }
 
 void
-discord_get_user(discord_st *discord, char user_id[], discord_user_st **p_user)
+concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user)
 {
   char url_route[256] = "/users/";
   strcat(url_route, user_id);
 
   if (NULL == p_user){
-    p_user = &discord->user;
+    p_user = &concord->user;
   }
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Discord_request_perform( 
-    discord->utils,
+  Concord_request_perform( 
+    concord->utils,
     (void**)p_user,
     url_route,
-    &_discord_ld_user,
-    &Discord_GET);
+    &_concord_ld_user,
+    &Concord_GET);
 }
 
 static void
-_discord_ld_client(void **p_client, struct curl_memory_s *chunk)
+_concord_ld_client(void **p_client, struct curl_memory_s *chunk)
 {
-  discord_user_st *client = *p_client;
+  concord_user_st *client = *p_client;
 
   jscon_scanf(chunk->response,
      "#id%js \
@@ -171,32 +171,32 @@ _discord_ld_client(void **p_client, struct curl_memory_s *chunk)
   *p_client = client;
 
   chunk->size = 0;
-  discord_free(chunk->response);
+  concord_free(chunk->response);
 }
 
 void 
-discord_get_client(discord_st *discord, discord_user_st **p_client)
+concord_get_client(concord_st *concord, concord_user_st **p_client)
 {
   char url_route[256] = "/users/@me";
 
   if (NULL == p_client){
-    p_client = &discord->client;
+    p_client = &concord->client;
   }
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Discord_request_perform( 
-    discord->utils,
+  Concord_request_perform( 
+    concord->utils,
     (void**)p_client,
     url_route,
-    &_discord_ld_client,
-    &Discord_GET);
+    &_concord_ld_client,
+    &Concord_GET);
 }
 
 static void
-_discord_ld_client_guilds(void **p_client, struct curl_memory_s *chunk)
+_concord_ld_client_guilds(void **p_client, struct curl_memory_s *chunk)
 {
-  discord_user_st *client = *p_client;
+  concord_user_st *client = *p_client;
 
   if (NULL != client->guilds){
     jscon_destroy(client->guilds);
@@ -207,24 +207,24 @@ _discord_ld_client_guilds(void **p_client, struct curl_memory_s *chunk)
   *p_client = client;
 
   chunk->size = 0;
-  discord_free(chunk->response);
+  concord_free(chunk->response);
 }
 
 void 
-discord_get_client_guilds(discord_st *discord, discord_user_st **p_client)
+concord_get_client_guilds(concord_st *concord, concord_user_st **p_client)
 {
   char url_route[256] = "/users/@me/guilds";
 
   if (NULL == p_client){
-    p_client = &discord->client;
+    p_client = &concord->client;
   }
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Discord_request_perform( 
-    discord->utils,
+  Concord_request_perform( 
+    concord->utils,
     (void**)p_client,
     url_route,
-    &_discord_ld_client_guilds,
-    &Discord_GET);
+    &_concord_ld_client_guilds,
+    &Concord_GET);
 }
