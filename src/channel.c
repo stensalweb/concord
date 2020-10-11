@@ -129,11 +129,11 @@ discord_get_channel(discord_st* discord, char channel_id[], discord_channel_st *
     *p_channel = discord_channel_init(discord->utils);
   }
 
-  struct discord_clist_s *conn = discord_get_conn(
+  struct discord_clist_s *conn = Discord_get_conn(
                                     discord->utils,
                                     url_route,
                                     &_discord_ld_channel,
-                                    &discord_GET);
+                                    &Discord_GET);
 
   conn->p_object = (void**)p_channel;
 

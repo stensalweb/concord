@@ -106,11 +106,11 @@ discord_get_user(discord_st *discord, char user_id[], discord_user_st **p_user)
     p_user = &discord->user;
   }
 
-  struct discord_clist_s *conn = discord_get_conn(
+  struct discord_clist_s *conn = Discord_get_conn(
                                     discord->utils,
                                     url_route,
                                     &_discord_ld_user,
-                                    &discord_GET);
+                                    &Discord_GET);
 
   conn->p_object = (void**)p_user;
 
@@ -188,11 +188,11 @@ discord_get_client(discord_st *discord, discord_user_st **p_client)
     p_client = &discord->client;
   }
 
-  struct discord_clist_s *conn = discord_get_conn(
+  struct discord_clist_s *conn = Discord_get_conn(
                                     discord->utils,
                                     url_route,
                                     &_discord_ld_client,
-                                    &discord_GET);
+                                    &Discord_GET);
 
   conn->p_object = (void**)p_client;
 
@@ -229,11 +229,11 @@ discord_get_client_guilds(discord_st *discord, discord_user_st **p_client)
     p_client = &discord->client;
   }
 
-  struct discord_clist_s *conn = discord_get_conn(
+  struct discord_clist_s *conn = Discord_get_conn(
                                     discord->utils,
                                     url_route,
                                     &_discord_ld_client_guilds,
-                                    &discord_GET);
+                                    &Discord_GET);
 
   conn->p_object = (void**)p_client;
 

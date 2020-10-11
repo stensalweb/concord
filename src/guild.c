@@ -111,11 +111,11 @@ discord_get_guild(discord_st *discord, char guild_id[], discord_guild_st **p_gui
     p_guild = &discord->guild;
   }
 
-  struct discord_clist_s *conn = discord_get_conn(
+  struct discord_clist_s *conn = Discord_get_conn(
                                     discord->utils,
                                     url_route,
                                     &_discord_ld_guild,
-                                    &discord_GET);
+                                    &Discord_GET);
 
   conn->p_object = (void**)p_guild;
 
@@ -153,11 +153,11 @@ discord_get_guild_channels(discord_st *discord, char guild_id[], discord_guild_s
     p_guild = &discord->guild;
   }
 
-  struct discord_clist_s *conn = discord_get_conn(
+  struct discord_clist_s *conn = Discord_get_conn(
                                     discord->utils,
                                     url_route,
                                     &_discord_ld_guild_channels,
-                                    &discord_GET);
+                                    &Discord_GET);
 
   conn->p_object = (void**)p_guild;
 

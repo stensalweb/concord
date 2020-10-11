@@ -103,7 +103,7 @@ _discord_clist_free_all(struct discord_clist_s *conn)
 }
 
 struct discord_clist_s*
-discord_get_conn(discord_utils_st *utils, char url_route[], discord_load_ft *load_cb, curl_request_ft *request_cb)
+Discord_get_conn(discord_utils_st *utils, char url_route[], discord_load_ft *load_cb, curl_request_ft *request_cb)
 {
   struct discord_clist_s *conn = hashtable_get(utils->conn_hashtable, url_route);
 
@@ -274,7 +274,7 @@ discord_request_method(discord_st *discord, discord_request_method_et method)
 }
 
 void
-discord_GET(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[])
+Discord_GET(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
 
@@ -283,7 +283,7 @@ discord_GET(discord_utils_st *utils, struct discord_clist_s *conn_list, char url
 }
 
 void
-discord_POST(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[])
+Discord_POST(discord_utils_st *utils, struct discord_clist_s *conn_list, char url_route[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
 
