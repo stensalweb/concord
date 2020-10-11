@@ -70,6 +70,8 @@ typedef struct {
   char *application_id;
   char *parent_id;
   char *last_pin_timestamp;
+
+  jscon_item_st *messages;
 } concord_channel_st;
 
 /* GUILD OBJECT
@@ -207,6 +209,7 @@ void concord_global_cleanup();
 concord_channel_st* concord_channel_init();
 void concord_channel_destroy(concord_channel_st *channel);
 void concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st **p_channel);
+void concord_get_channel_messages(concord_st *concord, char channel_id[], concord_channel_st **p_channel);
 
 concord_guild_st* concord_guild_init();
 void concord_guild_destroy(concord_guild_st *guild);

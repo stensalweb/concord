@@ -120,12 +120,15 @@ Concord_get_conn(concord_utils_st *utils, char endpoint[], concord_ld_object_ft 
 
   new_conn->endpoint_key = strdup(endpoint);
   assert(NULL != new_conn->endpoint_key);
-  /* this stores connection node inside object's specific hashtable
-      using the node key (given at this function parameter) */
+
+  /* this stores the connection node inside a hashtable
+      where entries keys are the endpoint used when creating this
+      new connection.
+    this allows for easy_handles reusability */
   hashtable_set(utils->conn_hashtable, new_conn->endpoint_key, new_conn);
 
-  /* this stores connection node inside concord's general hashtable
-      using easy handle's memory address converted to string as key.
+  /* this stores connection node inside a hashtable where entries
+      keys are easy handle memory address converted to string
      will be used when checking for multi_perform completed transfers */
   char addr_key[18];
   sprintf(addr_key, "%p", new_conn->easy_handle);

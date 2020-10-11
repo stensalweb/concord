@@ -43,6 +43,10 @@ concord_channel_destroy(concord_channel_st *channel)
     jscon_destroy(channel->permission_overwrites);
   }
 
+  if (NULL != channel->messages){
+    jscon_destroy(channel->messages);
+  }
+
   concord_free(channel);
 }
 
@@ -120,13 +124,13 @@ _concord_ld_channel(void **p_channel, struct curl_memory_s *chunk)
 }
 
 void
-concord_get_channel(concord_st* concord, char channel_id[], concord_channel_st **p_channel)
+concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st **p_channel)
 {
   char endpoint[ENDPOINT_LENGTH] = "/channels/";
   strcat(endpoint, channel_id);
 
   if (NULL == p_channel){
-    *p_channel = concord_channel_init(concord->utils);
+    p_channel = &concord->channel;
   }
 
   /* this is a template common to every function that deals with
@@ -136,5 +140,42 @@ concord_get_channel(concord_st* concord, char channel_id[], concord_channel_st *
     (void**)p_channel,
     endpoint,
     &_concord_ld_channel,
+    &Concord_GET);
+}
+
+static void
+_concord_ld_channel_messages(void **p_channel, struct curl_memory_s *chunk)
+{
+  concord_channel_st *channel = *p_channel;
+
+  if (NULL != channel->messages){
+    jscon_destroy(channel->messages);
+  }
+
+  channel->messages = jscon_parse(chunk->response);
+
+  *p_channel = channel;
+  
+  chunk->size = 0;
+  concord_free(chunk->response);
+}
+
+void
+concord_get_channel_messages(concord_st *concord, char channel_id[], concord_channel_st **p_channel)
+{
+  char endpoint[ENDPOINT_LENGTH];
+  sprintf(endpoint, "/channels/%s/messages", channel_id);
+
+  if (NULL == p_channel){
+    p_channel = &concord->channel;
+  }
+
+  /* this is a template common to every function that deals with
+      sending a request to the Discord API */
+  Concord_request_perform( 
+    concord->utils,
+    (void**)p_channel,
+    endpoint,
+    &_concord_ld_channel_messages,
     &Concord_GET);
 }
