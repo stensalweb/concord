@@ -20,8 +20,8 @@
  * SOFTWARE.
  */
 
-#ifndef HASHTABLE_H
-#define HASHTABLE_H
+#ifndef HASHTABLE_H_
+#define HASHTABLE_H_
 
 /* GENERAL PURPOSE FUNCTIONS */
 typedef struct hashtable_entry_s {

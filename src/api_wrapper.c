@@ -10,6 +10,7 @@
 #include <curl/curl.h>
 
 #include "libconcord.h"
+#include "hashtable.h"
 #include "api_wrapper_private.h"
 
 static size_t

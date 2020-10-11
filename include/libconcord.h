@@ -4,7 +4,6 @@
 #include <curl/curl.h>
 
 #include "../JSCON/include/libjscon.h"
-#include "hashtable.h"
 
 #define BASE_URL "https://discord.com/api"
 #define MAX_URL_LENGTH 1 << 9
@@ -174,9 +173,9 @@ typedef struct concord_utils_s {
   char bot_token[256];
   struct curl_slist *header;
 
-  hashtable_st *easy_hashtable;
+  struct hashtable_s *easy_hashtable;
   CURLM *multi_handle;
-  hashtable_st *conn_hashtable;
+  struct hashtable_s *conn_hashtable;
   struct concord_clist_s *conn_list;
 
   concord_request_method_et method;
