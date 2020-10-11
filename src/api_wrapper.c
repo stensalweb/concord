@@ -103,7 +103,7 @@ _concord_clist_free_all(struct concord_clist_s *conn)
 }
 
 struct concord_clist_s*
-Concord_get_conn(concord_utils_st *utils, char endpoint[], concord_load_ft *load_cb, curl_request_ft *request_cb)
+Concord_get_conn(concord_utils_st *utils, char endpoint[], concord_ld_object_ft *load_cb, curl_request_ft *request_cb)
 {
   struct concord_clist_s *conn = hashtable_get(utils->conn_hashtable, endpoint);
 
@@ -352,7 +352,7 @@ Concord_request_perform(
   concord_utils_st *utils, 
   void **p_object, 
   char endpoint[], 
-  concord_load_ft *load_cb, 
+  concord_ld_object_ft *load_cb, 
   curl_request_ft *request_cb)
 {
   struct concord_clist_s *conn = Concord_get_conn(
