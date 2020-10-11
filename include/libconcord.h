@@ -11,7 +11,8 @@
 
 #define MAX_RESPONSE_LENGTH 1 << 15
 #define MAX_HEADER_LENGTH 1 << 9
-#define BOT_TOKEN_LENGTH 256
+#define BOT_TOKEN_LENGTH 256 /* @todo this is too much */
+#define ENDPOINT_LENGTH 256
 
 #define UTILS_HASHTABLE_SIZE 50
 
@@ -156,8 +157,8 @@ struct curl_memory_s {
 typedef void (concord_load_ft)(void **p_object, struct curl_memory_s*);
 
 struct concord_clist_s {
-  char *primary_key; //conn_hashtable key
-  char *secondary_key; //easy_hashtable key
+  char *endpoint_key; //conn_hashtable key
+  char *easyaddr_key; //easy_hashtable key
 
   CURL *easy_handle; //its address will be used as secondary key for utils hashtable
   concord_load_ft *load_cb;
@@ -180,7 +181,7 @@ typedef struct concord_utils_s {
   void (*method_cb)(struct concord_utils_s *utils, struct concord_clist_s *conn);
 } concord_utils_st;
 
-typedef void (curl_request_ft)(concord_utils_st *utils, struct concord_clist_s *conn, char url_route[]);
+typedef void (curl_request_ft)(concord_utils_st *utils, struct concord_clist_s *conn, char endpoint[]);
 
 typedef struct concord_s {
   concord_channel_st *channel;

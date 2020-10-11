@@ -85,7 +85,14 @@ _concord_ld_guild(void **p_guild, struct curl_memory_s *chunk)
  
   /* UNCOMMENT FOR TESTING
   fprintf(stdout,
-      "\njson: %s\nGUILD: %s %s %s %d %lld %s\n",
+      "\njson: %s\n\
+      \nGUILD:\n\
+      \"id\": %s\n\
+      \"name\": %s\n\
+      \"icon\": %s\n\
+      \"owner\": %d\n\
+      \"permissions\": %lld\n\
+      \"permissions_new\": %s\n",
       chunk->response,
       guild->id,
       guild->name,
@@ -104,8 +111,8 @@ _concord_ld_guild(void **p_guild, struct curl_memory_s *chunk)
 void
 concord_get_guild(concord_st *concord, char guild_id[], concord_guild_st **p_guild)
 {
-  char url_route[256] = "/guilds/";
-  strcat(url_route, guild_id);
+  char endpoint[ENDPOINT_LENGTH] = "/guilds/";
+  strcat(endpoint, guild_id);
 
   if (NULL == p_guild){
     p_guild = &concord->guild;
@@ -116,7 +123,7 @@ concord_get_guild(concord_st *concord, char guild_id[], concord_guild_st **p_gui
   Concord_request_perform( 
     concord->utils,
     (void**)p_guild,
-    url_route,
+    endpoint,
     &_concord_ld_guild,
     &Concord_GET);
 }
@@ -141,8 +148,8 @@ _concord_ld_guild_channels(void **p_guild, struct curl_memory_s *chunk)
 void
 concord_get_guild_channels(concord_st *concord, char guild_id[], concord_guild_st **p_guild)
 {
-  char url_route[256];
-  sprintf(url_route, "/guilds/%s/channels", guild_id);
+  char endpoint[ENDPOINT_LENGTH];
+  sprintf(endpoint, "/guilds/%s/channels", guild_id);
 
   if (NULL == p_guild){
     p_guild = &concord->guild;
@@ -153,7 +160,7 @@ concord_get_guild_channels(concord_st *concord, char guild_id[], concord_guild_s
   Concord_request_perform( 
     concord->utils,
     (void**)p_guild,
-    url_route,
+    endpoint,
     &_concord_ld_guild_channels,
     &Concord_GET);
 }

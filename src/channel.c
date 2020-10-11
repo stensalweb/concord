@@ -92,7 +92,7 @@ _concord_ld_channel(void **p_channel, struct curl_memory_s *chunk)
   /*//UNCOMMENT FOR TESTING
   fprintf(stdout,
       "\njson: %s\nCHANNEL: %lld %d %s %lld %s %s %s %s %lld %s %p %s %s %lld %lld %p %s %s\n",
-      response,
+      chunk->response,
       channel->position,
       channel->nsfw,
       channel->last_message_id,
@@ -122,8 +122,8 @@ _concord_ld_channel(void **p_channel, struct curl_memory_s *chunk)
 void
 concord_get_channel(concord_st* concord, char channel_id[], concord_channel_st **p_channel)
 {
-  char url_route[256] = "/channels/";
-  strcat(url_route, channel_id);
+  char endpoint[ENDPOINT_LENGTH] = "/channels/";
+  strcat(endpoint, channel_id);
 
   if (NULL == p_channel){
     *p_channel = concord_channel_init(concord->utils);
@@ -134,7 +134,7 @@ concord_get_channel(concord_st* concord, char channel_id[], concord_channel_st *
   Concord_request_perform( 
     concord->utils,
     (void**)p_channel,
-    url_route,
+    endpoint,
     &_concord_ld_channel,
     &Concord_GET);
 }
