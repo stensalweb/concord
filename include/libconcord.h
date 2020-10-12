@@ -3,7 +3,7 @@
 
 #include <curl/curl.h>
 
-#include "../JSCON/include/libjscon.h"
+#include <libjscon.h>
 
 #define BASE_URL "https://discord.com/api"
 #define MAX_URL_LENGTH 1 << 9

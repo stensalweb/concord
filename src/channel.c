@@ -4,7 +4,11 @@
 #include <assert.h>
 #include <string.h>
 
-#include "libconcord.h"
+//#include <curl/curl.h>
+//#include <libjsonc.h>
+
+#include <libconcord.h>
+
 #include "api_wrapper_private.h"
 
 concord_channel_st*

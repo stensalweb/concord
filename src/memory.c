@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "libconcord.h"
+#include <libconcord.h>
 
 /* @todo instead of exit(), it should throw the error
     somewhere */

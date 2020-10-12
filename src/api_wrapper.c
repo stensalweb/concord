@@ -7,9 +7,11 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include <curl/curl.h>
+//#include <curl/curl.h>
+//#include <libjsonc.h>
 
-#include "libconcord.h"
+#include <libconcord.h>
+
 #include "hashtable.h"
 #include "api_wrapper_private.h"
 #include "logger.h"

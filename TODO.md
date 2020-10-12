@@ -18,6 +18,7 @@ This document describes features to be incorporated in the future.
 
 ## LOW
 
+- `curl_update` needs to update nghttp path
 - (?) Implement a prediction system for auto-performing async requests which hold a dependency
 - Custom hashtable implementation that share entries among them (for when hashtables hold the same entries but with different keys)
 

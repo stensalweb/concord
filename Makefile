@@ -4,7 +4,7 @@ CC = gcc
 
 SRCDIR = src
 OBJDIR = obj
-INCLUDEDIR = include
+INCLUDEDIR = -Iinclude -IJSCON/include
 LIBDIR = lib
 LIB = $(LIBDIR)/libconcord.a
 EXEC = run
@@ -38,16 +38,16 @@ mkdir:
 	-mkdir -p $(OBJDIR) $(LIBDIR)
 
 $(MAIN_O): $(MAIN)
-	$(CC) -I$(INCLUDEDIR) -c $< -o $@ $(CFLAGS)
+	$(CC) $(INCLUDEDIR) -c $< -o $@ $(CFLAGS)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
-	$(CC) -I$(INCLUDEDIR) -c $< -o $@ $(CFLAGS)
+	$(CC) $(INCLUDEDIR) -c $< -o $@ $(CFLAGS)
 
 $(LIB):
 	-ar rcs $@ $(OBJS)
 
 debug : $(EXEC) $(MAIN) $(SRCDIR)/*.c
-	$(CC) -g -I$(INCLUDEDIR) $(MAIN) $(SRCDIR)/*.c -o debug.out $(CFLAGS) $(LDLIBS)
+	$(CC) -g $(INCLUDEDIR) $(MAIN) $(SRCDIR)/*.c -o debug.out $(CFLAGS) $(LDLIBS)
 
 clean :
 	-rm -rf $(OBJDIR)
