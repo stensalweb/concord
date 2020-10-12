@@ -12,6 +12,7 @@ This document describes features to be incorporated in the future.
 ## MEDIUM
 
 - There are more advantageous options for doing async transfers, with either [poll or epoll](https://daniel.haxx.se/docs/poll-vs-select.html). I must learn about each of those options, check whether those advantages apply to this library's goal or not. ( see `concord_dispatch()` )
+  - Update libcurl to at least 7.66.0 for [`curl_multi_poll()`](https://daniel.haxx.se/docs/poll-vs-select.html)
 
 ## LOW
 

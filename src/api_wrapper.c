@@ -166,7 +166,7 @@ _concord_set_curl_multi(concord_utils_st *utils, struct concord_clist_s *conn)
   }
 }
 
-/* wrapper around curl_multi_perform() */
+/* wrapper around curl_multi_perform() , using select() */
 void
 concord_dispatch(concord_st *concord)
 {
@@ -219,14 +219,8 @@ concord_dispatch(concord_st *concord)
         in curl_multi_fdset() doc. */
 
     if (-1 == maxfd){
-#ifdef _WIN32
-      Sleep(100);
+      WAITMS(100);
       rc = 0;
-#else
-      /* Portable sleep for platforms other than Windows. */
-      struct timeval wait = { 0, 100 * 1000 }; /* 100ms */
-      rc = select(0, NULL, NULL, NULL, &wait);
-#endif
     } else {
       /* Note that ons some platforms 'timeout' may be modified by
           select(). If you need access to the original value save a

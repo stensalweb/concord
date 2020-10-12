@@ -2,6 +2,14 @@
 #define LIBCONCORD_API_WRAPPER_H_
 //#include "libconcord.h" (implicit) 
 
+#ifndef WAITMS
+#ifdef _WIN32
+#define WAITMS(t) Sleep(t)
+#else 
+#define WAITMS(t) usleep((t)*1000)
+#endif
+#endif
+
 void Concord_GET(concord_utils_st *utils, struct concord_clist_s *conn_list, char endpoint[]);
 void Concord_POST(concord_utils_st *utils, struct concord_clist_s *conn_list, char endpoint[]);
 
