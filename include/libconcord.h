@@ -10,7 +10,6 @@
 
 #define MAX_RESPONSE_LENGTH 1 << 15
 #define MAX_HEADER_LENGTH 1 << 9
-#define BOT_TOKEN_LENGTH 256 /* @todo this is too much */
 #define ENDPOINT_LENGTH 256
 
 #define UTILS_HASHTABLE_SIZE 50
@@ -161,7 +160,7 @@ struct concord_clist_s {
   char *request_key; //conn_hashtable key
   char *addr_key; //easy_hashtable key
 
-  CURL *easy_handle; //its address will be used as secondary key for utils hashtable
+  CURL *easy_handle;
   concord_ld_object_ft *load_cb;
 
   struct curl_memory_s chunk;
@@ -170,16 +169,29 @@ struct concord_clist_s {
 };
 
 typedef struct concord_utils_s {
-  char bot_token[256];
-  struct curl_slist *header;
+  struct curl_slist *header; /* @todo this could be a global */
 
-  struct hashtable_s *easy_hashtable;
+  /* SCHEDULE METHOD TYPE USAGE */
   CURLM *multi_handle;
-  struct hashtable_s *conn_hashtable;
+  /*
+  struct concord_clist_s *multi_list; //multi will use these handles
+  */
+
+  /* SYNC METHOD TYPE USAGE
+  CURLSH *easy_share; // @todo implement this
+  */
+
+  /* hashtables used for easy handles lookup */
+  struct hashtable_s *easy_hashtable; //keys are easy handles addr
+  struct hashtable_s *conn_hashtable; //keys are function specific
+
+  /* easy handle linked list for connection reuse */
   struct concord_clist_s *conn_list;
 
   concord_request_method_et method;
   void (*method_cb)(struct concord_utils_s *utils, struct concord_clist_s *conn);
+
+  char token[]; /* @todo hash this maybe */
 } concord_utils_st;
 
 typedef void (curl_request_ft)(concord_utils_st *utils, struct concord_clist_s *conn, char endpoint[]);
@@ -217,11 +229,11 @@ void concord_get_guild_channels(concord_st *concord, char guild_id[], concord_gu
 
 concord_user_st* concord_user_init();
 void concord_user_destroy(concord_user_st *user);
-void concord_get_client(concord_st *concord, concord_user_st **p_client);
 void concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user);
+void concord_get_client(concord_st *concord, concord_user_st **p_client);
 void concord_get_client_guilds(concord_st* concord, concord_user_st **p_client);
 
-concord_st* concord_init(char *bot_token);
+concord_st* concord_init(char token[]);
 void concord_cleanup(concord_st* concord);
 
 #endif

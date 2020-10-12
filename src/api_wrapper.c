@@ -267,6 +267,7 @@ concord_dispatch(concord_st *concord)
 
     /* load object */
     if (NULL != conn->chunk.response){
+      //logger_throw(conn->chunk.response);
       (*conn->load_cb)(conn->p_object, conn->chunk.response);
 
       conn->p_object = NULL;
@@ -325,7 +326,7 @@ _concord_init_request_header(concord_utils_st *utils)
   new_header = curl_slist_append(new_header,"X-RateLimit-Precision: millisecond");
   assert(NULL != new_header);
 
-  new_header = curl_slist_append(new_header, strcat(auth_header, utils->bot_token));
+  new_header = curl_slist_append(new_header, strcat(auth_header, utils->token));
   assert(NULL != new_header);
 
   new_header = curl_slist_append(new_header,"User-Agent: concord (http://github.com/LucasMull/concord, v0.0)");
@@ -338,10 +339,10 @@ _concord_init_request_header(concord_utils_st *utils)
 }
 
 static concord_utils_st*
-_concord_utils_init(char bot_token[])
+_concord_utils_init(char token[])
 {
-  concord_utils_st *new_utils = concord_malloc(sizeof *new_utils);
-  strncpy(new_utils->bot_token, bot_token, BOT_TOKEN_LENGTH-1);
+  concord_utils_st *new_utils = concord_malloc(sizeof *new_utils + strlen(token));
+  strncpy(new_utils->token, token, strlen(token)-1);
 
   new_utils->header = _concord_init_request_header(new_utils);
 
@@ -400,11 +401,11 @@ Concord_request_perform(
 }
 
 concord_st*
-concord_init(char bot_token[])
+concord_init(char token[])
 {
   concord_st *new_concord = concord_malloc(sizeof *new_concord);
 
-  new_concord->utils = _concord_utils_init(bot_token);
+  new_concord->utils = _concord_utils_init(token);
 
   new_concord->channel = concord_channel_init(new_concord->utils);
   new_concord->guild = concord_guild_init(new_concord->utils);
