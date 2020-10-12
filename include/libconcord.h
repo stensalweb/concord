@@ -155,7 +155,7 @@ struct curl_memory_s {
   size_t size;
 };
 
-typedef void (concord_ld_object_ft)(void **p_object, struct curl_memory_s*);
+typedef void (concord_ld_object_ft)(void **p_object, char *response);
 
 struct concord_clist_s {
   char *request_key; //conn_hashtable key
@@ -196,8 +196,8 @@ typedef struct concord_s {
 
 void __concord_free(void **p_ptr);
 #define concord_free(n) __concord_free((void**)&n)
-void* __concord_malloc(size_t size, unsigned long line);
-#define concord_malloc(n) __concord_malloc(n, __LINE__)
+void* __concord_malloc(size_t size, unsigned long line, char file[]);
+#define concord_malloc(n) __concord_malloc(n, __LINE__, __FILE__)
 
 void concord_request_method(concord_st *concord, concord_request_method_et method);
 void concord_dispatch(concord_st *concord);

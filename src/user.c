@@ -39,11 +39,11 @@ concord_user_destroy(concord_user_st *user)
 }
 
 static void
-_concord_ld_user(void **p_user, struct curl_memory_s *chunk)
+_concord_ld_user(void **p_user, char *response)
 {
   concord_user_st *user = *p_user;
 
-  jscon_scanf(chunk->response,
+  jscon_scanf(response,
      "#id%js \
       #username%js \
       #discriminator%js \
@@ -91,9 +91,6 @@ _concord_ld_user(void **p_user, struct curl_memory_s *chunk)
   */
 
   *p_user = user;
-
-  chunk->size = 0;
-  concord_free(chunk->response);
 }
 
 void
@@ -117,64 +114,6 @@ concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user)
     &Concord_GET);
 }
 
-static void
-_concord_ld_client(void **p_client, struct curl_memory_s *chunk)
-{
-  concord_user_st *client = *p_client;
-
-  jscon_scanf(chunk->response,
-     "#id%js \
-      #username%js \
-      #discriminator%js \
-      #avatar%js \
-      #bot%jb \
-      #system%jb \
-      #mfa_enabled%jb \
-      #locale%js \
-      #verified%jb \
-      #email%js \
-      #flags%jd \
-      #premium_type%jd \
-      #public_flags%jd",
-      client->id,
-      client->username,
-      client->discriminator,
-      client->avatar,
-      &client->bot,
-      &client->sys,
-      &client->mfa_enabled,
-      client->locale,
-      &client->verified,
-      client->email,
-      &client->flags,
-      &client->premium_type,
-      &client->public_flags);
-
-  /* UNCOMMENT FOR TESTING
-  fprintf(stdout,
-      "\njson: %s\nCLIENT: %s %s %s %s %d %d %d %s %d %s %lld %lld %lld\n",
-      response,
-      client->id,
-      client->username,
-      client->discriminator,
-      client->avatar,
-      client->bot,
-      client->sys,
-      client->mfa_enabled,
-      client->locale,
-      client->verified,
-      client->email,
-      client->flags,
-      client->premium_type,
-      client->public_flags);
-  */
-
-  *p_client = client;
-
-  chunk->size = 0;
-  concord_free(chunk->response);
-}
-
 void 
 concord_get_client(concord_st *concord, concord_user_st **p_client)
 {
@@ -191,12 +130,12 @@ concord_get_client(concord_st *concord, concord_user_st **p_client)
     (void**)p_client,
     "GetClient",
     endpoint,
-    &_concord_ld_client,
+    &_concord_ld_user,
     &Concord_GET);
 }
 
 static void
-_concord_ld_client_guilds(void **p_client, struct curl_memory_s *chunk)
+_concord_ld_client_guilds(void **p_client, char *response)
 {
   concord_user_st *client = *p_client;
 
@@ -204,12 +143,9 @@ _concord_ld_client_guilds(void **p_client, struct curl_memory_s *chunk)
     jscon_destroy(client->guilds);
   }
 
-  client->guilds = jscon_parse(chunk->response);
+  client->guilds = jscon_parse(response);
 
   *p_client = client;
-
-  chunk->size = 0;
-  concord_free(chunk->response);
 }
 
 void 

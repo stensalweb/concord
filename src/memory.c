@@ -7,13 +7,13 @@
     somewhere */
 //this is redefined as a macro
 void*
-__concord_malloc(size_t size, unsigned long line)
+__concord_malloc(size_t size, unsigned long line, char file[])
 {
   void *ptr = calloc(1, size);
 
   if (NULL == ptr){
     fprintf(stderr, "[%s:%lu] Out of memory(%lu bytes)\n",
-              __FILE__, line, (unsigned long)size);
+              file, line, (unsigned long)size);
     exit(EXIT_FAILURE);
   }
 

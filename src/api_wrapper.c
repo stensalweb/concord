@@ -12,6 +12,7 @@
 #include "libconcord.h"
 #include "hashtable.h"
 #include "api_wrapper_private.h"
+#include "logger.h"
 
 static size_t
 _concord_curl_write_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
@@ -110,9 +111,8 @@ Concord_get_conn(
   curl_request_ft *request_cb)
 {
   struct concord_clist_s *conn = hashtable_get(utils->conn_hashtable, request_key);
-
-  /* found connection node, set new URL and return it */
   if (NULL != conn){
+    /* found connection node, set new URL and return it */
     char base_url[MAX_URL_LENGTH] = BASE_URL;
     curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
     return conn;
@@ -156,6 +156,17 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
     fprintf(stderr, "\n%s\n\n", curl_share_strerror(res));
     exit(EXIT_FAILURE);
   }
+
+  if (NULL != conn->chunk.response){
+    (*conn->load_cb)(conn->p_object, conn->chunk.response);
+
+    conn->p_object = NULL;
+    concord_free(conn->chunk.response);
+    conn->chunk.size = 0;
+  }
+
+  //@todo sleep value shouldn't be hard-coded
+  WAITMS(300);
 }
 
 static void
@@ -219,6 +230,7 @@ concord_dispatch(concord_st *concord)
         in curl_multi_fdset() doc. */
 
     if (-1 == maxfd){
+      //@todo sleep value shouldn't be hard-coded
       WAITMS(100);
       rc = 0;
     } else {
@@ -242,7 +254,7 @@ concord_dispatch(concord_st *concord)
   /* See how the transfers went */
   CURLMsg *msg; /* for picking up messages with the transfer status */
   int msgs_left; /*how many messages are left */
-  while (NULL != (msg = curl_multi_info_read(utils->multi_handle, &msgs_left))){
+  while ((msg = curl_multi_info_read(utils->multi_handle, &msgs_left))){
     if (CURLMSG_DONE != msg->msg){
       continue;
     }
@@ -253,9 +265,16 @@ concord_dispatch(concord_st *concord)
     struct concord_clist_s *conn = hashtable_get(utils->easy_hashtable, addr_key);
     assert (NULL != conn);
 
-    (*conn->load_cb)(conn->p_object, &conn->chunk); /* load object */
-    conn->p_object = NULL;
+    /* load object */
+    if (NULL != conn->chunk.response){
+      (*conn->load_cb)(conn->p_object, conn->chunk.response);
 
+      conn->p_object = NULL;
+      concord_free(conn->chunk.response);
+      conn->chunk.size = 0;
+    }
+
+    /* @todo this probably should be inside the above if condition */
     curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
   }
 }
@@ -378,11 +397,6 @@ Concord_request_perform(
      if method is SCHEDULE, then add current's conn easy_handle to the multi stack,
       and wait until concord_dispatch() is called for asynchronous execution */
   (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
-
-  /* if method is SYNC (default), then perform load on object at once */
-  if (SYNC == utils->method){
-    (*load_cb)(p_object, &conn->chunk);
-  }
 }
 
 concord_st*

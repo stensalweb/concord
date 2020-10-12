@@ -65,11 +65,11 @@ concord_guild_destroy(concord_guild_st *guild)
 }
 
 static void
-_concord_ld_guild(void **p_guild, struct curl_memory_s *chunk)
+_concord_ld_guild(void **p_guild, char *response)
 {
   concord_guild_st *guild = *p_guild;
 
-  jscon_scanf(chunk->response,
+  jscon_scanf(response,
      "#id%js \
       #name%js \
       #icon%js \
@@ -103,9 +103,6 @@ _concord_ld_guild(void **p_guild, struct curl_memory_s *chunk)
   */
 
   *p_guild = guild;
-
-  chunk->size = 0;
-  concord_free(chunk->response);
 }
 
 void
@@ -130,7 +127,7 @@ concord_get_guild(concord_st *concord, char guild_id[], concord_guild_st **p_gui
 }
 
 static void
-_concord_ld_guild_channels(void **p_guild, struct curl_memory_s *chunk)
+_concord_ld_guild_channels(void **p_guild, char *response)
 {
   concord_guild_st *guild = *p_guild;
 
@@ -138,12 +135,9 @@ _concord_ld_guild_channels(void **p_guild, struct curl_memory_s *chunk)
     jscon_destroy(guild->channels);
   }
 
-  guild->channels = jscon_parse(chunk->response);
+  guild->channels = jscon_parse(response);
 
   *p_guild = guild;
-
-  chunk->size = 0;
-  concord_free(chunk->response);
 }
 
 void
