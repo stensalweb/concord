@@ -3,7 +3,7 @@
 # Install any build dependencies needed for curl
 sudo apt-get build-dep curl
 
-# Get latest (as of Feb 25, 2016) libcurl
+# Get latest libcurl
 mkdir ~/curl
 cd ~/curl
 wget http://curl.haxx.se/download/curl-7.72.0.tar.bz2
