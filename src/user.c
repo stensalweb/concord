@@ -5,7 +5,7 @@
 #include <string.h>
 
 //#include <curl/curl.h>
-//#include <libjsonc.h>
+//#include <libjscon.h>
 
 #include <libconcord.h>
 
@@ -43,11 +43,11 @@ concord_user_destroy(concord_user_st *user)
 }
 
 static void
-_concord_ld_user(void **p_user, char *response)
+_concord_ld_user(void **p_user, struct curl_response_s *chunk)
 {
   concord_user_st *user = *p_user;
 
-  jscon_scanf(response,
+  jscon_scanf(chunk->response,
      "#id%js \
       #username%js \
       #discriminator%js \
@@ -139,7 +139,7 @@ concord_get_client(concord_st *concord, concord_user_st **p_client)
 }
 
 static void
-_concord_ld_client_guilds(void **p_client, char *response)
+_concord_ld_client_guilds(void **p_client, struct curl_response_s *chunk)
 {
   concord_user_st *client = *p_client;
 
@@ -147,7 +147,7 @@ _concord_ld_client_guilds(void **p_client, char *response)
     jscon_destroy(client->guilds);
   }
 
-  client->guilds = jscon_parse(response);
+  client->guilds = jscon_parse(chunk->response);
 
   *p_client = client;
 }

@@ -5,7 +5,7 @@
 #include <string.h>
 
 //#include <curl/curl.h>
-//#include <libjsonc.h>
+//#include <libjscon.h>
 
 #include <libconcord.h>
 
@@ -69,11 +69,11 @@ concord_guild_destroy(concord_guild_st *guild)
 }
 
 static void
-_concord_ld_guild(void **p_guild, char *response)
+_concord_ld_guild(void **p_guild, struct curl_response_s *chunk)
 {
   concord_guild_st *guild = *p_guild;
 
-  jscon_scanf(response,
+  jscon_scanf(chunk->response,
      "#id%js \
       #name%js \
       #icon%js \
@@ -131,7 +131,7 @@ concord_get_guild(concord_st *concord, char guild_id[], concord_guild_st **p_gui
 }
 
 static void
-_concord_ld_guild_channels(void **p_guild, char *response)
+_concord_ld_guild_channels(void **p_guild, struct curl_response_s *chunk)
 {
   concord_guild_st *guild = *p_guild;
 
@@ -139,7 +139,7 @@ _concord_ld_guild_channels(void **p_guild, char *response)
     jscon_destroy(guild->channels);
   }
 
-  guild->channels = jscon_parse(response);
+  guild->channels = jscon_parse(chunk->response);
 
   *p_guild = guild;
 }

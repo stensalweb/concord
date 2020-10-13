@@ -149,22 +149,24 @@ typedef enum {
   SCHEDULE = 1,
 } concord_request_method_et;
 
-struct curl_memory_s {
+struct curl_response_s {
   char *response;
   size_t size;
 };
 
-typedef void (concord_ld_object_ft)(void **p_object, char *response);
+typedef void (concord_ld_object_ft)(void **p_object, struct curl_response_s *chunk);
 
 struct concord_clist_s {
-  char *request_key; //conn_hashtable key
-  char *addr_key; //easy_hashtable key
+  char *conn_key; //conn_hashtable key
 
-  CURL *easy_handle;
-  concord_ld_object_ft *load_cb;
+  char *easy_key; //string format easy_handle address to use as easy_hashtable key
+  CURL *easy_handle; //easy handle used to perform the request
 
-  struct curl_memory_s chunk;
-  void **p_object; //object to be created
+  struct curl_response_s chunk; //stores response string here
+
+  concord_ld_object_ft *load_cb; //object load callback
+  void **p_object; //hold onto object to be passed as a load_cb parameter
+
   struct concord_clist_s *next;
 };
 
@@ -183,7 +185,7 @@ typedef struct concord_utils_s {
 
   /* hashtables used for easy handles lookup */
   struct hashtable_s *easy_hashtable; //keys are easy handles addr
-  struct hashtable_s *conn_hashtable; //keys are function specific
+  struct hashtable_s *conn_hashtable; //keys are method specific
 
   /* easy handle linked list for connection reuse */
   struct concord_clist_s *conn_list;

@@ -5,7 +5,7 @@
 #include <string.h>
 
 //#include <curl/curl.h>
-//#include <libjsonc.h>
+//#include <libjscon.h>
 
 #include <libconcord.h>
 
@@ -55,11 +55,11 @@ concord_channel_destroy(concord_channel_st *channel)
 }
 
 static void
-_concord_ld_channel(void **p_channel, char *response)
+_concord_ld_channel(void **p_channel, struct curl_response_s *chunk)
 {
   concord_channel_st *channel = *p_channel;
 
-  jscon_scanf(response,
+  jscon_scanf(chunk->response,
      "#position%jd \
       #nsfw%jb \
       #last_message_id%js \
@@ -146,7 +146,7 @@ concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st *
 }
 
 static void
-_concord_ld_channel_messages(void **p_channel, char *response)
+_concord_ld_channel_messages(void **p_channel, struct curl_response_s *chunk)
 {
   concord_channel_st *channel = *p_channel;
 
@@ -154,7 +154,7 @@ _concord_ld_channel_messages(void **p_channel, char *response)
     jscon_destroy(channel->messages);
   }
 
-  channel->messages = jscon_parse(response);
+  channel->messages = jscon_parse(chunk->response);
 
   *p_channel = channel;
 }

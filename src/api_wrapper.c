@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 //#include <curl/curl.h>
-//#include <libjsonc.h>
+//#include <libjscon.h>
 
 #include <libconcord.h>
 
@@ -20,7 +20,7 @@ static size_t
 _concord_curl_write_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   size_t realsize = size * nmemb;
-  struct curl_memory_s *chunk = (struct curl_memory_s*)p_userdata;
+  struct curl_response_s *chunk = (struct curl_response_s*)p_userdata;
 
   char *tmp = realloc(chunk->response, chunk->size + realsize + 1);
 
@@ -36,7 +36,7 @@ _concord_curl_write_cb(char *content, size_t size, size_t nmemb, void *p_userdat
 
 /* init easy handle with some default opt */
 CURL*
-_concord_curl_easy_init(concord_utils_st *utils, struct curl_memory_s *chunk)
+_concord_curl_easy_init(concord_utils_st *utils, struct curl_response_s *chunk)
 {
   CURL *new_easy_handle = curl_easy_init();
   assert(NULL != new_easy_handle);
@@ -97,8 +97,8 @@ _concord_clist_free_all(struct concord_clist_s *conn)
   do {
     next_conn = conn->next;
     curl_easy_cleanup(conn->easy_handle);
-    concord_free(conn->request_key);
-    concord_free(conn->addr_key);
+    concord_free(conn->conn_key);
+    concord_free(conn->easy_key);
     concord_free(conn);
     conn = next_conn;
   } while (next_conn);
@@ -107,12 +107,12 @@ _concord_clist_free_all(struct concord_clist_s *conn)
 struct concord_clist_s*
 Concord_get_conn(
   concord_utils_st *utils,
-  char request_key[],
+  char conn_key[],
   char endpoint[],
   concord_ld_object_ft *load_cb,
   curl_request_ft *request_cb)
 {
-  struct concord_clist_s *conn = hashtable_get(utils->conn_hashtable, request_key);
+  struct concord_clist_s *conn = hashtable_get(utils->conn_hashtable, conn_key);
   if (NULL != conn){
     /* found connection node, set new URL and return it */
     char base_url[MAX_URL_LENGTH] = BASE_URL;
@@ -128,24 +128,24 @@ Concord_get_conn(
   new_conn->load_cb = load_cb;
   assert(NULL != new_conn->load_cb);
 
-  new_conn->request_key = strdup(request_key);
-  assert(NULL != new_conn->request_key);
+  new_conn->conn_key = strdup(conn_key);
+  assert(NULL != new_conn->conn_key);
 
   /* this stores the connection node inside a hashtable
       where entries keys are the requests within each
       function
     this allows for easy_handles reusability */
-  hashtable_set(utils->conn_hashtable, new_conn->request_key, new_conn);
+  hashtable_set(utils->conn_hashtable, new_conn->conn_key, new_conn);
 
   /* this stores connection node inside a hashtable where entries
       keys are easy handle memory address converted to string
      will be used when checking for multi_perform completed transfers */
-  char addr_key[18];
-  sprintf(addr_key, "%p", new_conn->easy_handle);
-  new_conn->addr_key = strdup(addr_key);
-  assert(NULL != new_conn->addr_key);
+  char easy_key[18];
+  sprintf(easy_key, "%p", new_conn->easy_handle);
+  new_conn->easy_key = strdup(easy_key);
+  assert(NULL != new_conn->easy_key);
 
-  hashtable_set(utils->easy_hashtable, new_conn->addr_key, new_conn);
+  hashtable_set(utils->easy_hashtable, new_conn->easy_key, new_conn);
 
   return new_conn;
 }
@@ -160,7 +160,7 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
   }
 
   if (NULL != conn->chunk.response){
-    (*conn->load_cb)(conn->p_object, conn->chunk.response);
+    (*conn->load_cb)(conn->p_object, &conn->chunk);
 
     conn->p_object = NULL;
     concord_free(conn->chunk.response);
@@ -262,15 +262,15 @@ concord_dispatch(concord_st *concord)
     }
 
     /* Find out which handle this message is about */
-    char addr_key[18];
-    sprintf(addr_key, "%p", msg->easy_handle);
-    struct concord_clist_s *conn = hashtable_get(utils->easy_hashtable, addr_key);
+    char easy_key[18];
+    sprintf(easy_key, "%p", msg->easy_handle);
+    struct concord_clist_s *conn = hashtable_get(utils->easy_hashtable, easy_key);
     assert (NULL != conn);
 
     /* load object */
     if (NULL != conn->chunk.response){
       //logger_throw(conn->chunk.response);
-      (*conn->load_cb)(conn->p_object, conn->chunk.response);
+      (*conn->load_cb)(conn->p_object, &conn->chunk);
 
       conn->p_object = NULL;
       concord_free(conn->chunk.response);
@@ -378,14 +378,14 @@ void
 Concord_request_perform(
   concord_utils_st *utils, 
   void **p_object, 
-  char request_key[],
+  char conn_key[],
   char endpoint[], 
   concord_ld_object_ft *load_cb, 
   curl_request_ft *request_cb)
 {
   struct concord_clist_s *conn = Concord_get_conn(
                                     utils,
-                                    request_key,
+                                    conn_key,
                                     endpoint,
                                     load_cb,
                                     request_cb);
