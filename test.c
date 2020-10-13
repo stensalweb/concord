@@ -14,13 +14,13 @@ int main(void)
   concord_global_init();
 
   concord_st *concord = concord_init(bot_token); //scheduler
-  concord_request_method(concord, SYNC);
+  concord_request_method(concord, SCHEDULE);
 
-  concord_get_client_guilds(concord, NULL); //client will be stored in concord->client
-  concord_dispatch(concord);
+  concord_user_st *client = concord_user_init();
+  concord_get_client_guilds(concord, &client);
+  concord_dispatch(concord->utils);
 
   /* THIS WILL FETCH CHANNELS FROM EACH GUILD BOT IS A PART OF */
-  concord_user_st *client = concord->client;
   concord_guild_st **guilds = concord_malloc(jscon_size(client->guilds) * sizeof *guilds);
   for (long i=0; i < jscon_size(client->guilds); ++i){
     jscon_item_st *item_guild = jscon_get_byindex(client->guilds, i);
@@ -31,7 +31,7 @@ int main(void)
     concord_get_guild(concord, guild_id, guilds+i);
     concord_get_guild_channels(concord, guild_id, guilds+i);
   }
-  concord_dispatch(concord);
+  concord_dispatch(concord->utils);
 
 /* @todo fix ratelimiting
 
@@ -68,6 +68,8 @@ int main(void)
     concord_guild_destroy(guilds[i]);
   }
   concord_free(guilds);
+
+  concord_user_destroy(client);
 
   concord_cleanup(concord);
   concord_global_cleanup();

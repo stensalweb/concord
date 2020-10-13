@@ -10,6 +10,7 @@
 #include <libconcord.h>
 
 #include "api_wrapper_private.h"
+#include "logger.h"
 
 concord_user_st*
 concord_user_init(concord_utils_st *utils)
@@ -109,7 +110,7 @@ concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user)
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Concord_request_perform( 
+  Concord_perform_request( 
     concord->utils,
     (void**)p_user,
     "GetUser",
@@ -129,7 +130,7 @@ concord_get_client(concord_st *concord, concord_user_st **p_client)
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Concord_request_perform( 
+  Concord_perform_request( 
     concord->utils,
     (void**)p_client,
     "GetClient",
@@ -163,7 +164,7 @@ concord_get_client_guilds(concord_st *concord, concord_user_st **p_client)
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Concord_request_perform( 
+  Concord_perform_request( 
     concord->utils,
     (void**)p_client,
     "GetClientGuilds",

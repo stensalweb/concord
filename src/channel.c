@@ -136,7 +136,7 @@ concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st *
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Concord_request_perform( 
+  Concord_perform_request( 
     concord->utils,
     (void**)p_channel,
     "GetChannel",
@@ -171,7 +171,7 @@ concord_get_channel_messages(concord_st *concord, char channel_id[], concord_cha
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Concord_request_perform( 
+  Concord_perform_request( 
     concord->utils,
     (void**)p_channel,
     "GetChannelMessages",

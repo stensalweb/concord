@@ -149,6 +149,9 @@ typedef enum {
   SCHEDULE = 1,
 } concord_request_method_et;
 
+/* max active tasks before schedule automatically executes tasks on hold */
+#define SCHEDULE_MAX_ACTIVE 5
+
 struct curl_response_s {
   char *response;
   size_t size;
@@ -175,13 +178,10 @@ typedef struct concord_utils_s {
 
   /* SCHEDULE METHOD TYPE USAGE */
   CURLM *multi_handle;
-  /*
-  struct concord_clist_s *multi_list; //multi will use these handles
-  */
+  size_t active_handles;
 
   /* SYNC METHOD TYPE USAGE
-  CURLSH *easy_share; // @todo implement this
-  */
+  CURLSH *easy_share; // @todo implement this */
 
   /* hashtables used for easy handles lookup */
   struct hashtable_s *easy_hashtable; //keys are easy handles addr
@@ -214,7 +214,7 @@ void* __concord_malloc(size_t size, unsigned long line, char file[]);
 #define concord_malloc(n) __concord_malloc(n, __LINE__, __FILE__)
 
 void concord_request_method(concord_st *concord, concord_request_method_et method);
-void concord_dispatch(concord_st *concord);
+void concord_dispatch(concord_utils_st *utils);
 
 void concord_global_init();
 void concord_global_cleanup();
