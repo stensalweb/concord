@@ -43,7 +43,7 @@ _concord_curl_easy_init(concord_utils_st *utils, struct curl_response_s *chunk)
 
   curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->header);
   curl_easy_setopt(new_easy_handle, CURLOPT_FAILONERROR, 1L);
-//  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
 
   // SET CURL_EASY CALLBACK //
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_write_cb);
@@ -199,6 +199,7 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
   logger_excep(CURLE_OK != res, curl_share_strerror(res));
 
   if (NULL != conn->chunk.response){
+    //logger_throw(conn->chunk.response);
     (*conn->load_cb)(conn->p_object, &conn->chunk);
 
     conn->p_object = NULL;

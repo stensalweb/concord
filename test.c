@@ -33,37 +33,40 @@ int main(void)
   }
   concord_dispatch(concord->utils);
 
-/* @todo fix ratelimiting
 
   // FETCH 50 MESSAGES FROM EACH CHANNEL FROM FIRST GUILD AND WILL OUTPUT THEM TO A a.out FILE
-  FILE *f_out = fopen("a.out", "w");
-  assert(NULL != f_out);
-
-  concord_st *blocking_concord = concord_init(bot_token); //sync
-  concord_channel_st **channels = concord_malloc(jscon_size(guild[0]->channels) * sizeof *channels);
+  concord_channel_st **channels = concord_malloc(jscon_size(guilds[0]->channels) * sizeof *channels);
 
   char *buffer;
-  for (long i=0; i < jscon_size(guild[0]->channels); ++i){
-    jscon_item_st *item_channel = jscon_get_byindex(guild[0]->channels, i);
+  for (long i=0; i < jscon_size(guilds[0]->channels); ++i){
+    jscon_item_st *item_channel = jscon_get_byindex(guilds[0]->channels, i);
     char *channel_id = jscon_get_string(jscon_get_branch(item_channel, "id"));
     assert(NULL != channel_id);
 
     channels[i] = concord_channel_init();
-    concord_get_channel(blocking_concord, channel_id, channels+i);
-    concord_get_channel_messages(blocking_concord, channel_id, channels+i);
+    concord_get_channel_messages(concord, channel_id, channels+i);
+  }
+  concord_dispatch(concord->utils);
 
-    buffer = jscon_stringify(channel[i]->messages, JSCON_ANY);
+  FILE *f_out = fopen("a.out", "w");
+  assert(NULL != f_out);
+
+  for (long i=0; i < jscon_size(guilds[0]->channels); ++i){
+    if (NULL == channels[i]->messages)
+      continue;
+
+    buffer = jscon_stringify(channels[i]->messages, JSCON_ANY);
     fprintf(f_out, "%s\n", buffer);
     free(buffer);
   }
   fclose(f_out);
 
   // DELETE ALLOCATED OBJECTS
-  for (long i=0; i < jscon_size(guild[0]->channels); ++i){
+  for (long i=0; i < jscon_size(guilds[0]->channels); ++i){
     concord_channel_destroy(channels[i]);
   }
   concord_free(channels);
-*/ 
+ 
   for (long i=0; i < jscon_size(client->guilds); ++i){
     concord_guild_destroy(guilds[i]);
   }
