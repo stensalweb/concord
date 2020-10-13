@@ -103,9 +103,10 @@ _concord_clist_free_all(struct concord_clist_s *conn)
   } while (next_conn);
 }
 
-struct concord_clist_s*
-_concord_get_sync_conn(
+static void
+_concord_perform_sync(
   concord_utils_st *utils,
+  void **p_object, 
   char conn_key[],
   char endpoint[],
   concord_ld_object_ft *load_cb,
@@ -116,43 +117,49 @@ _concord_get_sync_conn(
     /* found connection node, set new URL and return it */
     char base_url[MAX_URL_LENGTH] = BASE_URL;
     curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
-    return conn;
+  } else {
+    /* didn't find connection node, create a new one and return it */
+    _concord_clist_append(utils, &conn, endpoint);
+    assert(NULL != conn);
+
+    (*request_cb)(utils, conn, endpoint); //register desired request to new easy_handle
+
+    conn->load_cb = load_cb;
+
+    conn->conn_key = strdup(conn_key);
+    assert(NULL != conn->conn_key);
+
+    /* this stores the connection node inside a hashtable
+        where entries keys are the requests within each
+        function
+      this allows for easy_handles reusability */
+    hashtable_set(utils->conn_hashtable, conn->conn_key, conn);
+
+    /* this stores connection node inside a hashtable where entries
+        keys are easy handle memory address converted to string
+       will be used when checking for multi_perform completed transfers */
+    char easy_key[18];
+    sprintf(easy_key, "%p", conn->easy_handle);
+    conn->easy_key = strdup(easy_key);
+    assert(NULL != conn->easy_key);
+
+    hashtable_set(utils->easy_hashtable, conn->easy_key, conn);
+
+    conn->p_object = p_object; //save object for when load_cb is executed
   }
+  
+  /* if method is SYNC (default), then exec current conn's easy_handle with
+      easy_perform() in a blocking manner.
 
-  /* didn't find connection node, create a new one and return it */
-  struct concord_clist_s *new_conn;
-  _concord_clist_append(utils, &new_conn, endpoint);
-  assert(NULL != new_conn);
-
-  (*request_cb)(utils, new_conn, endpoint); //register desired request to new easy_handle
-
-  new_conn->load_cb = load_cb;
-
-  new_conn->conn_key = strdup(conn_key);
-  assert(NULL != new_conn->conn_key);
-
-  /* this stores the connection node inside a hashtable
-      where entries keys are the requests within each
-      function
-    this allows for easy_handles reusability */
-  hashtable_set(utils->conn_hashtable, new_conn->conn_key, new_conn);
-
-  /* this stores connection node inside a hashtable where entries
-      keys are easy handle memory address converted to string
-     will be used when checking for multi_perform completed transfers */
-  char easy_key[18];
-  sprintf(easy_key, "%p", new_conn->easy_handle);
-  new_conn->easy_key = strdup(easy_key);
-  assert(NULL != new_conn->easy_key);
-
-  hashtable_set(utils->easy_hashtable, new_conn->easy_key, new_conn);
-
-  return new_conn;
+     if method is SCHEDULE, then add current's conn easy_handle to the multi stack,
+      and wait until concord_dispatch() is called for asynchronous execution */
+  (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
 }
 
-struct concord_clist_s*
-_concord_get_scheduler_conn(
+static void
+_concord_perform_scheduler(
   concord_utils_st *utils,
+  void **p_object, 
   char conn_key[],
   char endpoint[],
   concord_ld_object_ft *load_cb,
@@ -188,8 +195,14 @@ _concord_get_scheduler_conn(
 
   conn->load_cb = load_cb;
 
+  conn->p_object = p_object; //save object for when load_cb is executed
+  
+  /* if method is SYNC (default), then exec current conn's easy_handle with
+      easy_perform() in a blocking manner.
 
-  return conn;
+     if method is SCHEDULE, then add current's conn easy_handle to the multi stack,
+      and wait until concord_dispatch() is called for asynchronous execution */
+  (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
 }
 
 static void
@@ -428,39 +441,29 @@ Concord_perform_request(
   concord_ld_object_ft *load_cb, 
   curl_request_ft *request_cb)
 {
-  struct concord_clist_s *conn;
-
-  /* @todo turn this into a callback instead ? */
   switch (utils->method){
   case SCHEDULE:
-      conn = _concord_get_scheduler_conn(
-                              utils,
-                              conn_key,
-                              endpoint,
-                              load_cb,
-                              request_cb);
+      _concord_perform_scheduler(
+                      utils,
+                      p_object,
+                      conn_key,
+                      endpoint,
+                      load_cb,
+                      request_cb);
       break;
   case SYNC:
-      conn = _concord_get_sync_conn(
-                         utils,
-                         conn_key,
-                         endpoint,
-                         load_cb,
-                         request_cb);
+      _concord_perform_sync(
+                 utils,
+                 p_object,
+                 conn_key,
+                 endpoint,
+                 load_cb,
+                 request_cb);
       break;
   default:
       logger_throw("undefined request method");
       exit(EXIT_FAILURE);
   }
-
-  conn->p_object = p_object; //save object for when load_cb is executed
-  
-  /* if method is SYNC (default), then exec current conn's easy_handle with
-      easy_perform() in a blocking manner.
-
-     if method is SCHEDULE, then add current's conn easy_handle to the multi stack,
-      and wait until concord_dispatch() is called for asynchronous execution */
-  (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
 }
 
 concord_st*

@@ -173,6 +173,11 @@ struct concord_clist_s {
   struct concord_clist_s *next;
 };
 
+
+struct concord_utils_s; //forwarding
+
+typedef void (concord_method_ft)(struct concord_utils_s *utils, struct concord_clist_s *conn);
+
 typedef struct concord_utils_s {
   struct curl_slist *header; /* @todo this could be a global */
 
@@ -191,10 +196,11 @@ typedef struct concord_utils_s {
   struct concord_clist_s *conn_list;
 
   concord_request_method_et method;
-  void (*method_cb)(struct concord_utils_s *utils, struct concord_clist_s *conn);
+  concord_method_ft *method_cb;
 
   char token[]; /* @todo hash this maybe */
 } concord_utils_st;
+
 
 typedef void (curl_request_ft)(concord_utils_st *utils, struct concord_clist_s *conn, char endpoint[]);
 
