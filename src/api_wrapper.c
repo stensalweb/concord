@@ -44,7 +44,6 @@ _concord_curl_easy_init(concord_utils_st *utils, struct curl_response_s *chunk)
   curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->header);
   curl_easy_setopt(new_easy_handle, CURLOPT_FAILONERROR, 1L);
   curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
-  curl_easy_setopt(new_easy_handle, CURLOPT_SHARE, utils->easy_share);
 
   // SET CURL_EASY CALLBACK //
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_write_cb);
@@ -125,6 +124,9 @@ _concord_perform_sync(
 
     (*request_cb)(utils, conn, endpoint); //register desired request to new easy_handle
 
+    /* share resources between SYNC type easy_handles */
+    curl_easy_setopt(conn->easy_handle, CURLOPT_SHARE, utils->easy_share);
+
     conn->load_cb = load_cb;
 
     conn->conn_key = strdup(conn_key);
@@ -164,10 +166,6 @@ _concord_perform_scheduler(
   concord_ld_object_ft *load_cb,
   curl_request_ft *request_cb)
 {
-  char scheduler_key[5];
-  sprintf(scheduler_key, "%ld", utils->active_handles);
-  conn_key = scheduler_key;
-
   struct concord_clist_s *conn = hashtable_get(utils->conn_hashtable, conn_key);
   if (NULL == conn){
     /* didn't find connection node, create a new one */
@@ -412,14 +410,19 @@ Concord_perform_request(
 {
   switch (utils->method){
   case SCHEDULE:
+   {
+      char scheduler_key[15];
+      sprintf(scheduler_key, "Task#%ld", utils->active_handles);
+
       _concord_perform_scheduler(
                       utils,
                       p_object,
-                      conn_key,
+                      scheduler_key,
                       endpoint,
                       load_cb,
                       request_cb);
       break;
+   }
   case SYNC:
       _concord_perform_sync(
                  utils,
