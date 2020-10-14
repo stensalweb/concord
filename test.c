@@ -14,7 +14,7 @@ int main(void)
   concord_global_init();
 
   concord_st *concord = concord_init(bot_token); //scheduler
-  concord_request_method(concord, SCHEDULE);
+  concord_request_method(concord, SYNC);
 
   concord_user_st *client = concord_user_init();
   concord_get_client_guilds(concord, &client);

@@ -239,6 +239,15 @@ _concord_perform_schedule(
       and wait until concord_dispatch() is called for asynchronous execution */
   (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
 }
+
+long long
+_concord_current_timestap()
+{
+  struct timeval te;
+
+  gettimeofday(&te, NULL); //get current time
+  return te.tv_sec*1000LL + te.tv_usec/1000; //calculate milliseconds
+}
 /*
 static void
 _concord_set_cooldown(concord_utils_st *utils){
@@ -249,6 +258,7 @@ static void
 _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
 {
   CURLcode ec = curl_easy_perform(conn->easy_handle);
+  logger_throw(utils->response_header.response);
   logger_excep(CURLE_OK != ec, curl_easy_strerror(ec));
 
   if (NULL != conn->chunk.response){
