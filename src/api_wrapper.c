@@ -238,83 +238,49 @@ _concord_set_curl_multi(concord_utils_st *utils, struct concord_clist_s *conn)
   }
 }
 
-/* wrapper around curl_multi_perform() , using select() */
+/* wrapper around curl_multi_perform() , using poll() */
 void
 concord_dispatch(concord_utils_st *utils)
 {
-  int still_running = 0; /* keep number of running handles */
+  int transfers_running = 0; /* keep number of running handles */
+  int repeats = 0;
+  do {
+    CURLMcode mc;
+    int numfds;
 
-  /* we start some action by calling perform right away */
-  curl_multi_perform(utils->multi_handle, &still_running);
-  while (still_running) {
-    int rc; /* select() return code */
+    mc = curl_multi_perform(utils->multi_handle, &transfers_running);
 
-    fd_set fdread;
-    fd_set fdwrite;
-    fd_set fdexcep;
-    int maxfd = -1;
-
-    long curl_timeo = -1;
-
-    FD_ZERO(&fdread);
-    FD_ZERO(&fdwrite);
-    FD_ZERO(&fdexcep);
-
-    /* set a suitable timeout to play around with */
-    struct timeval timeout = {.tv_sec = 1, .tv_usec = 0};
-
-    curl_multi_timeout(utils->multi_handle, &curl_timeo);
-    if (curl_timeo >= 0){
-      timeout.tv_sec = curl_timeo / 1000;
-      if (timeout.tv_sec > 1){
-        timeout.tv_sec = 1;
-      } else {
-        timeout.tv_usec = (curl_timeo % 1000) * 1000;
-      }
+    if (CURLM_OK == mc){
+      /* wait for activity, timeout or "nothing" */
+      mc = curl_multi_wait(utils->multi_handle, NULL, 0, 1000, &numfds);
     }
 
-    /*curl_multi_fdset() return code, get file descriptor from the
-        transfers*/
-    CURLMcode mc = curl_multi_fdset(utils->multi_handle, &fdread, &fdwrite, &fdexcep, &maxfd);
-
     if (CURLM_OK != mc){
-      fprintf(stderr, "curl_multi_fdset() failed, code %d.\n", mc);
+      logger_throw(curl_multi_sterror(mc));
       break;
     }
 
-    /* On success the value of maxfd is guaranteed to be >= -1. We call
-        select(maxfd+1, ...); specially in case of (maxfd == -1) there
-        are no fds ready yet so we call select(0, ...) --or Sleep() on
-        Windows-- to sleep 100ms, which is the minimum suggested value
-        in curl_multi_fdset() doc. */
-
-    if (-1 == maxfd){
-      //@todo sleep value shouldn't be hard-coded
-      WAITMS(100);
-      rc = 0;
+    /* numfds being zero means either a timeout or no file descriptor to
+        wait for. Try timeout on first occurrences, then assume no file
+        descriptors and no file descriptors to wait for mean wait for
+        n milliseconds. */
+    if (0 == numfds){
+      ++repeats; /* count number of repeated zero numfds */
+      if (repeats > 1){
+        WAITMS(100); /* sleep n milliseconds */
+      }
     } else {
-      /* Note that ons some platforms 'timeout' may be modified by
-          select(). If you need access to the original value save a
-          copy beforehand */
-      rc = select(maxfd + 1, &fdread, &fdwrite, &fdexcep, &timeout);
+      repeats = 0;
     }
-
-    switch(rc) {
-    case -1:
-        /* select error */
-        break;
-    case 0: /* timeout */
-    default: /* action */
-        curl_multi_perform(utils->multi_handle, &still_running);
-        break;
-    }
-  }
+  } while (transfers_running);
 
   /* See how the transfers went */
   CURLMsg *msg; /* for picking up messages with the transfer status */
   int msgs_left; /*how many messages are left */
-  while ((msg = curl_multi_info_read(utils->multi_handle, &msgs_left))){
-    if (CURLMSG_DONE != msg->msg) continue;
+  while ((msg = curl_multi_info_read(utils->multi_handle, &msgs_left)))
+  {
+    if (CURLMSG_DONE != msg->msg)
+      continue;
 
     /* Find out which handle this message is about */
     char easy_key[18];
