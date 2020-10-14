@@ -44,6 +44,7 @@ _concord_curl_easy_init(concord_utils_st *utils, struct curl_response_s *chunk)
   curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->header);
   curl_easy_setopt(new_easy_handle, CURLOPT_FAILONERROR, 1L);
   curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(new_easy_handle, CURLOPT_SHARE, utils->easy_share);
 
   // SET CURL_EASY CALLBACK //
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_write_cb);
@@ -144,15 +145,13 @@ _concord_perform_sync(
     assert(NULL != conn->easy_key);
 
     hashtable_set(utils->easy_hashtable, conn->easy_key, conn);
-
-    conn->p_object = p_object; //save object for when load_cb is executed
   }
+
+  conn->p_object = p_object; //save object for when load_cb is executed
   
   /* if method is SYNC (default), then exec current conn's easy_handle with
-      easy_perform() in a blocking manner.
+      easy_perform() in a blocking manner. */
 
-     if method is SCHEDULE, then add current's conn easy_handle to the multi stack,
-      and wait until concord_dispatch() is called for asynchronous execution */
   (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
 }
 
@@ -197,10 +196,7 @@ _concord_perform_scheduler(
 
   conn->p_object = p_object; //save object for when load_cb is executed
   
-  /* if method is SYNC (default), then exec current conn's easy_handle with
-      easy_perform() in a blocking manner.
-
-     if method is SCHEDULE, then add current's conn easy_handle to the multi stack,
+  /* if method is SCHEDULE, then add current's conn easy_handle to the multi stack,
       and wait until concord_dispatch() is called for asynchronous execution */
   (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
 }
@@ -208,8 +204,8 @@ _concord_perform_scheduler(
 static void
 _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
 {
-  CURLcode res = curl_easy_perform(conn->easy_handle);
-  logger_excep(CURLE_OK != res, curl_share_strerror(res));
+  CURLcode ec = curl_easy_perform(conn->easy_handle);
+  logger_excep(CURLE_OK != ec, curl_easy_strerror(ec));
 
   if (NULL != conn->chunk.response){
     //logger_throw(conn->chunk.response);
@@ -256,7 +252,7 @@ concord_dispatch(concord_utils_st *utils)
     }
 
     if (CURLM_OK != mc){
-      logger_throw(curl_multi_sterror(mc));
+      logger_throw(curl_multi_strerror(mc));
       break;
     }
 
@@ -372,8 +368,13 @@ _concord_utils_init(char token[])
 
   new_utils->header = _concord_init_request_header(new_utils);
 
-  new_utils->method = SYNC;
-  new_utils->method_cb = &_concord_set_curl_easy;
+  new_utils->multi_handle = curl_multi_init();
+
+  /* @todo i need to benchmark this */
+  new_utils->easy_share = curl_share_init();
+  curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_COOKIE);
+  curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
+  curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
 
   new_utils->easy_hashtable = hashtable_init();
   hashtable_build(new_utils->easy_hashtable, UTILS_HASHTABLE_SIZE);
@@ -381,7 +382,8 @@ _concord_utils_init(char token[])
   new_utils->conn_hashtable = hashtable_init();
   hashtable_build(new_utils->conn_hashtable, UTILS_HASHTABLE_SIZE);
 
-  new_utils->multi_handle = curl_multi_init();
+  new_utils->method = SYNC;
+  new_utils->method_cb = &_concord_set_curl_easy;
 
   return new_utils;
 }
@@ -391,6 +393,7 @@ _concord_utils_destroy(concord_utils_st *utils)
 {
   curl_slist_free_all(utils->header);
   curl_multi_cleanup(utils->multi_handle);
+  curl_share_cleanup(utils->easy_share);
   hashtable_destroy(utils->easy_hashtable);
   hashtable_destroy(utils->conn_hashtable);
   _concord_clist_free_all(utils->conn_list);

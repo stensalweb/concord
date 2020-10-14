@@ -181,12 +181,12 @@ typedef void (concord_method_ft)(struct concord_utils_s *utils, struct concord_c
 typedef struct concord_utils_s {
   struct curl_slist *header; /* @todo this could be a global */
 
-  /* SCHEDULE METHOD TYPE USAGE */
+  /* SCHEDULE METHOD USAGE */
   CURLM *multi_handle;
   size_t active_handles;
 
-  /* SYNC METHOD TYPE USAGE
-  CURLSH *easy_share; // @todo implement this */
+  /* SYNC METHOD USAGE */
+  CURLSH *easy_share;
 
   /* hashtables used for easy handles lookup */
   struct hashtable_s *easy_hashtable; //keys are easy handles addr
