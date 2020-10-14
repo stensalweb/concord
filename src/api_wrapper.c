@@ -3,10 +3,6 @@
 #include <assert.h>
 #include <string.h>
 
-/* somewhat unix-specific */
-#include <sys/time.h>
-#include <unistd.h>
-
 //#include <curl/curl.h>
 //#include <libjscon.h>
 
@@ -15,6 +11,48 @@
 #include "hashtable.h"
 #include "api_wrapper_private.h"
 #include "logger.h"
+
+/* code excerpt taken from
+  https://raw.githubusercontent.com/Michaelangel007/buddhabrot/master/buddhabrot.cpp */
+#ifdef _WIN32
+  #define WIN32_LEAN_AND_MEAN
+  #define NOMINMAX
+  #include <Windows.h> // Windows.h -> WinDef.h defines min() max()
+
+  typedef struct timeval {
+    long tv_sec;
+    long tv_usec;
+  } timeval;
+
+  int gettimeofday(struct timeval *tp, struct timezone *tzp)
+  {
+    // FILETIME JAN 1 1970 00:00:00
+    /* Note: some broken version only have 8 trailing zero's, the corret epoch has 9
+        trailing zero's */
+    static cont uint64_t EPOCH = ((uint64_t) 116444736000000000ULL);
+
+    SYSTEMTIME  nSystemTime;
+    FILETIME    nFileTime;
+    uint64_t    ntime;
+
+    GetSystemTime( &nSystemTime );
+    SystemTimeToFileTime( &nSystemTime, &nFileTime );
+    nTime = ((uint64_t)nFileTime.dwLowDateTime );
+    nTime += ((uint64_t)nFileTime.dwHighDateTime) << 32;
+
+    tp->tv_sec = (long) ((nTime - EPOCH) / 10000000L);
+    tp->tv_sec = (long) (nSystemTime.wMilliseconds * 1000);
+
+    return 0;
+  }
+
+  #define WAITMS(t) Sleep(t)
+#else 
+  #include <sys/time.h>
+  #include <unistd.h>
+
+  #define WAITMS(t) usleep((t)*1000)
+#endif
 
 static size_t
 _concord_curl_write_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
@@ -41,13 +79,16 @@ _concord_curl_easy_init(concord_utils_st *utils, struct curl_response_s *chunk)
   CURL *new_easy_handle = curl_easy_init();
   assert(NULL != new_easy_handle);
 
-  curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->header);
+  curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->request_header);
   curl_easy_setopt(new_easy_handle, CURLOPT_FAILONERROR, 1L);
-  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
+//  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
 
-  // SET CURL_EASY CALLBACK //
+  // SET CURL_EASY CALLBACKS //
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_write_cb);
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, chunk);
+
+  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERFUNCTION, &_concord_curl_write_cb);
+  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERDATA, &utils->response_header);
 
   return new_easy_handle;
 }
@@ -158,7 +199,7 @@ _concord_perform_sync(
 }
 
 static void
-_concord_perform_scheduler(
+_concord_perform_schedule(
   concord_utils_st *utils,
   void **p_object, 
   char conn_key[],
@@ -198,7 +239,12 @@ _concord_perform_scheduler(
       and wait until concord_dispatch() is called for asynchronous execution */
   (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
 }
+/*
+static void
+_concord_set_cooldown(concord_utils_st *utils){
 
+}
+*/
 static void
 _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
 {
@@ -210,8 +256,14 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
     (*conn->load_cb)(conn->p_object, &conn->chunk);
 
     conn->p_object = NULL;
+
     concord_free(conn->chunk.response);
     conn->chunk.size = 0;
+
+    /* perform rate-limit stuff here */
+
+    concord_free(utils->response_header.response);
+    utils->response_header.size = 0;
   }
 
   //@todo sleep value shouldn't be hard-coded
@@ -225,7 +277,7 @@ _concord_set_curl_multi(concord_utils_st *utils, struct concord_clist_s *conn)
     curl_multi_add_handle(utils->multi_handle, conn->easy_handle);
     ++utils->active_handles;
 
-    /* dispatch instantly if hit max active handles */
+    /* dispatch instantly if hit max active handles limit */
     if (SCHEDULE_MAX_ACTIVE == utils->active_handles){
       concord_dispatch(utils);
     }
@@ -288,8 +340,15 @@ concord_dispatch(concord_utils_st *utils)
       (*conn->load_cb)(conn->p_object, &conn->chunk);
 
       conn->p_object = NULL;
+
       concord_free(conn->chunk.response);
       conn->chunk.size = 0;
+
+      /* perform rate-limit stuff here */
+
+      logger_throw(utils->response_header.response);
+      concord_free(utils->response_header.response);
+      utils->response_header.size = 0;
     }
 
     /* @todo this probably should be inside the above if condition */
@@ -313,7 +372,7 @@ concord_request_method(concord_st *concord, concord_request_method_et method)
       concord->utils->method_cb = &_concord_set_curl_easy;
       break;
   default:
-      logger_throw("undefined request method");
+      logger_throw("ERROR: undefined request method");
       exit(EXIT_FAILURE);
   }
 }
@@ -340,13 +399,13 @@ Concord_POST(concord_utils_st *utils, struct concord_clist_s *conn, char endpoin
 static struct curl_slist*
 _concord_init_request_header(concord_utils_st *utils)
 {
-  char auth_header[MAX_HEADER_LENGTH] = "Authorization: Bot "; 
+  char auth[MAX_HEADER_LENGTH] = "Authorization: Bot "; 
 
   struct curl_slist *new_header = NULL;
   new_header = curl_slist_append(new_header,"X-RateLimit-Precision: millisecond");
   assert(NULL != new_header);
 
-  new_header = curl_slist_append(new_header, strcat(auth_header, utils->token));
+  new_header = curl_slist_append(new_header, strcat(auth, utils->token));
   assert(NULL != new_header);
 
   new_header = curl_slist_append(new_header,"User-Agent: concord (http://github.com/LucasMull/concord, v0.0)");
@@ -364,11 +423,11 @@ _concord_utils_init(char token[])
   concord_utils_st *new_utils = concord_malloc(sizeof *new_utils + strlen(token));
   strncpy(new_utils->token, token, strlen(token)-1);
 
-  new_utils->header = _concord_init_request_header(new_utils);
+  new_utils->request_header = _concord_init_request_header(new_utils);
 
   new_utils->multi_handle = curl_multi_init();
 
-  /* @todo i need to benchmark this */
+  /* @todo i need to benchmark this to see if there's actual benefit */
   new_utils->easy_share = curl_share_init();
   curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_COOKIE);
   curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
@@ -389,7 +448,7 @@ _concord_utils_init(char token[])
 static void
 _concord_utils_destroy(concord_utils_st *utils)
 {
-  curl_slist_free_all(utils->header);
+  curl_slist_free_all(utils->request_header);
   curl_multi_cleanup(utils->multi_handle);
   curl_share_cleanup(utils->easy_share);
   hashtable_destroy(utils->easy_hashtable);
@@ -411,13 +470,13 @@ Concord_perform_request(
   switch (utils->method){
   case SCHEDULE:
    {
-      char scheduler_key[15];
-      sprintf(scheduler_key, "Task#%ld", utils->active_handles);
+      char task_key[15];
+      sprintf(task_key, "ScheduleTask#%ld", utils->active_handles);
 
-      _concord_perform_scheduler(
+      _concord_perform_schedule(
                       utils,
                       p_object,
-                      scheduler_key,
+                      task_key,
                       endpoint,
                       load_cb,
                       request_cb);
@@ -433,7 +492,7 @@ Concord_perform_request(
                  request_cb);
       break;
   default:
-      logger_throw("undefined request method");
+      logger_throw("ERROR: undefined request method");
       exit(EXIT_FAILURE);
   }
 }

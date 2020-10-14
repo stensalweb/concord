@@ -33,7 +33,7 @@ int main(void)
   }
   concord_dispatch(concord->utils);
 
-
+/*
   // FETCH 50 MESSAGES FROM EACH CHANNEL FROM FIRST GUILD AND WILL OUTPUT THEM TO A a.out FILE
   concord_channel_st **channels = concord_malloc(jscon_size(guilds[0]->channels) * sizeof *channels);
 
@@ -66,7 +66,7 @@ int main(void)
     concord_channel_destroy(channels[i]);
   }
   concord_free(channels);
- 
+*/
   for (long i=0; i < jscon_size(client->guilds); ++i){
     concord_guild_destroy(guilds[i]);
   }

@@ -174,12 +174,20 @@ struct concord_clist_s {
 };
 
 
+struct concord_cooldowns_s {
+  jscon_item_st *exceed_rate_limit; //on HTTP 429 response the API will return a JSON body
+};
+
+
 struct concord_utils_s; //forwarding
 
 typedef void (concord_method_ft)(struct concord_utils_s *utils, struct concord_clist_s *conn);
 
 typedef struct concord_utils_s {
-  struct curl_slist *header; /* @todo this could be a global */
+  struct curl_slist *request_header; /* @todo this could be a global, as it is a READ-ONLY variable */
+
+  struct curl_response_s response_header; //stores response header here
+  struct concord_cooldowns_s cooldowns;
 
   /* SCHEDULE METHOD USAGE */
   CURLM *multi_handle;
