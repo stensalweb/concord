@@ -5,6 +5,8 @@ This document describes features to be incorporated in the future.
 ## HIGH
 
 - [Check rate-limits dynamically](https://discord.com/developers/docs/topics/rate-limits#rate-limits)
+  - Create parsing function to extract X-RateLimit information
+  - Create a exception function that detects when user is being rate limited, and act accordingly
 - Hashtable size should be dynamically increased as necessary
 - Create objects (channel, user, etc) print functions for easier debugging
 - Token should go through a hashing and dehashing function
