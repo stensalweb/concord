@@ -4,6 +4,9 @@ This document describes features to be incorporated in the future.
 
 ## HIGH
 
+- Implement Discord Gateway (WebSockets) support
+  - Intuitive event handler
+  - Resume logic on error
 - [Check rate-limits dynamically](https://discord.com/developers/docs/topics/rate-limits#rate-limits)
   - Create parsing function to extract X-RateLimit information
   - Create a exception function that detects when user is being rate limited, and act accordingly
