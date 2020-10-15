@@ -54,41 +54,83 @@
   #define WAITMS(t) usleep((t)*1000)
 #endif
 
+double
+_concord_current_timestamp()
+{
+  struct timeval te;
+
+  gettimeofday(&te, NULL); //get current time
+  return te.tv_sec*1000 + te.tv_usec/1000; //calculate milliseconds
+}
+
+#define XRL_BUCKET      "x-ratelimit-bucket: "
+#define XRL_LIMIT       "x-ratelimit-limit: "
+#define XRL_REMAINING   "x-ratelimit-remaining: "
+#define XRL_RESET       "x-ratelimit-reset: "
+#define XRL_RESET_AFTER "x-ratelimit-reset-after: "
+
+#define LEN_BUCKET      20
+#define LEN_LIMIT       19
+#define LEN_REMAINING   23
+#define LEN_RESET       19
+#define LEN_RESET_AFTER 25
+
 static size_t
-_concord_curl_write_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
+_concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
+{
+  int realsize = size * nmemb;
+  struct concord_ratelimit_s *ratelimit = (struct concord_ratelimit_s*)p_userdata;
+
+  if (0 == strncmp(XRL_BUCKET, content, LEN_BUCKET)){
+    strncpy(ratelimit->bucket, &content[LEN_BUCKET], realsize - LEN_BUCKET);
+  } else if (0 == strncmp(XRL_LIMIT, content, LEN_LIMIT)) {
+    ratelimit->limit = strtol(&content[LEN_LIMIT], NULL, 10);
+  } else if (0 == strncmp(XRL_REMAINING, content, LEN_REMAINING)) {
+    ratelimit->remaining = strtol(&content[LEN_REMAINING], NULL, 10);
+  } else if (0 == strncmp(XRL_RESET, content, LEN_RESET)) {
+    ratelimit->reset = strtod(&content[LEN_RESET], NULL);
+  } else if (0 == strncmp(XRL_RESET_AFTER, content, LEN_RESET_AFTER)) {
+    ratelimit->reset_after = strtod(&content[LEN_RESET_AFTER], NULL);
+  }
+
+  return (size_t)realsize;
+}
+
+static size_t
+_concord_curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   size_t realsize = size * nmemb;
-  struct curl_response_s *chunk = (struct curl_response_s*)p_userdata;
+  struct curl_response_s *response_body = (struct curl_response_s*)p_userdata;
 
-  char *tmp = realloc(chunk->str, chunk->size + realsize + 1);
+  char *tmp = realloc(response_body->str, response_body->size + realsize + 1);
 
   if (tmp == NULL) return 0;
 
-  chunk->str = tmp;
-  memcpy((char*)chunk->str + chunk->size, content, realsize);
-  chunk->size += realsize;
-  chunk->str[chunk->size] = '\0';
+  response_body->str = tmp;
+  memcpy((char*)response_body->str + response_body->size, content, realsize);
+  response_body->size += realsize;
+  response_body->str[response_body->size] = '\0';
 
   return realsize;
 }
 
 /* init easy handle with some default opt */
 CURL*
-_concord_curl_easy_init(concord_utils_st *utils, struct curl_response_s *response_body)
+_concord_curl_easy_init(concord_utils_st *utils, struct concord_clist_s *conn)
 {
   CURL *new_easy_handle = curl_easy_init();
   assert(NULL != new_easy_handle);
 
   curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->request_header);
   curl_easy_setopt(new_easy_handle, CURLOPT_FAILONERROR, 1L);
-//  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
 
   // SET CURL_EASY CALLBACKS //
-  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_write_cb);
-  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, response_body);
+  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_body_cb);
+  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, &conn->response_body);
 
-  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERFUNCTION, &_concord_curl_write_cb);
-  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERDATA, &utils->response_header);
+  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERFUNCTION, &_concord_curl_header_cb);
+  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERDATA, &utils->ratelimit);
 
   return new_easy_handle;
 }
@@ -112,7 +154,7 @@ _concord_clist_append(concord_utils_st *utils, struct concord_clist_s **p_new_co
   struct concord_clist_s *last;
   struct concord_clist_s *new_conn = concord_malloc(sizeof *new_conn);
 
-  new_conn->easy_handle = _concord_curl_easy_init(utils, &new_conn->response_body);
+  new_conn->easy_handle = _concord_curl_easy_init(utils, new_conn);
 
   if (NULL != p_new_conn){
     *p_new_conn = new_conn;
@@ -240,44 +282,30 @@ _concord_perform_schedule(
   (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
 }
 
-long long
-_concord_current_timestap()
-{
-  struct timeval te;
-
-  gettimeofday(&te, NULL); //get current time
-  return te.tv_sec*1000LL + te.tv_usec/1000; //calculate milliseconds
-}
-/*
-static void
-_concord_set_cooldown(concord_utils_st *utils){
-
-}
-*/
 static void
 _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
 {
-  CURLcode ec = curl_easy_perform(conn->easy_handle);
-  logger_throw(utils->response_header.str);
-  logger_excep(CURLE_OK != ec, curl_easy_strerror(ec));
+  CURLcode ecode = curl_easy_perform(conn->easy_handle);
+  logger_excep(CURLE_OK != ecode, curl_easy_strerror(ecode));
 
   if (NULL != conn->response_body.str){
     //logger_throw(conn->response_body.str);
     (*conn->load_cb)(conn->p_object, &conn->response_body);
 
+    double delay_ms;
+    if (0 == utils->ratelimit.remaining){
+      delay_ms = utils->ratelimit.reset_after;
+    } else {
+      delay_ms = 0;
+    }
+
+    WAITMS(delay_ms);
+
     conn->p_object = NULL;
 
     concord_free(conn->response_body.str);
     conn->response_body.size = 0;
-
-    /* perform rate-limit stuff here */
-
-    concord_free(utils->response_header.str);
-    utils->response_header.size = 0;
   }
-
-  //@todo sleep value shouldn't be hard-coded
-  WAITMS(300);
 }
 
 static void
@@ -300,32 +328,39 @@ concord_dispatch(concord_utils_st *utils)
 {
   int transfers_running = 0; /* keep number of running handles */
   int repeats = 0;
+  double delay_ms = 0;
   do {
-    CURLMcode mc;
+    CURLMcode mcode;
     int numfds;
 
-    mc = curl_multi_perform(utils->multi_handle, &transfers_running);
+    mcode = curl_multi_perform(utils->multi_handle, &transfers_running);
 
-    if (CURLM_OK == mc){
+    if (CURLM_OK == mcode){
       /* wait for activity, timeout or "nothing" */
-      mc = curl_multi_wait(utils->multi_handle, NULL, 0, 1000, &numfds);
+      mcode = curl_multi_wait(utils->multi_handle, NULL, 0, delay_ms, &numfds);
     }
 
-    if (CURLM_OK != mc){
-      logger_throw(curl_multi_strerror(mc));
+    if (CURLM_OK != mcode){
+      logger_throw(curl_multi_strerror(mcode));
       break;
     }
 
     /* numfds being zero means either a timeout or no file descriptor to
         wait for. Try timeout on first occurrences, then assume no file
         descriptors and no file descriptors to wait for mean wait for
-        n milliseconds. */
+        100 milliseconds. */
     if (0 == numfds){
       ++repeats; /* count number of repeated zero numfds */
       if (repeats > 1){
-        WAITMS(100); /* sleep n milliseconds */
+        WAITMS(100); /* sleep 100 milliseconds */
       }
     } else {
+      if (0 == utils->ratelimit.remaining){
+        delay_ms = utils->ratelimit.reset_after;
+      } else {
+        delay_ms = 0;
+      }
+
       repeats = 0;
     }
   } while (transfers_running);
@@ -353,12 +388,6 @@ concord_dispatch(concord_utils_st *utils)
 
       concord_free(conn->response_body.str);
       conn->response_body.size = 0;
-
-      /* perform rate-limit stuff here */
-
-      logger_throw(utils->response_header.str);
-      concord_free(utils->response_header.str);
-      utils->response_header.size = 0;
     }
 
     /* @todo this probably should be inside the above if condition */
@@ -460,10 +489,10 @@ _concord_utils_destroy(concord_utils_st *utils)
 {
   curl_slist_free_all(utils->request_header);
   curl_multi_cleanup(utils->multi_handle);
+  _concord_clist_free_all(utils->conn_list);
   curl_share_cleanup(utils->easy_share);
   hashtable_destroy(utils->easy_hashtable);
   hashtable_destroy(utils->conn_hashtable);
-  _concord_clist_free_all(utils->conn_list);
 
   concord_free(utils);
 }
