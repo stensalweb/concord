@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <stdbool.h>
 
 //#include <curl/curl.h>
 //#include <libjscon.h>
@@ -54,13 +55,21 @@
   #define WAITMS(t) usleep((t)*1000)
 #endif
 
-double
-_concord_current_timestamp()
+static double
+_concord_parse_ratelimit(struct concord_ratelimit_s *ratelimit, _Bool use_clock)
 {
-  struct timeval te;
+  if (true == use_clock || !ratelimit->reset_after){
+    struct timeval te;
 
-  gettimeofday(&te, NULL); //get current time
-  return te.tv_sec*1000 + te.tv_usec/1000; //calculate milliseconds
+    gettimeofday(&te, NULL); //get current time
+    
+    double utc = te.tv_sec*1000 + te.tv_usec/1000; //calculate milliseconds
+    double reset = ratelimit->reset * 1000;
+
+    return reset - utc + 1000;
+  }
+
+  return ratelimit->reset_after;
 }
 
 #define XRL_BUCKET      "x-ratelimit-bucket: "
@@ -292,9 +301,11 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
     //logger_throw(conn->response_body.str);
     (*conn->load_cb)(conn->p_object, &conn->response_body);
 
+    /* @todo for some reason only getting a single header when
+        doing blocking, find out why */
     double delay_ms;
-    if (0 == utils->ratelimit.remaining){
-      delay_ms = utils->ratelimit.reset_after;
+    if (0 != utils->ratelimit.remaining){
+      delay_ms = _concord_parse_ratelimit(&utils->ratelimit, false);
     } else {
       delay_ms = 0;
     }
@@ -355,8 +366,8 @@ concord_dispatch(concord_utils_st *utils)
         WAITMS(100); /* sleep 100 milliseconds */
       }
     } else {
-      if (0 == utils->ratelimit.remaining){
-        delay_ms = utils->ratelimit.reset_after;
+      if (0 != utils->ratelimit.remaining){
+        delay_ms = _concord_parse_ratelimit(&utils->ratelimit, true);
       } else {
         delay_ms = 0;
       }
