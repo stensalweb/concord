@@ -69,11 +69,11 @@ concord_guild_destroy(concord_guild_st *guild)
 }
 
 static void
-_concord_ld_guild(void **p_guild, struct curl_response_s *chunk)
+_concord_ld_guild(void **p_guild, struct curl_response_s *response_body)
 {
   concord_guild_st *guild = *p_guild;
 
-  jscon_scanf(chunk->response,
+  jscon_scanf(response_body->str,
      "#id%js \
       #name%js \
       #icon%js \
@@ -97,7 +97,7 @@ _concord_ld_guild(void **p_guild, struct curl_response_s *chunk)
       \"owner\": %d\n\
       \"permissions\": %lld\n\
       \"permissions_new\": %s\n",
-      chunk->response,
+      response_body->str,
       guild->id,
       guild->name,
       guild->icon,
@@ -131,7 +131,7 @@ concord_get_guild(concord_st *concord, char guild_id[], concord_guild_st **p_gui
 }
 
 static void
-_concord_ld_guild_channels(void **p_guild, struct curl_response_s *chunk)
+_concord_ld_guild_channels(void **p_guild, struct curl_response_s *response_body)
 {
   concord_guild_st *guild = *p_guild;
 
@@ -139,7 +139,7 @@ _concord_ld_guild_channels(void **p_guild, struct curl_response_s *chunk)
     jscon_destroy(guild->channels);
   }
 
-  guild->channels = jscon_parse(chunk->response);
+  guild->channels = jscon_parse(response_body->str);
 
   *p_guild = guild;
 }

@@ -44,11 +44,11 @@ concord_user_destroy(concord_user_st *user)
 }
 
 static void
-_concord_ld_user(void **p_user, struct curl_response_s *chunk)
+_concord_ld_user(void **p_user, struct curl_response_s *response_body)
 {
   concord_user_st *user = *p_user;
 
-  jscon_scanf(chunk->response,
+  jscon_scanf(response_body->str,
      "#id%js \
       #username%js \
       #discriminator%js \
@@ -140,7 +140,7 @@ concord_get_client(concord_st *concord, concord_user_st **p_client)
 }
 
 static void
-_concord_ld_client_guilds(void **p_client, struct curl_response_s *chunk)
+_concord_ld_client_guilds(void **p_client, struct curl_response_s *response_body)
 {
   concord_user_st *client = *p_client;
 
@@ -148,7 +148,7 @@ _concord_ld_client_guilds(void **p_client, struct curl_response_s *chunk)
     jscon_destroy(client->guilds);
   }
 
-  client->guilds = jscon_parse(chunk->response);
+  client->guilds = jscon_parse(response_body->str);
 
   *p_client = client;
 }

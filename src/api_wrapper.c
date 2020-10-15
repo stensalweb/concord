@@ -60,21 +60,21 @@ _concord_curl_write_cb(char *content, size_t size, size_t nmemb, void *p_userdat
   size_t realsize = size * nmemb;
   struct curl_response_s *chunk = (struct curl_response_s*)p_userdata;
 
-  char *tmp = realloc(chunk->response, chunk->size + realsize + 1);
+  char *tmp = realloc(chunk->str, chunk->size + realsize + 1);
 
   if (tmp == NULL) return 0;
 
-  chunk->response = tmp;
-  memcpy((char*)chunk->response + chunk->size, content, realsize);
+  chunk->str = tmp;
+  memcpy((char*)chunk->str + chunk->size, content, realsize);
   chunk->size += realsize;
-  chunk->response[chunk->size] = '\0';
+  chunk->str[chunk->size] = '\0';
 
   return realsize;
 }
 
 /* init easy handle with some default opt */
 CURL*
-_concord_curl_easy_init(concord_utils_st *utils, struct curl_response_s *chunk)
+_concord_curl_easy_init(concord_utils_st *utils, struct curl_response_s *response_body)
 {
   CURL *new_easy_handle = curl_easy_init();
   assert(NULL != new_easy_handle);
@@ -85,7 +85,7 @@ _concord_curl_easy_init(concord_utils_st *utils, struct curl_response_s *chunk)
 
   // SET CURL_EASY CALLBACKS //
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_write_cb);
-  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, chunk);
+  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, response_body);
 
   curl_easy_setopt(new_easy_handle, CURLOPT_HEADERFUNCTION, &_concord_curl_write_cb);
   curl_easy_setopt(new_easy_handle, CURLOPT_HEADERDATA, &utils->response_header);
@@ -112,7 +112,7 @@ _concord_clist_append(concord_utils_st *utils, struct concord_clist_s **p_new_co
   struct concord_clist_s *last;
   struct concord_clist_s *new_conn = concord_malloc(sizeof *new_conn);
 
-  new_conn->easy_handle = _concord_curl_easy_init(utils, &new_conn->chunk);
+  new_conn->easy_handle = _concord_curl_easy_init(utils, &new_conn->response_body);
 
   if (NULL != p_new_conn){
     *p_new_conn = new_conn;
@@ -258,21 +258,21 @@ static void
 _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
 {
   CURLcode ec = curl_easy_perform(conn->easy_handle);
-  logger_throw(utils->response_header.response);
+  logger_throw(utils->response_header.str);
   logger_excep(CURLE_OK != ec, curl_easy_strerror(ec));
 
-  if (NULL != conn->chunk.response){
-    //logger_throw(conn->chunk.response);
-    (*conn->load_cb)(conn->p_object, &conn->chunk);
+  if (NULL != conn->response_body.str){
+    //logger_throw(conn->response_body.str);
+    (*conn->load_cb)(conn->p_object, &conn->response_body);
 
     conn->p_object = NULL;
 
-    concord_free(conn->chunk.response);
-    conn->chunk.size = 0;
+    concord_free(conn->response_body.str);
+    conn->response_body.size = 0;
 
     /* perform rate-limit stuff here */
 
-    concord_free(utils->response_header.response);
+    concord_free(utils->response_header.str);
     utils->response_header.size = 0;
   }
 
@@ -345,19 +345,19 @@ concord_dispatch(concord_utils_st *utils)
     assert (NULL != conn);
 
     /* execute load callback to perform change in object */
-    if (NULL != conn->chunk.response){
-      //logger_throw(conn->chunk.response);
-      (*conn->load_cb)(conn->p_object, &conn->chunk);
+    if (NULL != conn->response_body.str){
+      //logger_throw(conn->response_body.str);
+      (*conn->load_cb)(conn->p_object, &conn->response_body);
 
       conn->p_object = NULL;
 
-      concord_free(conn->chunk.response);
-      conn->chunk.size = 0;
+      concord_free(conn->response_body.str);
+      conn->response_body.size = 0;
 
       /* perform rate-limit stuff here */
 
-      logger_throw(utils->response_header.response);
-      concord_free(utils->response_header.response);
+      logger_throw(utils->response_header.str);
+      concord_free(utils->response_header.str);
       utils->response_header.size = 0;
     }
 

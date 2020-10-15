@@ -55,11 +55,11 @@ concord_channel_destroy(concord_channel_st *channel)
 }
 
 static void
-_concord_ld_channel(void **p_channel, struct curl_response_s *chunk)
+_concord_ld_channel(void **p_channel, struct curl_response_s *response_body)
 {
   concord_channel_st *channel = *p_channel;
 
-  jscon_scanf(chunk->response,
+  jscon_scanf(response_body->str,
      "#position%jd \
       #nsfw%jb \
       #last_message_id%js \
@@ -100,7 +100,7 @@ _concord_ld_channel(void **p_channel, struct curl_response_s *chunk)
   /*//UNCOMMENT FOR TESTING
   fprintf(stdout,
       "\njson: %s\nCHANNEL: %lld %d %s %lld %s %s %s %s %lld %s %p %s %s %lld %lld %p %s %s\n",
-      chunk->response,
+      response_body->str,
       channel->position,
       channel->nsfw,
       channel->last_message_id,
@@ -146,7 +146,7 @@ concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st *
 }
 
 static void
-_concord_ld_channel_messages(void **p_channel, struct curl_response_s *chunk)
+_concord_ld_channel_messages(void **p_channel, struct curl_response_s *response_body)
 {
   concord_channel_st *channel = *p_channel;
 
@@ -154,7 +154,7 @@ _concord_ld_channel_messages(void **p_channel, struct curl_response_s *chunk)
     jscon_destroy(channel->messages);
   }
 
-  channel->messages = jscon_parse(chunk->response);
+  channel->messages = jscon_parse(response_body->str);
 
   *p_channel = channel;
 }

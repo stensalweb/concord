@@ -153,11 +153,11 @@ typedef enum {
 #define SCHEDULE_MAX_ACTIVE 5
 
 struct curl_response_s {
-  char *response;
+  char *str;
   size_t size;
 };
 
-typedef void (concord_ld_object_ft)(void **p_object, struct curl_response_s *chunk);
+typedef void (concord_ld_object_ft)(void **p_object, struct curl_response_s *response_body);
 
 struct concord_clist_s {
   char *conn_key; //conn_hashtable key
@@ -165,7 +165,7 @@ struct concord_clist_s {
   char *easy_key; //string format easy_handle address to use as easy_hashtable key
   CURL *easy_handle; //easy handle used to perform the request
 
-  struct curl_response_s chunk; //stores response string here
+  struct curl_response_s response_body; //stores response body associated with the easy_handle
 
   concord_ld_object_ft *load_cb; //object load callback
   void **p_object; //hold onto object to be passed as a load_cb parameter
