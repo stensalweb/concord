@@ -8,6 +8,8 @@ This document describes features to be incorporated in the future.
   - Intuitive event handler
   - Resume logic on error
 - [Check rate-limits dynamically](https://discord.com/developers/docs/topics/rate-limits#rate-limits)
+  - Use 'current timestamp' instead of 'reset after'
+  - Deal with 429 condition
   - Create parsing function to extract X-RateLimit information
   - Create a exception function that detects when user is being rate limited, and act accordingly
 - Hashtable size should be dynamically increased as necessary
