@@ -14,17 +14,17 @@
 concord_channel_st*
 concord_channel_init(concord_utils_st *utils)
 {
-  concord_channel_st *new_channel = concord_malloc(sizeof *new_channel);
-  new_channel->id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->guild_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->name = concord_malloc(NAME_LENGTH);
-  new_channel->topic = concord_malloc(TOPIC_LENGTH);
-  new_channel->last_message_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->icon = concord_malloc(MAX_HASH_LENGTH);
-  new_channel->owner_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->application_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->parent_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->last_pin_timestamp = concord_malloc(SNOWFLAKE_TIMESTAMP);
+  concord_channel_st *new_channel = safe_malloc(sizeof *new_channel);
+  new_channel->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->guild_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->name = safe_malloc(NAME_LENGTH);
+  new_channel->topic = safe_malloc(TOPIC_LENGTH);
+  new_channel->last_message_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->icon = safe_malloc(MAX_HASH_LENGTH);
+  new_channel->owner_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->application_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->parent_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_channel->last_pin_timestamp = safe_malloc(SNOWFLAKE_TIMESTAMP);
 
   return new_channel;
 }
@@ -32,16 +32,16 @@ concord_channel_init(concord_utils_st *utils)
 void
 concord_channel_destroy(concord_channel_st *channel)
 {
-  concord_free(channel->id);
-  concord_free(channel->guild_id);
-  concord_free(channel->name);
-  concord_free(channel->topic);
-  concord_free(channel->last_message_id);
-  concord_free(channel->icon);
-  concord_free(channel->owner_id);
-  concord_free(channel->application_id);
-  concord_free(channel->parent_id);
-  concord_free(channel->last_pin_timestamp);
+  safe_free(channel->id);
+  safe_free(channel->guild_id);
+  safe_free(channel->name);
+  safe_free(channel->topic);
+  safe_free(channel->last_message_id);
+  safe_free(channel->icon);
+  safe_free(channel->owner_id);
+  safe_free(channel->application_id);
+  safe_free(channel->parent_id);
+  safe_free(channel->last_pin_timestamp);
 
   if (NULL != channel->permission_overwrites){
     jscon_destroy(channel->permission_overwrites);
@@ -51,7 +51,7 @@ concord_channel_destroy(concord_channel_st *channel)
     jscon_destroy(channel->messages);
   }
 
-  concord_free(channel);
+  safe_free(channel);
 }
 
 static void

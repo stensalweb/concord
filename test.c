@@ -21,7 +21,7 @@ int main(void)
   concord_dispatch(concord->utils);
 
   /* THIS WILL FETCH CHANNELS FROM EACH GUILD BOT IS A PART OF */
-  concord_guild_st **guilds = concord_malloc(jscon_size(client->guilds) * sizeof *guilds);
+  concord_guild_st **guilds = safe_malloc(jscon_size(client->guilds) * sizeof *guilds);
   for (long i=0; i < jscon_size(client->guilds); ++i){
     jscon_item_st *item_guild = jscon_get_byindex(client->guilds, i);
     char *guild_id = jscon_get_string(jscon_get_branch(item_guild, "id"));
@@ -33,11 +33,10 @@ int main(void)
   }
   concord_dispatch(concord->utils);
 
-/*
-  // FETCH 50 MESSAGES FROM EACH CHANNEL FROM FIRST GUILD AND WILL OUTPUT THEM TO A a.out FILE
-  concord_channel_st **channels = concord_malloc(jscon_size(guilds[0]->channels) * sizeof *channels);
 
-  char *buffer;
+  // FETCH 50 MESSAGES FROM EACH CHANNEL FROM FIRST GUILD AND WILL OUTPUT THEM TO A a.out FILE
+  concord_channel_st **channels = safe_malloc(jscon_size(guilds[0]->channels) * sizeof *channels);
+
   for (long i=0; i < jscon_size(guilds[0]->channels); ++i){
     jscon_item_st *item_channel = jscon_get_byindex(guilds[0]->channels, i);
     char *channel_id = jscon_get_string(jscon_get_branch(item_channel, "id"));
@@ -47,10 +46,11 @@ int main(void)
     concord_get_channel_messages(concord, channel_id, channels+i);
   }
   concord_dispatch(concord->utils);
-
+/*
   FILE *f_out = fopen("a.out", "w");
   assert(NULL != f_out);
 
+  char *buffer;
   for (long i=0; i < jscon_size(guilds[0]->channels); ++i){
     if (NULL == channels[i]->messages)
       continue;
@@ -60,17 +60,17 @@ int main(void)
     free(buffer);
   }
   fclose(f_out);
-
+*/
   // DELETE ALLOCATED OBJECTS
   for (long i=0; i < jscon_size(guilds[0]->channels); ++i){
     concord_channel_destroy(channels[i]);
   }
-  concord_free(channels);
-*/
+  safe_free(channels);
+
   for (long i=0; i < jscon_size(client->guilds); ++i){
     concord_guild_destroy(guilds[i]);
   }
-  concord_free(guilds);
+  safe_free(guilds);
 
   concord_user_destroy(client);
 

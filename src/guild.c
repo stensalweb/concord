@@ -14,26 +14,26 @@
 concord_guild_st*
 concord_guild_init(concord_utils_st* utils)
 {
-  concord_guild_st *new_guild = concord_malloc(sizeof *new_guild);
-  new_guild->id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->name = concord_malloc(NAME_LENGTH);
-  new_guild->icon = concord_malloc(MAX_HASH_LENGTH);
-  new_guild->discovery_splash = concord_malloc(MAX_HASH_LENGTH);
-  new_guild->owner_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->permissions_new = concord_malloc(SNOWFLAKE_INCREMENT);
-  new_guild->region = concord_malloc(MAX_REGION_LENGTH);
-  new_guild->afk_channel_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->embed_channel_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->application_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->widget_channel_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->system_channel_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->rules_channel_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->joined_at = concord_malloc(SNOWFLAKE_TIMESTAMP);
-  new_guild->vanity_url_code = concord_malloc(SNOWFLAKE_INCREMENT);
-  new_guild->description = concord_malloc(DESCRIPTION_LENGTH);
-  new_guild->banner = concord_malloc(MAX_HASH_LENGTH);
-  new_guild->preferred_locale = concord_malloc(MAX_LOCALE_LENGTH);
-  new_guild->public_updates_channel_id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  concord_guild_st *new_guild = safe_malloc(sizeof *new_guild);
+  new_guild->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->name = safe_malloc(NAME_LENGTH);
+  new_guild->icon = safe_malloc(MAX_HASH_LENGTH);
+  new_guild->discovery_splash = safe_malloc(MAX_HASH_LENGTH);
+  new_guild->owner_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->permissions_new = safe_malloc(SNOWFLAKE_INCREMENT);
+  new_guild->region = safe_malloc(MAX_REGION_LENGTH);
+  new_guild->afk_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->embed_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->application_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->widget_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->system_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->rules_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_guild->joined_at = safe_malloc(SNOWFLAKE_TIMESTAMP);
+  new_guild->vanity_url_code = safe_malloc(SNOWFLAKE_INCREMENT);
+  new_guild->description = safe_malloc(DESCRIPTION_LENGTH);
+  new_guild->banner = safe_malloc(MAX_HASH_LENGTH);
+  new_guild->preferred_locale = safe_malloc(MAX_LOCALE_LENGTH);
+  new_guild->public_updates_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
 
   return new_guild;
 }
@@ -41,31 +41,31 @@ concord_guild_init(concord_utils_st* utils)
 void
 concord_guild_destroy(concord_guild_st *guild)
 {
-  concord_free(guild->id);
-  concord_free(guild->name);
-  concord_free(guild->icon);
-  concord_free(guild->discovery_splash);
-  concord_free(guild->owner_id);
-  concord_free(guild->permissions_new);
-  concord_free(guild->region);
-  concord_free(guild->afk_channel_id);
-  concord_free(guild->embed_channel_id);
-  concord_free(guild->application_id);
-  concord_free(guild->widget_channel_id);
-  concord_free(guild->system_channel_id);
-  concord_free(guild->rules_channel_id);
-  concord_free(guild->joined_at);
-  concord_free(guild->vanity_url_code);
-  concord_free(guild->description);
-  concord_free(guild->banner);
-  concord_free(guild->preferred_locale);
-  concord_free(guild->public_updates_channel_id);
+  safe_free(guild->id);
+  safe_free(guild->name);
+  safe_free(guild->icon);
+  safe_free(guild->discovery_splash);
+  safe_free(guild->owner_id);
+  safe_free(guild->permissions_new);
+  safe_free(guild->region);
+  safe_free(guild->afk_channel_id);
+  safe_free(guild->embed_channel_id);
+  safe_free(guild->application_id);
+  safe_free(guild->widget_channel_id);
+  safe_free(guild->system_channel_id);
+  safe_free(guild->rules_channel_id);
+  safe_free(guild->joined_at);
+  safe_free(guild->vanity_url_code);
+  safe_free(guild->description);
+  safe_free(guild->banner);
+  safe_free(guild->preferred_locale);
+  safe_free(guild->public_updates_channel_id);
 
   if (NULL != guild->channels){
     jscon_destroy(guild->channels);
   }
 
-  concord_free(guild);
+  safe_free(guild);
 }
 
 static void

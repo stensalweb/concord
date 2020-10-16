@@ -15,13 +15,13 @@
 concord_user_st*
 concord_user_init(concord_utils_st *utils)
 {
-  concord_user_st *new_user = concord_malloc(sizeof *new_user);
-  new_user->id = concord_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_user->username = concord_malloc(USERNAME_LENGTH);
-  new_user->discriminator = concord_malloc(DISCRIMINATOR_LENGTH);
-  new_user->avatar = concord_malloc(MAX_HASH_LENGTH);
-  new_user->locale = concord_malloc(MAX_LOCALE_LENGTH);
-  new_user->email = concord_malloc(MAX_EMAIL_LENGTH);
+  concord_user_st *new_user = safe_malloc(sizeof *new_user);
+  new_user->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+  new_user->username = safe_malloc(USERNAME_LENGTH);
+  new_user->discriminator = safe_malloc(DISCRIMINATOR_LENGTH);
+  new_user->avatar = safe_malloc(MAX_HASH_LENGTH);
+  new_user->locale = safe_malloc(MAX_LOCALE_LENGTH);
+  new_user->email = safe_malloc(MAX_EMAIL_LENGTH);
 
   return new_user;
 }
@@ -29,18 +29,18 @@ concord_user_init(concord_utils_st *utils)
 void
 concord_user_destroy(concord_user_st *user)
 {
-  concord_free(user->id);
-  concord_free(user->username);
-  concord_free(user->discriminator);
-  concord_free(user->avatar);
-  concord_free(user->locale);
-  concord_free(user->email);
+  safe_free(user->id);
+  safe_free(user->username);
+  safe_free(user->discriminator);
+  safe_free(user->avatar);
+  safe_free(user->locale);
+  safe_free(user->email);
 
   if (NULL != user->guilds){
     jscon_destroy(user->guilds);
   }
 
-  concord_free(user);
+  safe_free(user);
 }
 
 static void

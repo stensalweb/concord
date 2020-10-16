@@ -7,7 +7,7 @@
     somewhere */
 //this is redefined as a macro
 void*
-__concord_malloc(size_t size, unsigned long line, char file[])
+__safe_malloc(size_t size, unsigned long line, char file[])
 {
   void *ptr = calloc(1, size);
 
@@ -22,7 +22,7 @@ __concord_malloc(size_t size, unsigned long line, char file[])
 
 //this is redefined as a macro
 void
-__concord_free(void **p_ptr)
+__safe_free(void **p_ptr)
 {
   if(NULL != p_ptr){
     free(*p_ptr);

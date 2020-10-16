@@ -149,9 +149,6 @@ typedef enum {
   SCHEDULE = 1,
 } concord_request_method_et;
 
-/* max active tasks before schedule automatically executes tasks on hold */
-#define SCHEDULE_MAX_ACTIVE 5
-
 struct curl_response_s {
   char *str;
   size_t size;
@@ -174,14 +171,14 @@ struct concord_clist_s {
 };
 
 /* @todo i can get rid of this */
-struct concord_ratelimit_s {
+struct concord_header_s {
   char *bucket;
   char *limit;
   char *remaining;
   char *reset;
   char *reset_after;
 
-  struct hashtable_s *header_hashtable; //keys are method specific
+  struct hashtable_s *hashtable;
 
   jscon_item_st *exceed_rate_limit; //on HTTP 429 response the API will return a JSON body
 };
@@ -194,7 +191,7 @@ typedef void (concord_method_ft)(struct concord_utils_s *utils, struct concord_c
 typedef struct concord_utils_s {
   struct curl_slist *request_header; /* @todo this could be a global, as it is a READ-ONLY variable */
 
-  struct concord_ratelimit_s ratelimit;
+  struct concord_header_s *header; /* this holds the http response header */
 
   /* SCHEDULE METHOD USAGE */
   CURLM *multi_handle;
@@ -229,10 +226,10 @@ typedef struct concord_s {
 } concord_st;
 
 
-void __concord_free(void **p_ptr);
-#define concord_free(n) __concord_free((void**)&n)
-void* __concord_malloc(size_t size, unsigned long line, char file[]);
-#define concord_malloc(n) __concord_malloc(n, __LINE__, __FILE__)
+void __safe_free(void **p_ptr);
+#define safe_free(n) __safe_free((void**)&n)
+void* __safe_malloc(size_t size, unsigned long line, char file[]);
+#define safe_malloc(n) __safe_malloc(n, __LINE__, __FILE__)
 
 void concord_request_method(concord_st *concord, concord_request_method_et method);
 void concord_dispatch(concord_utils_st *utils);

@@ -56,34 +56,28 @@
   #define WAITMS(t) usleep((t)*1000)
 #endif
 
-static double
-_concord_parse_ratelimit(struct concord_ratelimit_s *ratelimit, _Bool use_clock)
+static float
+_concord_parse_ratelimit_header(struct concord_header_s *header, _Bool use_clock)
 {
-  if (true == use_clock || !strtod(ratelimit->reset_after, NULL)){
+  if (true == use_clock || !strtod(header->reset_after, NULL)){
     struct timeval te;
 
     gettimeofday(&te, NULL); //get current time
     
-    double utc = te.tv_sec*1000 + te.tv_usec/1000; //calculate milliseconds
-    double reset = strtod(ratelimit->reset, NULL) * 1000;
+    float utc = te.tv_sec*1000 + te.tv_usec/1000; //calculate milliseconds
+    float reset = strtod(header->reset, NULL) * 1000;
 
     return reset - utc + 1000;
   }
 
-  return strtod(ratelimit->reset_after, NULL);
+  return strtod(header->reset_after, NULL);
 }
-
-#define XRL_BUCKET      "x-ratelimit-bucket"
-#define XRL_LIMIT       "x-ratelimit-limit"
-#define XRL_REMAINING   "x-ratelimit-remaining"
-#define XRL_RESET       "x-ratelimit-reset"
-#define XRL_RESET_AFTER "x-ratelimit-reset-after"
 
 static size_t
 _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   int realsize = size * nmemb;
-  struct concord_ratelimit_s *ratelimit = (struct concord_ratelimit_s*)p_userdata;
+  struct concord_header_s *header = (struct concord_header_s*)p_userdata;
 
   int len=0;
   while (!iscntrl(content[len]))
@@ -93,6 +87,7 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
       continue;
     } 
 
+    /* @todo implement with strncasecmp */
     if (0 != strncmp(content, "x-ratelimit", 11)){ 
       break;
     }
@@ -101,8 +96,8 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
     strncpy(key, content, len);
     key[len] = '\0';
 
-    char **rl_field = hashtable_get(ratelimit->header_hashtable, key);
-    concord_free(*rl_field);
+    char **rl_field = hashtable_get(header->hashtable, key);
+    safe_free(*rl_field);
 
     
     *rl_field = strndup(&content[len+2], realsize - len+2);
@@ -148,7 +143,7 @@ _concord_curl_easy_init(concord_utils_st *utils, struct concord_clist_s *conn)
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, &conn->response_body);
 
   curl_easy_setopt(new_easy_handle, CURLOPT_HEADERFUNCTION, &_concord_curl_header_cb);
-  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERDATA, &utils->ratelimit);
+  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERDATA, utils->header);
 
   return new_easy_handle;
 }
@@ -170,7 +165,7 @@ static void
 _concord_clist_append(concord_utils_st *utils, struct concord_clist_s **p_new_conn, char endpoint[])
 {
   struct concord_clist_s *last;
-  struct concord_clist_s *new_conn = concord_malloc(sizeof *new_conn);
+  struct concord_clist_s *new_conn = safe_malloc(sizeof *new_conn);
 
   new_conn->easy_handle = _concord_curl_easy_init(utils, new_conn);
 
@@ -197,9 +192,9 @@ _concord_clist_free_all(struct concord_clist_s *conn)
   do {
     next_conn = conn->next;
     curl_easy_cleanup(conn->easy_handle);
-    concord_free(conn->conn_key);
-    concord_free(conn->easy_key);
-    concord_free(conn);
+    safe_free(conn->conn_key);
+    safe_free(conn->easy_key);
+    safe_free(conn);
     conn = next_conn;
   } while (next_conn);
 }
@@ -309,9 +304,9 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
   if (NULL != conn->response_body.str){
     /* @todo for some reason only getting a single header when
         doing blocking, find out why */
-    double delay_ms;
-    if (0 != strtol(utils->ratelimit.remaining, NULL, 10)){
-      delay_ms = _concord_parse_ratelimit(&utils->ratelimit, false);
+    float delay_ms;
+    if (0 != strtol(utils->header->remaining, NULL, 10)){
+      delay_ms = _concord_parse_ratelimit_header(utils->header, false);
     } else {
       delay_ms = 0;
     }
@@ -323,7 +318,7 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
 
     conn->p_object = NULL;
 
-    concord_free(conn->response_body.str);
+    safe_free(conn->response_body.str);
     conn->response_body.size = 0;
   }
 }
@@ -334,11 +329,6 @@ _concord_set_curl_multi(concord_utils_st *utils, struct concord_clist_s *conn)
   if (NULL != conn->easy_handle){
     curl_multi_add_handle(utils->multi_handle, conn->easy_handle);
     ++utils->active_handles;
-
-    /* dispatch instantly if hit max active handles limit */
-    if (SCHEDULE_MAX_ACTIVE == utils->active_handles){
-      concord_dispatch(utils);
-    }
   }
 }
 
@@ -348,7 +338,7 @@ concord_dispatch(concord_utils_st *utils)
 {
   int transfers_running = 0; /* keep number of running handles */
   int repeats = 0;
-  double delay_ms = 0;
+  float delay_ms = 1000;
   do {
     CURLMcode mcode;
     int numfds;
@@ -375,10 +365,10 @@ concord_dispatch(concord_utils_st *utils)
         WAITMS(100); /* sleep 100 milliseconds */
       }
     } else {
-      /* @todo segmentation fault occurring when doing valgrind and utils->ratelimit
+      /* @todo segmentation fault occurring when doing valgrind and utils->header
           has a null attribute being checked */
-      if (utils->ratelimit.remaining && 0 != strtol(utils->ratelimit.remaining, NULL, 10)){
-        delay_ms = _concord_parse_ratelimit(&utils->ratelimit, true);
+      if (utils->header->remaining && 0 != strtol(utils->header->remaining, NULL, 10)){
+        delay_ms = _concord_parse_ratelimit_header(utils->header, true);
       } else {
         delay_ms = 0;
       }
@@ -408,11 +398,10 @@ concord_dispatch(concord_utils_st *utils)
 
       conn->p_object = NULL;
 
-      concord_free(conn->response_body.str);
+      safe_free(conn->response_body.str);
       conn->response_body.size = 0;
     }
 
-    /* @todo this probably should be inside the above if condition */
     curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
     --utils->active_handles;
   }
@@ -478,13 +467,81 @@ _concord_init_request_header(concord_utils_st *utils)
   return new_header;
 }
 
+#define XRL_BUCKET      "x-ratelimit-bucket"
+#define XRL_LIMIT       "x-ratelimit-limit"
+#define XRL_REMAINING   "x-ratelimit-remaining"
+#define XRL_RESET       "x-ratelimit-reset"
+#define XRL_RESET_AFTER "x-ratelimit-reset-after"
+
+static struct concord_header_s*
+_concord_utils_header_init()
+{
+  struct concord_header_s *new_header = safe_malloc(sizeof *new_header);
+
+  new_header->hashtable = hashtable_init();
+  hashtable_build(new_header->hashtable, 15);
+
+  char *key; 
+  key = strdup(XRL_BUCKET);
+  assert(NULL != key);
+  hashtable_set(new_header->hashtable, key, &new_header->bucket);
+
+  key = strdup(XRL_LIMIT);
+  assert(NULL != key);
+  hashtable_set(new_header->hashtable, key, &new_header->limit);
+
+  key = strdup(XRL_REMAINING);
+  assert(NULL != key);
+  hashtable_set(new_header->hashtable, key, &new_header->remaining);
+
+  key = strdup(XRL_RESET);
+  assert(NULL != key);
+  hashtable_set(new_header->hashtable, key, &new_header->reset);
+
+  key = strdup(XRL_RESET_AFTER);
+  assert(NULL != key);
+  hashtable_set(new_header->hashtable, key, &new_header->reset_after);
+
+  return new_header;
+}
+
+static void
+_concord_utils_header_destroy(struct concord_header_s *header)
+{
+  hashtable_entry_st *entry;
+  entry = hashtable_get_entry(header->hashtable, XRL_BUCKET);
+  safe_free(header->bucket);
+  safe_free(entry->key);
+
+  entry = hashtable_get_entry(header->hashtable, XRL_LIMIT);
+  safe_free(header->limit);
+  safe_free(entry->key);
+
+  entry = hashtable_get_entry(header->hashtable, XRL_REMAINING);
+  safe_free(header->remaining);
+  safe_free(entry->key);
+
+  entry = hashtable_get_entry(header->hashtable, XRL_RESET);
+  safe_free(header->reset);
+  safe_free(entry->key);
+
+  entry = hashtable_get_entry(header->hashtable, XRL_RESET_AFTER);
+  safe_free(header->reset_after);
+  safe_free(entry->key);
+
+  hashtable_destroy(header->hashtable);
+
+  safe_free(header);
+}
+
 static concord_utils_st*
 _concord_utils_init(char token[])
 {
-  concord_utils_st *new_utils = concord_malloc(sizeof *new_utils + strlen(token));
+  concord_utils_st *new_utils = safe_malloc(sizeof *new_utils + strlen(token));
   strncpy(new_utils->token, token, strlen(token)-1);
 
   new_utils->request_header = _concord_init_request_header(new_utils);
+  new_utils->header = _concord_utils_header_init();
 
   new_utils->multi_handle = curl_multi_init();
 
@@ -503,32 +560,6 @@ _concord_utils_init(char token[])
   new_utils->method = SYNC;
   new_utils->method_cb = &_concord_set_curl_easy;
 
-  /* @todo turn into a function */
-  struct concord_ratelimit_s *ratelimit = &new_utils->ratelimit;
-  ratelimit->header_hashtable = hashtable_init();
-  hashtable_build(ratelimit->header_hashtable, 15);
-
-  char *key; 
-  key = strdup(XRL_BUCKET);
-  assert(NULL != key);
-  hashtable_set(ratelimit->header_hashtable, key, &ratelimit->bucket);
-
-  key = strdup(XRL_LIMIT);
-  assert(NULL != key);
-  hashtable_set(ratelimit->header_hashtable, key, &ratelimit->limit);
-
-  key = strdup(XRL_REMAINING);
-  assert(NULL != key);
-  hashtable_set(ratelimit->header_hashtable, key, &ratelimit->remaining);
-
-  key = strdup(XRL_RESET);
-  assert(NULL != key);
-  hashtable_set(ratelimit->header_hashtable, key, &ratelimit->reset);
-
-  key = strdup(XRL_RESET_AFTER);
-  assert(NULL != key);
-  hashtable_set(ratelimit->header_hashtable, key, &ratelimit->reset_after);
-
   return new_utils;
 }
 
@@ -541,31 +572,9 @@ _concord_utils_destroy(concord_utils_st *utils)
   curl_share_cleanup(utils->easy_share);
   hashtable_destroy(utils->easy_hashtable);
   hashtable_destroy(utils->conn_hashtable);
+  _concord_utils_header_destroy(utils->header);
 
-  hashtable_entry_st *entry;
-  entry = hashtable_get_entry(utils->ratelimit.header_hashtable, XRL_BUCKET);
-  concord_free(utils->ratelimit.bucket);
-  free(entry->key);
-
-  entry = hashtable_get_entry(utils->ratelimit.header_hashtable, XRL_LIMIT);
-  concord_free(utils->ratelimit.limit);
-  free(entry->key);
-
-  entry = hashtable_get_entry(utils->ratelimit.header_hashtable, XRL_REMAINING);
-  concord_free(utils->ratelimit.remaining);
-  free(entry->key);
-
-  entry = hashtable_get_entry(utils->ratelimit.header_hashtable, XRL_RESET);
-  concord_free(utils->ratelimit.reset);
-  free(entry->key);
-
-  entry = hashtable_get_entry(utils->ratelimit.header_hashtable, XRL_RESET_AFTER);
-  concord_free(utils->ratelimit.reset_after);
-  free(entry->key);
-
-  hashtable_destroy(utils->ratelimit.header_hashtable);
-
-  concord_free(utils);
+  safe_free(utils);
 }
 
 void
@@ -610,7 +619,7 @@ Concord_perform_request(
 concord_st*
 concord_init(char token[])
 {
-  concord_st *new_concord = concord_malloc(sizeof *new_concord);
+  concord_st *new_concord = safe_malloc(sizeof *new_concord);
 
   new_concord->utils = _concord_utils_init(token);
 
@@ -631,7 +640,7 @@ concord_cleanup(concord_st *concord)
   concord_user_destroy(concord->client);
   _concord_utils_destroy(concord->utils);
 
-  concord_free(concord);
+  safe_free(concord);
 }
 
 void
