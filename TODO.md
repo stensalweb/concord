@@ -4,6 +4,8 @@ This document describes features to be incorporated in the future.
 
 ## HIGH
 
+- Replace `curl_multi_wait` with its [event driven](https://ec.haxx.se/libcurl/libcurl-drive/libcurl-drive-multi-socket) counterpart
+  - Alongside with libuv
 - Implement Discord Gateway (WebSockets) support
   - Intuitive event handler
   - Resume logic on error
@@ -18,8 +20,6 @@ This document describes features to be incorporated in the future.
 
 ## MEDIUM
 
-- There are more advantageous options for doing async transfers, with either [poll or epoll](https://daniel.haxx.se/docs/poll-vs-select.html). I must learn about each of those options, check whether those advantages apply to this library's goal or not. ( see `concord_dispatch()` )
-  - Update libcurl to at least 7.66.0 for [`curl_multi_poll()`](https://daniel.haxx.se/docs/poll-vs-select.html)
 - Custom hashtable implementation that share entries among them (for when hashtables hold the same entries but with different keys)
 
 ## LOW
