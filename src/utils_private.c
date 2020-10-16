@@ -48,7 +48,7 @@ Utils_parse_ratelimit_header(struct concord_header_s *header, bool use_clock)
     long long utc = te.tv_sec*1000 + te.tv_usec/1000; //calculate milliseconds
     long long reset = strtoll(header->reset, NULL, 10) * 1000;
 
-    return abs(reset - utc);
+    return reset - utc;
   }
 
   return strtoll(header->reset_after, NULL, 10);

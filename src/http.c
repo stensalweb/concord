@@ -16,27 +16,34 @@
 #include "utils_private.h"
 
 
+/* @todo there has to be things I'm missing */
 static size_t
 _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   int realsize = size * nmemb;
   struct concord_header_s *header = (struct concord_header_s*)p_userdata;
 
+  /* splits key from value at the current header line being read */
   int len=0;
-  while (!iscntrl(content[len]))
+  while (!iscntrl(content[len])) //stops at CRLF
   {
     if (':' != content[len]){
+      /* these chars belong to the key */
       ++len;
       continue;
     } 
 
+    /* we only want key/value pairs for ratelimiting */
     /* @todo implement with strncasecmp */
     if (0 != strncmp(content, "x-ratelimit", 11)) break;
 
     char key[30];
-    strncpy(key, content, len);
+    strncpy(key, content, len); //isolate key found
     key[len] = '\0';
 
+
+    /* if there's a value already assigned to this key, free it and
+        update its value with the new one*/
     char **rl_field = hashtable_get(header->hashtable, key);
     safe_free(*rl_field);
     
@@ -47,9 +54,10 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
   }
 
 
-  return (size_t)realsize;
+  return (size_t)realsize; //return value for curl internals
 }
 
+/* get curl response body */
 static size_t
 _concord_curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
@@ -88,6 +96,9 @@ _concord_curl_easy_init(concord_utils_st *utils, struct concord_clist_s *conn)
   return new_easy_handle;
 }
 
+/* @todo as the number of active easy_handle increases, this function becomes unnecessarily
+    slow (i think? didn't really check but seems like it would), this can be solved by storing
+    the last node at all times */
 static struct concord_clist_s*
 _concord_clist_get_last(struct concord_clist_s *conn_list)
 {
@@ -101,6 +112,7 @@ _concord_clist_get_last(struct concord_clist_s *conn_list)
   return iter;
 }
 
+/* appends new connection node to the end of the list */
 static void
 _concord_clist_append(concord_utils_st *utils, struct concord_clist_s **p_new_conn, char endpoint[])
 {
@@ -476,6 +488,7 @@ _concord_utils_init(char token[])
   new_utils->conn_hashtable = hashtable_init();
   hashtable_build(new_utils->conn_hashtable, UTILS_HASHTABLE_SIZE);
 
+  /* defaults to synchronous transfers method */
   new_utils->method = SYNC;
   new_utils->method_cb = &_concord_set_curl_easy;
 
@@ -508,6 +521,8 @@ Concord_perform_request(
   switch (utils->method){
   case SCHEDULE:
    {
+      /* for schedule we will create exclusive easy_handles, so that there won't
+          be any conflict changing between SYNC and SCHEDULE methods */
       char task_key[15];
       sprintf(task_key, "ScheduleTask#%ld", utils->active_handles);
 
@@ -564,7 +579,8 @@ concord_cleanup(concord_st *concord)
 
 void
 concord_global_init(){
-  curl_global_init(CURL_GLOBAL_DEFAULT);
+  int code = curl_global_init(CURL_GLOBAL_DEFAULT);
+  logger_excep(0 != code, "ERROR: Couldn't start curl_global_init()");
 }
 
 void
