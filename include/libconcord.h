@@ -173,16 +173,15 @@ struct concord_clist_s {
   struct concord_clist_s *next;
 };
 
-
+/* @todo i can get rid of this */
 struct concord_ratelimit_s {
-  char bucket[32];
-  int limit;
-  int remaining;
-  double reset;
-  double reset_after;
+  char *bucket;
+  char *limit;
+  char *remaining;
+  char *reset;
+  char *reset_after;
 
-
-  double delay;
+  struct hashtable_s *header_hashtable; //keys are method specific
 
   jscon_item_st *exceed_rate_limit; //on HTTP 429 response the API will return a JSON body
 };
