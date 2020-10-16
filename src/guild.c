@@ -9,7 +9,7 @@
 
 #include <libconcord.h>
 
-#include "api_wrapper_private.h"
+#include "http_private.h"
 
 concord_guild_st*
 concord_guild_init(concord_utils_st* utils)

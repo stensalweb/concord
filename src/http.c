@@ -3,76 +3,18 @@
 #include <assert.h>
 #include <string.h>
 #include <ctype.h>
-#include <stdbool.h>
 
 //#include <curl/curl.h>
 //#include <libjscon.h>
 
 #include <libconcord.h>
 
+#include "http_private.h"
+
 #include "hashtable.h"
-#include "api_wrapper_private.h"
 #include "logger.h"
-#include "utils.h"
+#include "utils_private.h"
 
-/* code excerpt taken from
-  https://raw.githubusercontent.com/Michaelangel007/buddhabrot/master/buddhabrot.cpp */
-#ifdef _WIN32
-  #define WIN32_LEAN_AND_MEAN
-  #define NOMINMAX
-  #include <Windows.h> // Windows.h -> WinDef.h defines min() max()
-
-  typedef struct timeval {
-    long tv_sec;
-    long tv_usec;
-  } timeval;
-
-  int gettimeofday(struct timeval *tp, struct timezone *tzp)
-  {
-    // FILETIME JAN 1 1970 00:00:00
-    /* Note: some broken version only have 8 trailing zero's, the corret epoch has 9
-        trailing zero's */
-    static cont uint64_t EPOCH = ((uint64_t) 116444736000000000ULL);
-
-    SYSTEMTIME  nSystemTime;
-    FILETIME    nFileTime;
-    uint64_t    ntime;
-
-    GetSystemTime( &nSystemTime );
-    SystemTimeToFileTime( &nSystemTime, &nFileTime );
-    nTime = ((uint64_t)nFileTime.dwLowDateTime );
-    nTime += ((uint64_t)nFileTime.dwHighDateTime) << 32;
-
-    tp->tv_sec = (long) ((nTime - EPOCH) / 10000000L);
-    tp->tv_sec = (long) (nSystemTime.wMilliseconds * 1000);
-
-    return 0;
-  }
-
-  #define WAITMS(t) Sleep(t)
-#else 
-  #include <sys/time.h>
-  #include <unistd.h>
-
-  #define WAITMS(t) usleep((t)*1000)
-#endif
-
-static float
-_concord_parse_ratelimit_header(struct concord_header_s *header, _Bool use_clock)
-{
-  if (true == use_clock || !utils_strtof(header->reset_after)){
-    struct timeval te;
-
-    gettimeofday(&te, NULL); //get current time
-    
-    float utc = te.tv_sec*1000 + te.tv_usec/1000; //calculate milliseconds
-    float reset = utils_strtof(header->reset) * 1000;
-
-    return reset - utc + 1000;
-  }
-
-  return utils_strtof(header->reset_after);
-}
 
 static size_t
 _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
@@ -99,7 +41,6 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
 
     char **rl_field = hashtable_get(header->hashtable, key);
     safe_free(*rl_field);
-
     
     *rl_field = strndup(&content[len+2], realsize - len+2);
     assert(NULL != *rl_field);
@@ -305,9 +246,9 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
   if (NULL != conn->response_body.str){
     /* @todo for some reason only getting a single header when
         doing blocking, find out why */
-    float delay_ms;
-    if (0 != utils_strtol(utils->header->remaining)){
-      delay_ms = _concord_parse_ratelimit_header(utils->header, false);
+    long long delay_ms;
+    if (0 != strtol(utils->header->remaining, NULL, 10)){
+      delay_ms = Utils_parse_ratelimit_header(utils->header, false);
     } else {
       delay_ms = 0;
     }
@@ -335,11 +276,13 @@ _concord_set_curl_multi(concord_utils_st *utils, struct concord_clist_s *conn)
 
 /* wrapper around curl_multi_perform() , using poll() */
 void
-concord_dispatch(concord_utils_st *utils)
+concord_dispatch(concord_st *concord)
 {
+  concord_utils_st *utils = concord->utils;
+
   int transfers_running = 0; /* keep number of running handles */
   int repeats = 0;
-  float delay_ms = 1000;
+  long long delay_ms = 0;
   do {
     CURLMcode mcode;
     int numfds;
@@ -363,13 +306,16 @@ concord_dispatch(concord_utils_st *utils)
         WAITMS(100); /* sleep 100 milliseconds */
       }
     } else {
-      /* @todo segmentation fault occurring when doing valgrind and utils->header
-          has a null attribute being checked */
-      if (0 != utils_strtol(utils->header->remaining)){
-        delay_ms = _concord_parse_ratelimit_header(utils->header, true);
+      /* @todo this is really shady */
+      if (NULL == utils->header->reset) continue;
+
+      if (0 != strtol(utils->header->remaining, NULL, 10)){
+        delay_ms = Utils_parse_ratelimit_header(utils->header, true);
       } else {
         delay_ms = 0;
       }
+      /* this too */
+      safe_free(utils->header->reset);
 
       repeats = 0;
     }

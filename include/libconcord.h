@@ -1,8 +1,9 @@
 #ifndef LIBCONCORD_H_
 #define LIBCONCORD_H_
 
-#include <curl/curl.h>
+#include <stdbool.h>
 
+#include <curl/curl.h>
 #include <libjscon.h>
 
 #define BASE_URL "https://discord.com/api"
@@ -57,7 +58,7 @@ typedef struct {
   jscon_item_st *permission_overwrites;
   char *name;
   char *topic;
-  _Bool nsfw;
+  bool nsfw;
   char *last_message_id;
   long long bitrate;
   long long user_limit;
@@ -80,14 +81,14 @@ typedef struct {
   char *icon;
   char *splash;
   char *discovery_splash;
-  _Bool owner;
+  bool owner;
   char *owner_id;
   long long permissions;
   char *permissions_new;
   char *region;
   char *afk_channel_id;
   long long afk_timeout;
-  _Bool embed_enabled;
+  bool embed_enabled;
   char *embed_channel_id;
   long long verification_level;
   long long default_message_notifications;
@@ -97,14 +98,14 @@ typedef struct {
   jscon_item_st *features;
   long long mfa_level;
   char *application_id;
-  _Bool widget_enabled;
+  bool widget_enabled;
   char *widget_channel_id;
   char *system_channel_id;
   long long system_channel_flags;
   char *rules_channel_id;
   char *joined_at;
-  _Bool large;
-  _Bool unavailable;
+  bool large;
+  bool unavailable;
   long long member_count;
   jscon_item_st *voice_states;
   jscon_item_st *members;
@@ -132,11 +133,11 @@ typedef struct {
   char *username;
   char *discriminator;
   char *avatar;
-  _Bool bot;
-  _Bool sys;
-  _Bool mfa_enabled;
+  bool bot;
+  bool sys;
+  bool mfa_enabled;
   char *locale;
-  _Bool verified;
+  bool verified;
   char *email;
   long long flags;
   long long premium_type;
@@ -232,7 +233,7 @@ void* __safe_malloc(size_t size, unsigned long line, char file[]);
 #define safe_malloc(n) __safe_malloc(n, __LINE__, __FILE__)
 
 void concord_request_method(concord_st *concord, concord_request_method_et method);
-void concord_dispatch(concord_utils_st *utils);
+void concord_dispatch(concord_st *concord);
 
 void concord_global_init();
 void concord_global_cleanup();

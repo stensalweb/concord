@@ -14,7 +14,8 @@ OBJS = 	$(OBJDIR)/test.o \
 	$(OBJDIR)/channel.o \
 	$(OBJDIR)/user.o \
 	$(OBJDIR)/guild.o \
-	$(OBJDIR)/api_wrapper.o
+	$(OBJDIR)/utils_private.o \
+	$(OBJDIR)/http.o
 
 MAIN = test.c
 MAIN_O = $(OBJDIR)/test.o

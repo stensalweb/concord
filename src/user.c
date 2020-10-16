@@ -9,7 +9,7 @@
 
 #include <libconcord.h>
 
-#include "api_wrapper_private.h"
+#include "http_private.h"
 #include "logger.h"
 
 concord_user_st*

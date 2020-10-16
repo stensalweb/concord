@@ -18,7 +18,7 @@ int main(void)
 
   concord_user_st *client = concord_user_init();
   concord_get_client_guilds(concord, &client);
-  concord_dispatch(concord->utils);
+  concord_dispatch(concord);
 
   /* THIS WILL FETCH CHANNELS FROM EACH GUILD BOT IS A PART OF */
   concord_guild_st **guilds = safe_malloc(jscon_size(client->guilds) * sizeof *guilds);
@@ -31,7 +31,7 @@ int main(void)
     concord_get_guild(concord, guild_id, guilds+i);
     concord_get_guild_channels(concord, guild_id, guilds+i);
   }
-  concord_dispatch(concord->utils);
+  concord_dispatch(concord);
 
 
   // FETCH 50 MESSAGES FROM EACH CHANNEL FROM FIRST GUILD AND WILL OUTPUT THEM TO A a.out FILE
@@ -45,7 +45,7 @@ int main(void)
     channels[i] = concord_channel_init();
     concord_get_channel_messages(concord, channel_id, channels+i);
   }
-  concord_dispatch(concord->utils);
+  concord_dispatch(concord);
 /*
   FILE *f_out = fopen("a.out", "w");
   assert(NULL != f_out);
