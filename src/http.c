@@ -31,9 +31,7 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
     } 
 
     /* @todo implement with strncasecmp */
-    if (0 != strncmp(content, "x-ratelimit", 11)){ 
-      break;
-    }
+    if (0 != strncmp(content, "x-ratelimit", 11)) break;
 
     char key[30];
     strncpy(key, content, len);
@@ -44,6 +42,7 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
     
     *rl_field = strndup(&content[len+2], realsize - len+2);
     assert(NULL != *rl_field);
+
     break;
   }
 
@@ -58,8 +57,7 @@ _concord_curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata
   struct curl_response_s *response_body = (struct curl_response_s*)p_userdata;
 
   char *tmp = realloc(response_body->str, response_body->size + realsize + 1);
-
-  if (tmp == NULL) return 0;
+  assert(NULL != tmp);
 
   response_body->str = tmp;
   memcpy((char*)response_body->str + response_body->size, content, realsize);
@@ -250,7 +248,7 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
     if (0 != strtol(utils->header->remaining, NULL, 10)){
       delay_ms = Utils_parse_ratelimit_header(utils->header, false);
     } else {
-      delay_ms = 0;
+      delay_ms = 100;
     }
 
     WAITMS(delay_ms);
@@ -275,6 +273,8 @@ _concord_set_curl_multi(concord_utils_st *utils, struct concord_clist_s *conn)
 }
 
 /* wrapper around curl_multi_perform() , using poll() */
+/* @todo I think I'm not using curl_multi_wait timeout parameter as I should,
+    or it's not doing what I think it is */
 void
 concord_dispatch(concord_st *concord)
 {
@@ -282,14 +282,13 @@ concord_dispatch(concord_st *concord)
 
   int transfers_running = 0; /* keep number of running handles */
   int repeats = 0;
-  long long delay_ms = 0;
+  long delay_ms = 100;
   do {
     CURLMcode mcode;
     int numfds;
 
     mcode = curl_multi_perform(utils->multi_handle, &transfers_running);
-
-    if (CURLM_OK == mcode){
+    if (delay_ms > 0 && CURLM_OK == mcode){
       /* wait for activity, timeout or "nothing" */
       mcode = curl_multi_wait(utils->multi_handle, NULL, 0, delay_ms, &numfds);
     }
@@ -306,16 +305,13 @@ concord_dispatch(concord_st *concord)
         WAITMS(100); /* sleep 100 milliseconds */
       }
     } else {
-      /* @todo this is really shady */
-      if (NULL == utils->header->reset) continue;
+      if (NULL == utils->header->remaining) continue;
 
       if (0 != strtol(utils->header->remaining, NULL, 10)){
         delay_ms = Utils_parse_ratelimit_header(utils->header, true);
       } else {
-        delay_ms = 0;
+        delay_ms = 100;
       }
-      /* this too */
-      safe_free(utils->header->reset);
 
       repeats = 0;
     }

@@ -21,17 +21,17 @@
         trailing zero's */
     static cont uint64_t EPOCH = ((uint64_t) 116444736000000000ULL);
 
-    SYSTEMTIME  nSystemTime;
-    FILETIME    nFileTime;
-    uint64_t    ntime;
+    SYSTEMTIME nSystemTime;
+    FILETIME nFileTime;
+    uint64_t ntime;
 
-    GetSystemTime( &nSystemTime );
-    SystemTimeToFileTime( &nSystemTime, &nFileTime );
-    nTime = ((uint64_t)nFileTime.dwLowDateTime );
+    GetSystemTime(&nSystemTime);
+    SystemTimeToFileTime(&nSystemTime, &nFileTime);
+    nTime = ((uint64_t)nFileTime.dwLowDateTime);
     nTime += ((uint64_t)nFileTime.dwHighDateTime) << 32;
 
-    tp->tv_sec = (long) ((nTime - EPOCH) / 10000000L);
-    tp->tv_sec = (long) (nSystemTime.wMilliseconds * 1000);
+    tp->tv_sec = (long)((nTime - EPOCH) / 10000000L);
+    tp->tv_sec = (long)(nSystemTime.wMilliseconds * 1000);
 
     return 0;
   }
@@ -48,7 +48,7 @@ Utils_parse_ratelimit_header(struct concord_header_s *header, bool use_clock)
     long long utc = te.tv_sec*1000 + te.tv_usec/1000; //calculate milliseconds
     long long reset = strtoll(header->reset, NULL, 10) * 1000;
 
-    return reset - utc + 1000;
+    return abs(reset - utc);
   }
 
   return strtoll(header->reset_after, NULL, 10);
