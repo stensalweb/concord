@@ -13,6 +13,7 @@
 #include "hashtable.h"
 #include "api_wrapper_private.h"
 #include "logger.h"
+#include "utils.h"
 
 /* code excerpt taken from
   https://raw.githubusercontent.com/Michaelangel007/buddhabrot/master/buddhabrot.cpp */
@@ -59,18 +60,18 @@
 static float
 _concord_parse_ratelimit_header(struct concord_header_s *header, _Bool use_clock)
 {
-  if (true == use_clock || !strtod(header->reset_after, NULL)){
+  if (true == use_clock || !utils_strtof(header->reset_after)){
     struct timeval te;
 
     gettimeofday(&te, NULL); //get current time
     
     float utc = te.tv_sec*1000 + te.tv_usec/1000; //calculate milliseconds
-    float reset = strtod(header->reset, NULL) * 1000;
+    float reset = utils_strtof(header->reset) * 1000;
 
     return reset - utc + 1000;
   }
 
-  return strtod(header->reset_after, NULL);
+  return utils_strtof(header->reset_after);
 }
 
 static size_t
@@ -305,7 +306,7 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
     /* @todo for some reason only getting a single header when
         doing blocking, find out why */
     float delay_ms;
-    if (0 != strtol(utils->header->remaining, NULL, 10)){
+    if (0 != utils_strtol(utils->header->remaining)){
       delay_ms = _concord_parse_ratelimit_header(utils->header, false);
     } else {
       delay_ms = 0;
@@ -350,10 +351,7 @@ concord_dispatch(concord_utils_st *utils)
       mcode = curl_multi_wait(utils->multi_handle, NULL, 0, delay_ms, &numfds);
     }
 
-    if (CURLM_OK != mcode){
-      logger_throw(curl_multi_strerror(mcode));
-      break;
-    }
+    logger_excep(CURLM_OK != mcode, curl_easy_strerror(mcode));
 
     /* numfds being zero means either a timeout or no file descriptor to
         wait for. Try timeout on first occurrences, then assume no file
@@ -367,7 +365,7 @@ concord_dispatch(concord_utils_st *utils)
     } else {
       /* @todo segmentation fault occurring when doing valgrind and utils->header
           has a null attribute being checked */
-      if (utils->header->remaining && 0 != strtol(utils->header->remaining, NULL, 10)){
+      if (0 != utils_strtol(utils->header->remaining)){
         delay_ms = _concord_parse_ratelimit_header(utils->header, true);
       } else {
         delay_ms = 0;
@@ -508,28 +506,7 @@ _concord_utils_header_init()
 static void
 _concord_utils_header_destroy(struct concord_header_s *header)
 {
-  hashtable_entry_st *entry;
-  entry = hashtable_get_entry(header->hashtable, XRL_BUCKET);
-  safe_free(header->bucket);
-  safe_free(entry->key);
-
-  entry = hashtable_get_entry(header->hashtable, XRL_LIMIT);
-  safe_free(header->limit);
-  safe_free(entry->key);
-
-  entry = hashtable_get_entry(header->hashtable, XRL_REMAINING);
-  safe_free(header->remaining);
-  safe_free(entry->key);
-
-  entry = hashtable_get_entry(header->hashtable, XRL_RESET);
-  safe_free(header->reset);
-  safe_free(entry->key);
-
-  entry = hashtable_get_entry(header->hashtable, XRL_RESET_AFTER);
-  safe_free(header->reset_after);
-  safe_free(entry->key);
-
-  hashtable_destroy(header->hashtable);
+  hashtable_destroy_dict(header->hashtable);
 
   safe_free(header);
 }
