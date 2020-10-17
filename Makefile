@@ -4,12 +4,11 @@ OBJDIR 	= obj
 INCLDIR = include
 LIBDIR 	= lib
 
-#SRC   = $(filter-out src/*_private.c, $(wildcard src/*.c))
-SRC   = $(wildcard src/*.c)
+SRC   = $(filter-out src/%_private.c, $(wildcard src/*.c))
 _OBJS = $(patsubst src/%.c, %.o, $(SRC))
 OBJS  = $(addprefix $(OBJDIR)/, $(_OBJS))
 
-CONCORD_DLIB   = $(LIBDIR)/libconcord.so
+CONCORD_DLIB = $(LIBDIR)/libconcord.so
 
 CFLAGS = -Wall -Werror -pedantic -g \
 	 -I$(INCLDIR) -IJSCON/$(INCLDIR)
