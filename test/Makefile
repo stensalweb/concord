@@ -6,9 +6,9 @@ EXEC = run
 SRC  = test.c
 
 CFLAGS = -Wall -Werror -pedantic -g \
-	 -I$(TOP)/include -I$(TOP)/JSCON/include -I$(TOP)/libuv/include
+	 -I$(TOP)/include -I$(TOP)/JSCON/include
 
-LDLIBS = $(LIBDIR)/* -lcurl
+LDLIBS = -ljscon -lcurl -luv -lconcord
 
 .PHONY : clean purge
 
@@ -19,4 +19,4 @@ $(LIBDIR):
 	$(MAKE) -C $(TOP)
 
 clean :
-	-rm -rf run
+	-rm -rf run *.out
