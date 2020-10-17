@@ -263,7 +263,7 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
       delay_ms = 100;
     }
 
-    WAITMS(delay_ms);
+    uv_sleep(delay_ms);
 
     //logger_throw(conn->response_body.str);
     (*conn->load_cb)(conn->p_object, &conn->response_body);
@@ -314,7 +314,7 @@ concord_dispatch(concord_st *concord)
     if (0 == numfds){
       ++repeats; /* count number of repeated zero numfds */
       if (repeats > 1){
-        WAITMS(100); /* sleep 100 milliseconds */
+        uv_sleep(100); /* sleep 100 milliseconds */
       }
     } else {
       if (NULL == utils->header->remaining) continue;
