@@ -5,7 +5,9 @@ LIBDIR = $(TOP)/lib
 EXEC = run
 SRC  = test.c
 
-CFLAGS = -Wall -Werror -pedantic -g -I$(TOP)/include -I$(TOP)/JSCON/include
+CFLAGS = -Wall -Werror -pedantic -g \
+	 -I$(TOP)/include -I$(TOP)/JSCON/include -I$(TOP)/libuv/include
+
 LDLIBS = $(LIBDIR)/* -lcurl
 
 .PHONY : clean purge
@@ -18,6 +20,3 @@ $(LIBDIR):
 
 clean :
 	-rm -rf run
-
-purge :
-	$(MAKE) -C $(TOP) purge
