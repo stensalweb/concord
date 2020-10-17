@@ -24,7 +24,6 @@ This document describes features to be incorporated in the future.
 
 ## LOW
 
-- (?) rename SYNC and SCHEDULE references to BLOCKING and MULTIPLEX, respectively. Though I'm not sure which meanings are more intuitive.
 - `curl_update` needs to update nghttp path
 
   
