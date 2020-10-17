@@ -1,57 +1,39 @@
-CFLAGS = -Wall -Werror -pedantic
-LDLIBS = -lcurl $(LIBDIR)/JSCON.a
-CC = gcc
+CC 	= gcc
+SRCDIR 	= src
+OBJDIR 	= obj
+INCLDIR = include
+LIBDIR 	= lib
 
-SRCDIR = src
-OBJDIR = obj
-INCLUDEDIR = -Iinclude -IJSCON/include
-LIBDIR = lib
-LIB = $(LIBDIR)/libconcord.a
-EXEC = run
+SRC   = $(filter-out src/*_private.c, $(wildcard src/*.c))
+_OBJS = $(patsubst src/%.c, %.o, $(SRC))
+OBJS  = $(addprefix $(OBJDIR)/, $(_OBJS))
 
-OBJS = 	$(OBJDIR)/test.o \
-	$(OBJDIR)/memory.o \
-	$(OBJDIR)/channel.o \
-	$(OBJDIR)/user.o \
-	$(OBJDIR)/guild.o \
-	$(OBJDIR)/utils_private.o \
-	$(OBJDIR)/http.o
+CONCORD_LIB = $(LIBDIR)/libconcord.a
+JSCON_LIB   = $(LIBDIR)/libjscon.a
 
-MAIN = test.c
-MAIN_O = $(OBJDIR)/test.o
+CFLAGS = -Wall -Werror -pedantic -g -I$(INCLDIR) -IJSCON/$(INCLDIR)
+LDLIBS = -lcurl $(JSCON_LIB)
 
-.PHONY : clean all debug
+.PHONY : all clean purge
 
-all: $(EXEC)
-
-$(EXEC): build $(LIBDIR)/JSCON.a
-	$(CC) -o $@ $(OBJS) $(LDLIBS)
-
-$(LIBDIR)/JSCON.a: JSCON/obj
-	-ar rcs $@ JSCON/obj/*
-
-JSCON/obj:
-	$(MAKE) -C JSCON
-
-build: mkdir $(MAIN_O) $(OBJS) $(LIB)
+all: mkdir $(JSCON_LIB) $(OBJS) $(CONCORD_LIB)
 
 mkdir:
 	-mkdir -p $(OBJDIR) $(LIBDIR)
 
-$(MAIN_O): $(MAIN)
-	$(CC) $(INCLUDEDIR) -c $< -o $@ $(CFLAGS)
+$(JSCON_LIB):
+	$(MAKE) -C JSCON purge all
+	cp JSCON/libjscon.a $(LIBDIR)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
-	$(CC) $(INCLUDEDIR) -c $< -o $@ $(CFLAGS)
+	$(CC) -c $< -o $@ $(CFLAGS)
 
-$(LIB):
+$(CONCORD_LIB):
 	-ar rcs $@ $(OBJS)
-
-debug : $(EXEC) $(MAIN) $(SRCDIR)/*.c
-	$(CC) -g $(INCLUDEDIR) $(MAIN) $(SRCDIR)/*.c -o debug.out $(CFLAGS) $(LDLIBS)
 
 clean :
 	-rm -rf $(OBJDIR)
 
 purge : clean
-	-rm -rf $(EXEC) $(LIBDIR) *.txt debug.out
+	-rm -rf $(LIBDIR)
+	$(MAKE) -C JSCON purge
