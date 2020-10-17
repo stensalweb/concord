@@ -24,6 +24,7 @@ This document describes features to be incorporated in the future.
 
 ## LOW
 
+- Apply a modifiable limit on how many easy handles are created while doing `ASYNC_IO` requests, before it dispatches automatically, doing this saves a lot of memory
 - `curl_update` needs to update nghttp path
 
   
