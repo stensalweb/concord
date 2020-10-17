@@ -146,8 +146,8 @@ typedef struct {
 } concord_user_st;
 
 typedef enum {
-  SYNC  = 0,
-  SCHEDULE = 1,
+  SYNC_IO  = 0,
+  ASYNC_IO = 1,
 } concord_request_method_et;
 
 struct curl_response_s {
@@ -194,11 +194,11 @@ typedef struct concord_utils_s {
 
   struct concord_header_s *header; /* this holds the http response header */
 
-  /* SCHEDULE METHOD USAGE */
+  /* ASYNC_IO METHOD USAGE */
   CURLM *multi_handle;
   size_t active_handles;
 
-  /* SYNC METHOD USAGE */
+  /* SYNC_IO METHOD USAGE */
   CURLSH *easy_share;
 
   /* hashtables used for easy handles lookup */

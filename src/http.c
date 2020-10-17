@@ -152,7 +152,7 @@ _concord_clist_free_all(struct concord_clist_s *conn)
 }
 
 static void
-_concord_perform_sync(
+_concord_perform_syncio(
   concord_utils_st *utils,
   void **p_object, 
   char conn_key[],
@@ -172,7 +172,7 @@ _concord_perform_sync(
 
     (*request_cb)(utils, conn, endpoint); //register desired request to new easy_handle
 
-    /* share resources between SYNC type easy_handles */
+    /* share resources between SYNC_IO type easy_handles */
     curl_easy_setopt(conn->easy_handle, CURLOPT_SHARE, utils->easy_share);
 
     conn->load_cb = load_cb;
@@ -199,14 +199,14 @@ _concord_perform_sync(
 
   conn->p_object = p_object; //save object for when load_cb is executed
   
-  /* if method is SYNC (default), then exec current conn's easy_handle with
+  /* if method is SYNC_IO (default), then exec current conn's easy_handle with
       easy_perform() in a blocking manner. */
 
   (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
 }
 
 static void
-_concord_perform_schedule(
+_concord_perform_asyncio(
   concord_utils_st *utils,
   void **p_object, 
   char conn_key[],
@@ -242,7 +242,7 @@ _concord_perform_schedule(
 
   conn->p_object = p_object; //save object for when load_cb is executed
   
-  /* if method is SCHEDULE, then add current's conn easy_handle to the multi stack,
+  /* if method is ASYNC_IO, then add current's conn easy_handle to the multi stack,
       and wait until concord_dispatch() is called for asynchronous execution */
   (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
 }
@@ -365,12 +365,12 @@ void
 concord_request_method(concord_st *concord, concord_request_method_et method)
 {
   switch (method){
-  case SCHEDULE:
-      concord->utils->method = SCHEDULE;
+  case ASYNC_IO:
+      concord->utils->method = ASYNC_IO;
       concord->utils->method_cb = &_concord_set_curl_multi;
       break;
-  case SYNC:
-      concord->utils->method = SYNC;
+  case SYNC_IO:
+      concord->utils->method = SYNC_IO;
       concord->utils->method_cb = &_concord_set_curl_easy;
       break;
   default:
@@ -489,7 +489,7 @@ _concord_utils_init(char token[])
   hashtable_build(new_utils->conn_hashtable, UTILS_HASHTABLE_SIZE);
 
   /* defaults to synchronous transfers method */
-  new_utils->method = SYNC;
+  new_utils->method = SYNC_IO;
   new_utils->method_cb = &_concord_set_curl_easy;
 
   return new_utils;
@@ -519,14 +519,14 @@ Concord_perform_request(
   curl_request_ft *request_cb)
 {
   switch (utils->method){
-  case SCHEDULE:
+  case ASYNC_IO:
    {
-      /* for schedule we will create exclusive easy_handles, so that there won't
-          be any conflict changing between SYNC and SCHEDULE methods */
+      /* for asyncio we will create exclusive easy_handles, so that there won't
+          be any conflict changing between SYNC_IO and ASYNC_IO methods */
       char task_key[15];
-      sprintf(task_key, "ScheduleTask#%ld", utils->active_handles);
+      sprintf(task_key, "AsyncioTask#%ld", utils->active_handles);
 
-      _concord_perform_schedule(
+      _concord_perform_asyncio(
                       utils,
                       p_object,
                       task_key,
@@ -535,8 +535,8 @@ Concord_perform_request(
                       request_cb);
       break;
    }
-  case SYNC:
-      _concord_perform_sync(
+  case SYNC_IO:
+      _concord_perform_syncio(
                  utils,
                  p_object,
                  conn_key,
