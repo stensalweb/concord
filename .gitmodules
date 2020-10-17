@@ -1,0 +1,6 @@
+[submodule "JSCON"]
+	path = JSCON
+	url = https://www.github.com/LucasMull/JSCON
+[submodule "libuv"]
+	path = libuv
+	url = https://www.github.com/libuv/libuv
