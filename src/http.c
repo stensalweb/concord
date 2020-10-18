@@ -40,19 +40,18 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
     strncpy(key, content, len); //isolate key found
     key[len] = '\0';
 
-    /* if there's a value already assigned to this key, free it and
-        update its value with the new one*/
-    char **rl_field = hashtable_get(header->ht, key);
-    safe_free(*rl_field);
-    
     //len+2 to skip ':' between key and value
-    *rl_field = strndup(&content[len+2], realsize - len+2);
-    assert(NULL != *rl_field);
-    /*
+    char *xrl_field = strndup(&content[len+2], realsize - len+2);
+    assert(NULL != xrl_field);
+
+    /* update xrl_field to dictionary */
+    char *str = dictionary_new_string(header->dict, key, xrl_field);
+    assert(NULL != str);
+   /* 
     if (0 == strcmp(key, "x-ratelimit-bucket")){
-      fprintf(stderr, "%s:%s\n", key, *rl_field);
+      fprintf(stderr, "%s:%s\n", key, xrl_field);
     }
-    */
+   */ 
     break;
   }
 
@@ -89,7 +88,7 @@ _concord_curl_easy_init(concord_utils_st *utils, struct concord_clist_s *conn)
 
   curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->request_header);
   curl_easy_setopt(new_easy_handle, CURLOPT_FAILONERROR, 1L);
-  //curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
+//  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
 
   // SET CURL_EASY CALLBACKS //
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_body_cb);
@@ -437,39 +436,17 @@ _concord_utils_header_init()
 {
   struct concord_header_s *new_header = safe_malloc(sizeof *new_header);
 
-  new_header->ht = hashtable_init();
-  hashtable_build(new_header->ht, 15);
+  new_header->dict = dictionary_init();
 
-  char *key; 
-  key = strdup(XRL_BUCKET);
-  assert(NULL != key);
-  hashtable_set(new_header->ht, key, &new_header->bucket);
+  dictionary_build(new_header->dict, 15);
 
-  key = strdup(XRL_LIMIT);
-  assert(NULL != key);
-  hashtable_set(new_header->ht, key, &new_header->limit);
-
-  key = strdup(XRL_REMAINING);
-  assert(NULL != key);
-  hashtable_set(new_header->ht, key, &new_header->remaining);
-
-  key = strdup(XRL_RESET);
-  assert(NULL != key);
-  hashtable_set(new_header->ht, key, &new_header->reset);
-
-  key = strdup(XRL_RESET_AFTER);
-  assert(NULL != key);
-  hashtable_set(new_header->ht, key, &new_header->reset_after);
+  dictionary_set(new_header->dict, XRL_BUCKET, &new_header->bucket, true);
+  dictionary_set(new_header->dict, XRL_LIMIT, &new_header->limit, true);
+  dictionary_set(new_header->dict, XRL_REMAINING, &new_header->remaining, true);
+  dictionary_set(new_header->dict, XRL_RESET, &new_header->reset, true);
+  dictionary_set(new_header->dict, XRL_RESET_AFTER, &new_header->reset_after, true);
 
   return new_header;
-}
-
-static void
-_concord_utils_header_destroy(struct concord_header_s *header)
-{
-  hashtable_destroy_dict(header->ht);
-
-  safe_free(header);
 }
 
 static concord_utils_st*
@@ -514,7 +491,9 @@ _concord_utils_destroy(concord_utils_st *utils)
   hashtable_destroy(utils->asyncio_ht);
   hashtable_destroy(utils->syncio_ht);
   hashtable_destroy(utils->easy_ht);
-  _concord_utils_header_destroy(utils->header);
+
+  dictionary_destroy(utils->header->dict);
+  safe_free(utils->header);
 
   safe_free(utils);
 }

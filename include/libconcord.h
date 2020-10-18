@@ -181,7 +181,7 @@ struct concord_header_s {
   char *reset;
   char *reset_after;
 
-  struct hashtable_s *ht;
+  struct dictionary_s *dict;
 };
 
 
