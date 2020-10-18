@@ -159,9 +159,9 @@ struct curl_response_s {
 typedef void (concord_ld_object_ft)(void **p_object, struct curl_response_s *response_body);
 
 struct concord_clist_s {
-  char *conn_key; //conn_ht key
-
+  char *conn_key; //syncio_ht/asyncio_ht key
   char *easy_key; //string format easy_handle address to use as easy_ht key
+
   CURL *easy_handle; //easy handle used to perform the request
 
   struct curl_response_s response_body; //stores response body associated with the easy_handle
@@ -195,26 +195,27 @@ typedef struct concord_utils_s {
   /* ASYNC_IO METHOD USAGE */
   CURLM *multi_handle;
   size_t active_handles;
+  struct hashtable_s *asyncio_ht; //easy_handles used for asyncio method
 
   /* SYNC_IO METHOD USAGE */
   CURLSH *easy_share;
+  struct hashtable_s *syncio_ht; //easy_handles used for syncio method
 
   /* hashtables used for easy handles lookup */
   struct hashtable_s *easy_ht; //keys are easy handles addr
-  struct hashtable_s *conn_ht; //keys are method specific
+  struct concord_clist_s *conn_list; // easy handle linked list for connection reuse
 
-  /* easy handle linked list for connection reuse */
-  struct concord_clist_s *conn_list;
-
-  char token[]; /* @todo hash this maybe */
+  char token[]; /* @todo hash/unhash token */
 } concord_utils_st;
 
-/*
+/* WORKING ON
 typedef struct {
-  char *http_method;
-  //char **major_params;
-  char *endpoint;
   char *hash;
+
+  char **major_params;
+  int n_params;
+
+  char *bucket_id;
 } concord_bucket_st;
 
 typedef struct {

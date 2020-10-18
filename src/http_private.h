@@ -11,9 +11,6 @@ enum http_method {
   PUT    = 5,
 };
 
-void HTTP_GET(concord_utils_st *utils, struct concord_clist_s *conn_list, char endpoint[]);
-void HTTP_POST(concord_utils_st *utils, struct concord_clist_s *conn_list, char endpoint[]);
-
 void Concord_http_request(concord_utils_st *utils, void **p_object, char conn_key[], char endpoint[], concord_ld_object_ft *load_cb, enum http_method http_method);
 
 #endif

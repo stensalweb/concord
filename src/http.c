@@ -34,7 +34,6 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
     } 
 
     /* we only want key/value pairs for ratelimiting */
-    /* @todo implement with strncasecmp */
     if (0 != strncmp(content, "x-ratelimit", 11)) break;
 
     char key[30];
@@ -49,9 +48,15 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
     //len+2 to skip ':' between key and value
     *rl_field = strndup(&content[len+2], realsize - len+2);
     assert(NULL != *rl_field);
-
+    /*
+    if (0 == strcmp(key, "x-ratelimit-bucket")){
+      fprintf(stderr, "%s:%s\n", key, *rl_field);
+    }
+    */
     break;
   }
+
+  //fwrite(content, 1, realsize, stderr);
 
 
   return (size_t)realsize; //return value for curl internals
@@ -84,7 +89,7 @@ _concord_curl_easy_init(concord_utils_st *utils, struct concord_clist_s *conn)
 
   curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->request_header);
   curl_easy_setopt(new_easy_handle, CURLOPT_FAILONERROR, 1L);
-  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
+  //curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
 
   // SET CURL_EASY CALLBACKS //
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_body_cb);
@@ -215,7 +220,7 @@ _concord_http_syncio(
   concord_ld_object_ft *load_cb,
   enum http_method http_method)
 {
-  struct concord_clist_s *conn = hashtable_get(utils->conn_ht, conn_key);
+  struct concord_clist_s *conn = hashtable_get(utils->syncio_ht, conn_key);
   if (NULL == conn){
     /* didn't find connection node, create a new one and return it */
     _concord_clist_append(utils, &conn);
@@ -235,7 +240,7 @@ _concord_http_syncio(
         where entries keys are the requests within each
         function
       this allows for easy_handles reusability */
-    hashtable_set(utils->conn_ht, conn->conn_key, conn);
+    hashtable_set(utils->syncio_ht, conn->conn_key, conn);
 
     /* this stores connection node inside a hashtable where entries
         keys are easy handle memory address converted to string
@@ -274,7 +279,7 @@ _concord_http_asyncio(
   concord_ld_object_ft *load_cb,
   enum http_method http_method)
 {
-  struct concord_clist_s *conn = hashtable_get(utils->conn_ht, conn_key);
+  struct concord_clist_s *conn = hashtable_get(utils->asyncio_ht, conn_key);
   if (NULL == conn){
     /* didn't find connection node, create a new one */
     _concord_clist_append(utils, &conn);
@@ -283,7 +288,7 @@ _concord_http_asyncio(
     conn->conn_key = strdup(conn_key);
     assert(NULL != conn->conn_key);
     
-    hashtable_set(utils->conn_ht, conn->conn_key, conn);
+    hashtable_set(utils->asyncio_ht, conn->conn_key, conn);
 
     /* this stores connection node inside a hashtable where entries
         keys are easy handle memory address converted to string
@@ -484,11 +489,14 @@ _concord_utils_init(char token[])
   curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
   curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
 
+  new_utils->asyncio_ht = hashtable_init();
+  hashtable_build(new_utils->asyncio_ht, UTILS_HASHTABLE_SIZE);
+
+  new_utils->syncio_ht = hashtable_init();
+  hashtable_build(new_utils->syncio_ht, UTILS_HASHTABLE_SIZE);
+
   new_utils->easy_ht = hashtable_init();
   hashtable_build(new_utils->easy_ht, UTILS_HASHTABLE_SIZE);
-
-  new_utils->conn_ht = hashtable_init();
-  hashtable_build(new_utils->conn_ht, UTILS_HASHTABLE_SIZE);
 
   /* defaults to synchronous transfers method */
   new_utils->method = SYNC_IO;
@@ -503,8 +511,9 @@ _concord_utils_destroy(concord_utils_st *utils)
   curl_multi_cleanup(utils->multi_handle);
   _concord_clist_free_all(utils->conn_list);
   curl_share_cleanup(utils->easy_share);
+  hashtable_destroy(utils->asyncio_ht);
+  hashtable_destroy(utils->syncio_ht);
   hashtable_destroy(utils->easy_ht);
-  hashtable_destroy(utils->conn_ht);
   _concord_utils_header_destroy(utils->header);
 
   safe_free(utils);
@@ -523,17 +532,19 @@ Concord_http_request(
   case ASYNC_IO:
    {
       /* for asyncio we will create exclusive easy_handles, so that there won't
-          be any conflict changing between SYNC_IO and ASYNC_IO methods */
+          be any conflict changing between SYNC_IO and ASYNC_IO methods, also, to
+          guarantee that each easy_handle will have a unique identifier before
+          dispatching for asynchronous requests */
       char task_key[15];
       sprintf(task_key, "AsyncioTask#%ld", utils->active_handles);
 
       _concord_http_asyncio(
-                      utils,
-                      p_object,
-                      task_key,
-                      endpoint,
-                      load_cb,
-                      http_method);
+                 utils,
+                 p_object,
+                 task_key,
+                 endpoint,
+                 load_cb,
+                 http_method);
       break;
    }
   case SYNC_IO:
