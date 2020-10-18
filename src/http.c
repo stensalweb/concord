@@ -41,12 +41,12 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
     strncpy(key, content, len); //isolate key found
     key[len] = '\0';
 
-
     /* if there's a value already assigned to this key, free it and
         update its value with the new one*/
-    char **rl_field = hashtable_get(header->hashtable, key);
+    char **rl_field = hashtable_get(header->ht, key);
     safe_free(*rl_field);
     
+    //len+2 to skip ':' between key and value
     *rl_field = strndup(&content[len+2], realsize - len+2);
     assert(NULL != *rl_field);
 
@@ -114,7 +114,7 @@ _concord_clist_get_last(struct concord_clist_s *conn_list)
 
 /* appends new connection node to the end of the list */
 static void
-_concord_clist_append(concord_utils_st *utils, struct concord_clist_s **p_new_conn, char endpoint[])
+_concord_clist_append(concord_utils_st *utils, struct concord_clist_s **p_new_conn)
 {
   struct concord_clist_s *last;
   struct concord_clist_s *new_conn = safe_malloc(sizeof *new_conn);
@@ -152,99 +152,30 @@ _concord_clist_free_all(struct concord_clist_s *conn)
 }
 
 static void
-_concord_perform_syncio(
-  concord_utils_st *utils,
-  void **p_object, 
-  char conn_key[],
-  char endpoint[],
-  concord_ld_object_ft *load_cb,
-  curl_request_ft *request_cb)
+_http_set_method(struct concord_clist_s *conn, enum http_method method)
 {
-  struct concord_clist_s *conn = hashtable_get(utils->conn_hashtable, conn_key);
-  if (NULL != conn){
-    /* found connection node, set new URL and return it */
-    char base_url[MAX_URL_LENGTH] = BASE_URL;
-    curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
-  } else {
-    /* didn't find connection node, create a new one and return it */
-    _concord_clist_append(utils, &conn, endpoint);
-    assert(NULL != conn);
-
-    (*request_cb)(utils, conn, endpoint); //register desired request to new easy_handle
-
-    /* share resources between SYNC_IO type easy_handles */
-    curl_easy_setopt(conn->easy_handle, CURLOPT_SHARE, utils->easy_share);
-
-    conn->load_cb = load_cb;
-
-    conn->conn_key = strdup(conn_key);
-    assert(NULL != conn->conn_key);
-
-    /* this stores the connection node inside a hashtable
-        where entries keys are the requests within each
-        function
-      this allows for easy_handles reusability */
-    hashtable_set(utils->conn_hashtable, conn->conn_key, conn);
-
-    /* this stores connection node inside a hashtable where entries
-        keys are easy handle memory address converted to string
-       will be used when checking for multi_perform completed transfers */
-    char easy_key[18];
-    sprintf(easy_key, "%p", conn->easy_handle);
-    conn->easy_key = strdup(easy_key);
-    assert(NULL != conn->easy_key);
-
-    hashtable_set(utils->easy_hashtable, conn->easy_key, conn);
+  /* @todo to implement commented out ones */
+  switch (method){
+  //case DELETE:
+  case GET:
+      curl_easy_setopt(conn->easy_handle, CURLOPT_HTTPGET, 1L);
+      return;
+  case POST:
+      curl_easy_setopt(conn->easy_handle, CURLOPT_POST, 1L);
+      return;
+  //case PATCH:
+  //case PUT:
+  default:
+    logger_throw("ERROR: Unknown HTTP Method");
+    exit(EXIT_FAILURE);
   }
-
-  conn->p_object = p_object; //save object for when load_cb is executed
-  
-  /* if method is SYNC_IO (default), then exec current conn's easy_handle with
-      easy_perform() in a blocking manner. */
-
-  (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
 }
 
 static void
-_concord_perform_asyncio(
-  concord_utils_st *utils,
-  void **p_object, 
-  char conn_key[],
-  char endpoint[],
-  concord_ld_object_ft *load_cb,
-  curl_request_ft *request_cb)
+_http_set_url(struct concord_clist_s *conn, char endpoint[])
 {
-  struct concord_clist_s *conn = hashtable_get(utils->conn_hashtable, conn_key);
-  if (NULL == conn){
-    /* didn't find connection node, create a new one */
-    _concord_clist_append(utils, &conn, endpoint);
-    assert(NULL != conn);
-
-    conn->conn_key = strdup(conn_key);
-    assert(NULL != conn->conn_key);
-    
-    hashtable_set(utils->conn_hashtable, conn->conn_key, conn);
-
-    /* this stores connection node inside a hashtable where entries
-        keys are easy handle memory address converted to string
-       will be used when checking for multi_perform completed transfers */
-    char easy_key[18];
-    sprintf(easy_key, "%p", conn->easy_handle);
-    conn->easy_key = strdup(easy_key);
-    assert(NULL != conn->easy_key);
-
-    hashtable_set(utils->easy_hashtable, conn->easy_key, conn);
-  }
-
-  (*request_cb)(utils, conn, endpoint); //register desired request to the easy_handle
-
-  conn->load_cb = load_cb;
-
-  conn->p_object = p_object; //save object for when load_cb is executed
-  
-  /* if method is ASYNC_IO, then add current's conn easy_handle to the multi stack,
-      and wait until concord_dispatch() is called for asynchronous execution */
-  (*utils->method_cb)(utils, conn); //exec easy_perform() or add handle to multi
+  char base_url[MAX_URL_LENGTH] = BASE_URL;
+  curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
 }
 
 static void
@@ -276,12 +207,104 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
 }
 
 static void
+_concord_http_syncio(
+  concord_utils_st *utils,
+  void **p_object, 
+  char conn_key[],
+  char endpoint[],
+  concord_ld_object_ft *load_cb,
+  enum http_method http_method)
+{
+  struct concord_clist_s *conn = hashtable_get(utils->conn_ht, conn_key);
+  if (NULL == conn){
+    /* didn't find connection node, create a new one and return it */
+    _concord_clist_append(utils, &conn);
+    assert(NULL != conn);
+
+    _http_set_method(conn, http_method);
+
+    /* share resources between SYNC_IO type easy_handles */
+    curl_easy_setopt(conn->easy_handle, CURLOPT_SHARE, utils->easy_share);
+
+    conn->load_cb = load_cb;
+
+    conn->conn_key = strdup(conn_key);
+    assert(NULL != conn->conn_key);
+
+    /* this stores the connection node inside a hashtable
+        where entries keys are the requests within each
+        function
+      this allows for easy_handles reusability */
+    hashtable_set(utils->conn_ht, conn->conn_key, conn);
+
+    /* this stores connection node inside a hashtable where entries
+        keys are easy handle memory address converted to string
+       will be used when checking for multi_perform completed transfers */
+    char easy_key[18];
+    sprintf(easy_key, "%p", conn->easy_handle);
+    conn->easy_key = strdup(easy_key);
+    assert(NULL != conn->easy_key);
+
+    hashtable_set(utils->easy_ht, conn->easy_key, conn);
+  }
+
+  _http_set_url(conn, endpoint);
+  conn->p_object = p_object; //save object for when load_cb is executed
+  
+  /* if method is SYNC_IO (default), then exec current conn's easy_handle with
+      easy_perform() in a blocking manner. */
+  _concord_set_curl_easy(utils, conn);
+}
+
+static void
 _concord_set_curl_multi(concord_utils_st *utils, struct concord_clist_s *conn)
 {
   if (NULL != conn->easy_handle){
     curl_multi_add_handle(utils->multi_handle, conn->easy_handle);
     ++utils->active_handles;
   }
+}
+
+static void
+_concord_http_asyncio(
+  concord_utils_st *utils,
+  void **p_object, 
+  char conn_key[],
+  char endpoint[],
+  concord_ld_object_ft *load_cb,
+  enum http_method http_method)
+{
+  struct concord_clist_s *conn = hashtable_get(utils->conn_ht, conn_key);
+  if (NULL == conn){
+    /* didn't find connection node, create a new one */
+    _concord_clist_append(utils, &conn);
+    assert(NULL != conn);
+
+    conn->conn_key = strdup(conn_key);
+    assert(NULL != conn->conn_key);
+    
+    hashtable_set(utils->conn_ht, conn->conn_key, conn);
+
+    /* this stores connection node inside a hashtable where entries
+        keys are easy handle memory address converted to string
+       will be used when checking for multi_perform completed transfers */
+    char easy_key[18];
+    sprintf(easy_key, "%p", conn->easy_handle);
+    conn->easy_key = strdup(easy_key);
+    assert(NULL != conn->easy_key);
+
+    hashtable_set(utils->easy_ht, conn->easy_key, conn);
+  }
+
+  _http_set_method(conn, http_method);
+  _http_set_url(conn, endpoint);
+
+  conn->load_cb = load_cb;
+  conn->p_object = p_object; //save object for when load_cb is executed
+  
+  /* if method is ASYNC_IO, then add current's conn easy_handle to the multi stack,
+      and wait until concord_dispatch() is called for asynchronous execution */
+  _concord_set_curl_multi(utils, conn);
 }
 
 /* wrapper around curl_multi_perform() , using poll() */
@@ -340,7 +363,7 @@ concord_dispatch(concord_st *concord)
     /* Find out which handle this message is about */
     char easy_key[18];
     sprintf(easy_key, "%p", msg->easy_handle);
-    struct concord_clist_s *conn = hashtable_get(utils->easy_hashtable, easy_key);
+    struct concord_clist_s *conn = hashtable_get(utils->easy_ht, easy_key);
     assert (NULL != conn);
 
     /* execute load callback to perform change in object */
@@ -366,35 +389,14 @@ concord_request_method(concord_st *concord, concord_request_method_et method)
 {
   switch (method){
   case ASYNC_IO:
-      concord->utils->method = ASYNC_IO;
-      concord->utils->method_cb = &_concord_set_curl_multi;
-      break;
   case SYNC_IO:
-      concord->utils->method = SYNC_IO;
-      concord->utils->method_cb = &_concord_set_curl_easy;
       break;
   default:
       logger_throw("ERROR: undefined request method");
       exit(EXIT_FAILURE);
   }
-}
 
-void
-Concord_GET(concord_utils_st *utils, struct concord_clist_s *conn, char endpoint[])
-{
-  char base_url[MAX_URL_LENGTH] = BASE_URL;
-
-  curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
-  curl_easy_setopt(conn->easy_handle, CURLOPT_HTTPGET, 1L);
-}
-
-void
-Concord_POST(concord_utils_st *utils, struct concord_clist_s *conn, char endpoint[])
-{
-  char base_url[MAX_URL_LENGTH] = BASE_URL;
-
-  curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
-  curl_easy_setopt(conn->easy_handle, CURLOPT_POST, 1L);
+  concord->utils->method = method;
 }
 
 /* @todo create distinction between bot and user token */
@@ -430,29 +432,29 @@ _concord_utils_header_init()
 {
   struct concord_header_s *new_header = safe_malloc(sizeof *new_header);
 
-  new_header->hashtable = hashtable_init();
-  hashtable_build(new_header->hashtable, 15);
+  new_header->ht = hashtable_init();
+  hashtable_build(new_header->ht, 15);
 
   char *key; 
   key = strdup(XRL_BUCKET);
   assert(NULL != key);
-  hashtable_set(new_header->hashtable, key, &new_header->bucket);
+  hashtable_set(new_header->ht, key, &new_header->bucket);
 
   key = strdup(XRL_LIMIT);
   assert(NULL != key);
-  hashtable_set(new_header->hashtable, key, &new_header->limit);
+  hashtable_set(new_header->ht, key, &new_header->limit);
 
   key = strdup(XRL_REMAINING);
   assert(NULL != key);
-  hashtable_set(new_header->hashtable, key, &new_header->remaining);
+  hashtable_set(new_header->ht, key, &new_header->remaining);
 
   key = strdup(XRL_RESET);
   assert(NULL != key);
-  hashtable_set(new_header->hashtable, key, &new_header->reset);
+  hashtable_set(new_header->ht, key, &new_header->reset);
 
   key = strdup(XRL_RESET_AFTER);
   assert(NULL != key);
-  hashtable_set(new_header->hashtable, key, &new_header->reset_after);
+  hashtable_set(new_header->ht, key, &new_header->reset_after);
 
   return new_header;
 }
@@ -460,7 +462,7 @@ _concord_utils_header_init()
 static void
 _concord_utils_header_destroy(struct concord_header_s *header)
 {
-  hashtable_destroy_dict(header->hashtable);
+  hashtable_destroy_dict(header->ht);
 
   safe_free(header);
 }
@@ -482,15 +484,14 @@ _concord_utils_init(char token[])
   curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
   curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
 
-  new_utils->easy_hashtable = hashtable_init();
-  hashtable_build(new_utils->easy_hashtable, UTILS_HASHTABLE_SIZE);
+  new_utils->easy_ht = hashtable_init();
+  hashtable_build(new_utils->easy_ht, UTILS_HASHTABLE_SIZE);
 
-  new_utils->conn_hashtable = hashtable_init();
-  hashtable_build(new_utils->conn_hashtable, UTILS_HASHTABLE_SIZE);
+  new_utils->conn_ht = hashtable_init();
+  hashtable_build(new_utils->conn_ht, UTILS_HASHTABLE_SIZE);
 
   /* defaults to synchronous transfers method */
   new_utils->method = SYNC_IO;
-  new_utils->method_cb = &_concord_set_curl_easy;
 
   return new_utils;
 }
@@ -502,21 +503,21 @@ _concord_utils_destroy(concord_utils_st *utils)
   curl_multi_cleanup(utils->multi_handle);
   _concord_clist_free_all(utils->conn_list);
   curl_share_cleanup(utils->easy_share);
-  hashtable_destroy(utils->easy_hashtable);
-  hashtable_destroy(utils->conn_hashtable);
+  hashtable_destroy(utils->easy_ht);
+  hashtable_destroy(utils->conn_ht);
   _concord_utils_header_destroy(utils->header);
 
   safe_free(utils);
 }
 
 void
-Concord_perform_request(
+Concord_http_request(
   concord_utils_st *utils, 
   void **p_object, 
   char conn_key[],
   char endpoint[], 
   concord_ld_object_ft *load_cb, 
-  curl_request_ft *request_cb)
+  enum http_method http_method)
 {
   switch (utils->method){
   case ASYNC_IO:
@@ -526,23 +527,23 @@ Concord_perform_request(
       char task_key[15];
       sprintf(task_key, "AsyncioTask#%ld", utils->active_handles);
 
-      _concord_perform_asyncio(
+      _concord_http_asyncio(
                       utils,
                       p_object,
                       task_key,
                       endpoint,
                       load_cb,
-                      request_cb);
+                      http_method);
       break;
    }
   case SYNC_IO:
-      _concord_perform_syncio(
+      _concord_http_syncio(
                  utils,
                  p_object,
                  conn_key,
                  endpoint,
                  load_cb,
-                 request_cb);
+                 http_method);
       break;
   default:
       logger_throw("ERROR: undefined request method");

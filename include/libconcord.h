@@ -159,9 +159,9 @@ struct curl_response_s {
 typedef void (concord_ld_object_ft)(void **p_object, struct curl_response_s *response_body);
 
 struct concord_clist_s {
-  char *conn_key; //conn_hashtable key
+  char *conn_key; //conn_ht key
 
-  char *easy_key; //string format easy_handle address to use as easy_hashtable key
+  char *easy_key; //string format easy_handle address to use as easy_ht key
   CURL *easy_handle; //easy handle used to perform the request
 
   struct curl_response_s response_body; //stores response body associated with the easy_handle
@@ -172,7 +172,8 @@ struct concord_clist_s {
   struct concord_clist_s *next;
 };
 
-/* @todo i can get rid of this */
+/* @todo i will get rid of this once
+    I implement bucket struct */
 struct concord_header_s {
   char *bucket;
   char *limit;
@@ -180,17 +181,13 @@ struct concord_header_s {
   char *reset;
   char *reset_after;
 
-  struct hashtable_s *hashtable;
-
-  jscon_item_st *exceed_rate_limit; //on HTTP 429 response the API will return a JSON body
+  struct hashtable_s *ht;
 };
 
 
-struct concord_utils_s; //forwarding
-
-typedef void (concord_method_ft)(struct concord_utils_s *utils, struct concord_clist_s *conn);
-
 typedef struct concord_utils_s {
+  concord_request_method_et method; /* is SYNC_IO or ASYNC_IO */
+
   struct curl_slist *request_header; /* @todo this could be a global, as it is a READ-ONLY variable */
 
   struct concord_header_s *header; /* this holds the http response header */
@@ -203,20 +200,28 @@ typedef struct concord_utils_s {
   CURLSH *easy_share;
 
   /* hashtables used for easy handles lookup */
-  struct hashtable_s *easy_hashtable; //keys are easy handles addr
-  struct hashtable_s *conn_hashtable; //keys are method specific
+  struct hashtable_s *easy_ht; //keys are easy handles addr
+  struct hashtable_s *conn_ht; //keys are method specific
 
   /* easy handle linked list for connection reuse */
   struct concord_clist_s *conn_list;
 
-  concord_request_method_et method;
-  concord_method_ft *method_cb;
-
   char token[]; /* @todo hash this maybe */
 } concord_utils_st;
 
+/*
+typedef struct {
+  char *http_method;
+  //char **major_params;
+  char *endpoint;
+  char *hash;
+} concord_bucket_st;
 
-typedef void (curl_request_ft)(concord_utils_st *utils, struct concord_clist_s *conn, char endpoint[]);
+typedef struct {
+  struct hashtable_s *bucket_ht;
+
+} concord_queue_st;
+*/
 
 typedef struct concord_s {
   concord_channel_st *channel;

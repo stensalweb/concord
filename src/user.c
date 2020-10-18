@@ -110,13 +110,13 @@ concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user)
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Concord_perform_request( 
+  Concord_http_request( 
     concord->utils,
     (void**)p_user,
     "GetUser",
     endpoint,
     &_concord_ld_user,
-    &Concord_GET);
+    GET);
 }
 
 void 
@@ -130,13 +130,13 @@ concord_get_client(concord_st *concord, concord_user_st **p_client)
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Concord_perform_request( 
+  Concord_http_request( 
     concord->utils,
     (void**)p_client,
     "GetClient",
     endpoint,
     &_concord_ld_user,
-    &Concord_GET);
+    GET);
 }
 
 static void
@@ -164,11 +164,11 @@ concord_get_client_guilds(concord_st *concord, concord_user_st **p_client)
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Concord_perform_request( 
+  Concord_http_request( 
     concord->utils,
     (void**)p_client,
     "GetClientGuilds",
     endpoint,
     &_concord_ld_client_guilds,
-    &Concord_GET);
+    GET);
 }
