@@ -4,6 +4,7 @@ This document describes features to be incorporated in the future.
 
 ## HIGH
 
+- Deal with the ratelimiting issue by grouping easy handles of the same type in a particular FIFO (named pipe) architecture. There can be multiple name pipes being scanned at once, the event loop will keep checking each of them until every one is depleted. What named pipe is popped at which order doesn't matter, as each will have its own ratelimiting rules to take care of. A named pipe will group `easy_handles` with common endpoint, and/or major parameters. Then, as the response header is being parsed it will check for the 'per route' bucket hashes returned by the Discord API.
 - Replace `curl_multi_wait` with its [event driven](https://ec.haxx.se/libcurl/libcurl-drive/libcurl-drive-multi-socket) counterpart
   - Alongside with libuv
 - Implement Discord Gateway (WebSockets) support
