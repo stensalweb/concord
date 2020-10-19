@@ -4,9 +4,6 @@
 #include <string.h>
 #include <ctype.h>
 
-//#include <curl/curl.h>
-//#include <libjscon.h>
-
 #include <libconcord.h>
 
 #include "http_private.h"
@@ -16,7 +13,8 @@
 #include "utils_private.h"
 
 
-/* @todo there has to be things I'm missing */
+/* this is a very crude http header parser, it splits value and keys
+    at ':' char */
 static size_t
 _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
@@ -63,7 +61,7 @@ _concord_curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata
   assert(NULL != tmp);
 
   response_body->str = tmp;
-  memcpy((char*)response_body->str + response_body->size, content, realsize);
+  memcpy(response_body->str + response_body->size, content, realsize);
   response_body->size += realsize;
   response_body->str[response_body->size] = '\0';
 
@@ -79,7 +77,7 @@ _concord_curl_easy_init(concord_utils_st *utils, struct concord_clist_s *conn)
 
   curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->request_header);
   curl_easy_setopt(new_easy_handle, CURLOPT_FAILONERROR, 1L);
-//  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 1L);
 
   // SET CURL_EASY CALLBACKS //
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_body_cb);
@@ -91,9 +89,10 @@ _concord_curl_easy_init(concord_utils_st *utils, struct concord_clist_s *conn)
   return new_easy_handle;
 }
 
-/* @todo as the number of active easy_handle increases, this function becomes unnecessarily
-    slow (i think? didn't really check but seems like it would), this can be solved by storing
-    the last node at all times */
+/* @todo as the number of active easy_handle increases, this function 
+    becomes unnecessarily slow (i think? didn't really check but seems
+    like it would), this can be solved by storing a reference to the
+    last node at all times */
 static struct concord_clist_s*
 _concord_clist_get_last(struct concord_clist_s *conn_list)
 {
@@ -133,7 +132,7 @@ _concord_clist_append(concord_utils_st *utils, struct concord_clist_s **p_new_co
 void
 _concord_clist_free_all(struct concord_clist_s *conn)
 {
-  if (!conn) return;
+  if (NULL == conn) return;
 
   struct concord_clist_s *next_conn;
   do {
@@ -182,14 +181,15 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
   if (NULL != conn->response_body.str){
     /* @todo for some reason only getting a single header when
         doing blocking, find out why */
-    long long delay_ms;
-    if (0 != strtol(dictionary_get(utils->header, XRL_REMAINING), NULL, 10)){
-      delay_ms = Utils_parse_ratelimit_header(utils->header, false);
+    long long timeout_ms;
+    int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
+    if (0 != remaining){
+      timeout_ms = Utils_parse_ratelimit_header(utils->header, false);
     } else {
-      delay_ms = 100;
+      timeout_ms = 100;
     }
 
-    uv_sleep(delay_ms);
+    uv_sleep(timeout_ms);
 
     //logger_throw(conn->response_body.str);
     (*conn->load_cb)(conn->p_object, &conn->response_body);
@@ -302,55 +302,13 @@ _concord_http_asyncio(
   _concord_set_curl_multi(utils, conn);
 }
 
-/* wrapper around curl_multi_perform() , using poll() */
-/* @todo I think I'm not using curl_multi_wait timeout parameter as I should,
-    or it's not doing what I think it is */
-void
-concord_dispatch(concord_st *concord)
+static void
+_curl_check_multi_info(concord_utils_st *utils)
 {
-  concord_utils_st *utils = concord->utils;
-
-  int transfers_running = 0; /* keep number of running handles */
-  int repeats = 0;
-  long delay_ms = 100;
-  do {
-    CURLMcode mcode;
-    int numfds;
-
-    mcode = curl_multi_perform(utils->multi_handle, &transfers_running);
-    if (delay_ms > 0 && CURLM_OK == mcode){
-      /* wait for activity, timeout or "nothing" */
-      mcode = curl_multi_wait(utils->multi_handle, NULL, 0, delay_ms, &numfds);
-    }
-
-    logger_excep(CURLM_OK != mcode, curl_easy_strerror(mcode));
-
-    /* numfds being zero means either a timeout or no file descriptor to
-        wait for. Try timeout on first occurrences, then assume no file
-        descriptors and no file descriptors to wait for mean wait for
-        100 milliseconds. */
-    if (0 == numfds){
-      ++repeats; /* count number of repeated zero numfds */
-      if (repeats > 1){
-        uv_sleep(100); /* sleep 100 milliseconds */
-      }
-    } else {
-      if (NULL == dictionary_get(utils->header, XRL_REMAINING)) continue;
-
-      if (0 != strtol(dictionary_get(utils->header, XRL_REMAINING), NULL, 10)){
-        delay_ms = Utils_parse_ratelimit_header(utils->header, true);
-      } else {
-        delay_ms = 100;
-      }
-
-      repeats = 0;
-    }
-  } while (transfers_running);
-
   /* See how the transfers went */
   CURLMsg *msg; /* for picking up messages with the transfer status */
-  int msgs_left; /*how many messages are left */
-  while ((msg = curl_multi_info_read(utils->multi_handle, &msgs_left)))
+  int pending; /*how many messages are left */
+  while ((msg = curl_multi_info_read(utils->multi_handle, &pending)))
   {
     if (CURLMSG_DONE != msg->msg)
       continue;
@@ -377,6 +335,52 @@ concord_dispatch(concord_st *concord)
   }
 
   assert(0 == utils->active_handles);
+}
+
+/* wrapper around curl_multi_perform() , using poll() */
+/* @todo I think I'm not using curl_multi_wait timeout parameter as I should, or it's not doing what I think it is */
+void
+concord_dispatch(concord_st *concord)
+{
+  concord_utils_st *utils = concord->utils;
+
+  int transfers_running = 0; /* keep number of running handles */
+  int repeats = 0;
+  long timeout_ms = 100;
+  do {
+    CURLMcode mcode;
+    int numfds;
+
+    mcode = curl_multi_perform(utils->multi_handle, &transfers_running);
+    if (CURLM_OK == mcode){
+      /* wait for activity, timeout or "nothing" */
+      mcode = curl_multi_wait(utils->multi_handle, NULL, 0, timeout_ms, &numfds);
+    }
+
+    logger_excep(CURLM_OK != mcode, curl_easy_strerror(mcode));
+
+    /* numfds being zero means either a timeout or no file descriptor to
+        wait for. Try timeout on first occurrences, then assume no file
+        descriptors and no file descriptors to wait for mean wait for
+        100 milliseconds. */
+    if (0 == numfds){
+      ++repeats; /* count number of repeated zero numfds */
+      if (repeats > 1){
+        uv_sleep(100); /* sleep 100 milliseconds */
+      }
+    } else {
+      int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
+      if (0 != remaining){
+        timeout_ms = Utils_parse_ratelimit_header(utils->header, true);
+      } else {
+        timeout_ms = 100;
+      }
+
+      repeats = 0;
+    }
+  } while (transfers_running);
+
+  _curl_check_multi_info(utils);
 }
 
 void

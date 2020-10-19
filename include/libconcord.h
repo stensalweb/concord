@@ -173,13 +173,6 @@ struct concord_clist_s {
 };
 
 
-#define XRL_BUCKET      "x-ratelimit-bucket"
-#define XRL_LIMIT       "x-ratelimit-limit"
-#define XRL_REMAINING   "x-ratelimit-remaining"
-#define XRL_RESET       "x-ratelimit-reset"
-#define XRL_RESET_AFTER "x-ratelimit-reset-after"
-
-
 typedef struct concord_utils_s {
   concord_request_method_et method; /* is SYNC_IO or ASYNC_IO */
 
