@@ -5,6 +5,6 @@
 
 struct concord_header_s;
 
-long long Utils_parse_ratelimit_header(struct concord_header_s *header, bool use_clock);
+long long Utils_parse_ratelimit_header(struct dictionary_s *header, bool use_clock);
 
 #endif

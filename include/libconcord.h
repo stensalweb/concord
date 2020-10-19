@@ -172,17 +172,12 @@ struct concord_clist_s {
   struct concord_clist_s *next;
 };
 
-/* @todo i will get rid of this once
-    I implement bucket struct */
-struct concord_header_s {
-  char *bucket;
-  char *limit;
-  char *remaining;
-  char *reset;
-  char *reset_after;
 
-  struct dictionary_s *dict;
-};
+#define XRL_BUCKET      "x-ratelimit-bucket"
+#define XRL_LIMIT       "x-ratelimit-limit"
+#define XRL_REMAINING   "x-ratelimit-remaining"
+#define XRL_RESET       "x-ratelimit-reset"
+#define XRL_RESET_AFTER "x-ratelimit-reset-after"
 
 
 typedef struct concord_utils_s {
@@ -190,7 +185,7 @@ typedef struct concord_utils_s {
 
   struct curl_slist *request_header; /* @todo this could be a global, as it is a READ-ONLY variable */
 
-  struct concord_header_s *header; /* this holds the http response header */
+  struct dictionary_s *header; /* this holds the http response header */
 
   /* ASYNC_IO METHOD USAGE */
   CURLM *multi_handle;

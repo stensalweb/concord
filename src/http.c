@@ -21,7 +21,7 @@ static size_t
 _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   int realsize = size * nmemb;
-  struct concord_header_s *header = (struct concord_header_s*)p_userdata;
+  struct dictionary_s *header = (struct dictionary_s*)p_userdata;
 
   /* splits key from value at the current header line being read */
   int len=0;
@@ -32,31 +32,22 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
       ++len;
       continue;
     } 
-
-    /* we only want key/value pairs for ratelimiting */
-    if (0 != strncmp(content, "x-ratelimit", 11)) break;
-
     char key[30];
     strncpy(key, content, len); //isolate key found
     key[len] = '\0';
 
     //len+2 to skip ':' between key and value
-    char *xrl_field = strndup(&content[len+2], realsize - len+2);
-    assert(NULL != xrl_field);
+    char *field = strndup(&content[len+2], realsize - len+2);
+    assert(NULL != field);
 
-    /* update xrl_field to dictionary */
-    char *str = dictionary_new_string(header->dict, key, xrl_field);
+    /* update field to dictionary */
+    char *str = dictionary_set(header, key, field, true);
     assert(NULL != str);
-   /* 
-    if (0 == strcmp(key, "x-ratelimit-bucket")){
-      fprintf(stderr, "%s:%s\n", key, xrl_field);
-    }
-   */ 
+    
+    //fprintf(stderr, "%s:%s\n", key, field);
+    
     break;
   }
-
-  //fwrite(content, 1, realsize, stderr);
-
 
   return (size_t)realsize; //return value for curl internals
 }
@@ -192,7 +183,7 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
     /* @todo for some reason only getting a single header when
         doing blocking, find out why */
     long long delay_ms;
-    if (0 != strtol(utils->header->remaining, NULL, 10)){
+    if (0 != strtol(dictionary_get(utils->header, XRL_REMAINING), NULL, 10)){
       delay_ms = Utils_parse_ratelimit_header(utils->header, false);
     } else {
       delay_ms = 100;
@@ -344,9 +335,9 @@ concord_dispatch(concord_st *concord)
         uv_sleep(100); /* sleep 100 milliseconds */
       }
     } else {
-      if (NULL == utils->header->remaining) continue;
+      if (NULL == dictionary_get(utils->header, XRL_REMAINING)) continue;
 
-      if (0 != strtol(utils->header->remaining, NULL, 10)){
+      if (0 != strtol(dictionary_get(utils->header, XRL_REMAINING), NULL, 10)){
         delay_ms = Utils_parse_ratelimit_header(utils->header, true);
       } else {
         delay_ms = 100;
@@ -425,30 +416,6 @@ _concord_init_request_header(concord_utils_st *utils)
   return new_header;
 }
 
-#define XRL_BUCKET      "x-ratelimit-bucket"
-#define XRL_LIMIT       "x-ratelimit-limit"
-#define XRL_REMAINING   "x-ratelimit-remaining"
-#define XRL_RESET       "x-ratelimit-reset"
-#define XRL_RESET_AFTER "x-ratelimit-reset-after"
-
-static struct concord_header_s*
-_concord_utils_header_init()
-{
-  struct concord_header_s *new_header = safe_malloc(sizeof *new_header);
-
-  new_header->dict = dictionary_init();
-
-  dictionary_build(new_header->dict, 15);
-
-  dictionary_set(new_header->dict, XRL_BUCKET, &new_header->bucket, true);
-  dictionary_set(new_header->dict, XRL_LIMIT, &new_header->limit, true);
-  dictionary_set(new_header->dict, XRL_REMAINING, &new_header->remaining, true);
-  dictionary_set(new_header->dict, XRL_RESET, &new_header->reset, true);
-  dictionary_set(new_header->dict, XRL_RESET_AFTER, &new_header->reset_after, true);
-
-  return new_header;
-}
-
 static concord_utils_st*
 _concord_utils_init(char token[])
 {
@@ -456,7 +423,6 @@ _concord_utils_init(char token[])
   strncpy(new_utils->token, token, strlen(token)-1);
 
   new_utils->request_header = _concord_init_request_header(new_utils);
-  new_utils->header = _concord_utils_header_init();
 
   new_utils->multi_handle = curl_multi_init();
 
@@ -475,6 +441,9 @@ _concord_utils_init(char token[])
   new_utils->easy_ht = hashtable_init();
   hashtable_build(new_utils->easy_ht, UTILS_HASHTABLE_SIZE);
 
+  new_utils->header = dictionary_init();
+  dictionary_build(new_utils->header, 15);
+
   /* defaults to synchronous transfers method */
   new_utils->method = SYNC_IO;
 
@@ -488,12 +457,12 @@ _concord_utils_destroy(concord_utils_st *utils)
   curl_multi_cleanup(utils->multi_handle);
   _concord_clist_free_all(utils->conn_list);
   curl_share_cleanup(utils->easy_share);
+
   hashtable_destroy(utils->asyncio_ht);
   hashtable_destroy(utils->syncio_ht);
   hashtable_destroy(utils->easy_ht);
 
-  dictionary_destroy(utils->header->dict);
-  safe_free(utils->header);
+  dictionary_destroy(utils->header);
 
   safe_free(utils);
 }
