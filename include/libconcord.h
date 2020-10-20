@@ -8,13 +8,14 @@
 #include <uv.h>
 
 #define BASE_URL "https://discord.com/api"
-#define MAX_URL_LENGTH 1 << 9
 
-#define MAX_RESPONSE_LENGTH 1 << 15
-#define MAX_HEADER_LENGTH 1 << 9
-#define ENDPOINT_LENGTH 256
+#define MAX_URL_LENGTH       1 << 9
+#define MAX_RESPONSE_LENGTH  1 << 15
+#define MAX_HEADER_LENGTH    1 << 9
 
-#define UTILS_HASHTABLE_SIZE 50
+#define ENDPOINT_LENGTH  256
+
+#define UTILS_HASHTABLE_SIZE  50
 
 /* SNOWFLAKES
 https://discord.com/developers/docs/reference#snowflakes */
@@ -40,13 +41,13 @@ typedef enum {
 /* CHANNEL TYPES
 https://discord.com/developers/docs/resources/channel#channel-object-channel-types */
 typedef enum {
-  GUILD_TEXT            = 0,
-  DM                    = 1,
-  GUILD_VOICE           = 2,
-  GROUP_DM              = 3,
-  GUILD_CATEGORY        = 4,
-  GUILD_NEWS            = 5,
-  GUILD_STORE           = 6,
+  GUILD_TEXT      = 0,
+  DM              = 1,
+  GUILD_VOICE     = 2,
+  GROUP_DM        = 3,
+  GUILD_CATEGORY  = 4,
+  GUILD_NEWS      = 5,
+  GUILD_STORE     = 6,
 } concord_channel_types_et;
 
 /* CHANNEL OBJECT
@@ -191,33 +192,17 @@ typedef struct concord_utils_s {
   struct dictionary_s *easy_dict; //get connection nodes by their easy_handle unique address
 
   struct concord_clist_s *conn_list; // easy handle linked list for connection reuse
-
-  char token[]; /* @todo hash/unhash token */
+  char *token; /* @todo hash/unhash token */
 } concord_utils_st;
 
-/* WORKING ON
-typedef struct {
-  char *hash;
-
-  char **major_params;
-  int n_params;
-
-  char *bucket_id;
-} concord_bucket_st;
-
-typedef struct {
-  struct hashtable_s *bucket_ht;
-
-} concord_queue_st;
-*/
 
 typedef struct concord_s {
+  concord_utils_st utils;
+
   concord_channel_st *channel;
   concord_user_st *user;
   concord_user_st *client;
   concord_guild_st *guild;
-
-  concord_utils_st *utils;
 } concord_st;
 
 

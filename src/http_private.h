@@ -1,25 +1,33 @@
-#ifndef LIBCONCORD_API_WRAPPER_H_
-#define LIBCONCORD_API_WRAPPER_H_
+#ifndef LIBCONCORD_HTTP_H_
+#define LIBCONCORD_HTTP_H_
 //#include <libconcord.h> (implicit) 
 
 enum http_method {
-  NONE   = 0,
-  DELETE = 1,
-  GET    = 2,
-  PATCH  = 3,
-  POST   = 4,
-  PUT    = 5,
+  NONE    = 0,
+  DELETE  = 1,
+  GET     = 2,
+  PATCH   = 3,
+  POST    = 4,
+  PUT     = 5,
 };
 
+#define MAX_CONCURRENT_CONNS  15
+
 /* ENDPOINTS */
-#define CHANNELS "/channels/%s"
-#define CHANNELS_MESSAGES "/channels/%s/messages"
+#define CHANNELS           "/channels/%s"
+#define CHANNELS_MESSAGES  "/channels/%s/messages"
 
-#define GUILDS "/guilds/%s"
-#define GUILDS_CHANNELS "/guilds/%s/channels"
+#define GUILDS             "/guilds/%s"
+#define GUILDS_CHANNELS    "/guilds/%s/channels"
 
-#define USERS "/users/%s"
-#define USERS_GUILDS "/users/%s/guilds"
+#define USERS              "/users/%s"
+#define USERS_GUILDS       "/users/%s/guilds"
+
+struct client_bucket_s {
+  char *endpoint; 
+  char *major_param;
+  char *hash;
+};
 
 /* 
   @param utils contains useful tools

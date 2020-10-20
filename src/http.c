@@ -251,7 +251,12 @@ _concord_set_curl_multi(concord_utils_st *utils, struct concord_clist_s *conn)
 {
   if (NULL != conn->easy_handle){
     curl_multi_add_handle(utils->multi_handle, conn->easy_handle);
-    ++utils->active_handles;
+    
+    if (++utils->active_handles >= 5){
+      /* dispatch automatically if limit of max concurrent
+          connections is reached */
+      concord_dispatch((concord_st*)utils);
+    }
   }
 }
 
@@ -334,7 +339,7 @@ _curl_check_multi_info(concord_utils_st *utils)
 void
 concord_dispatch(concord_st *concord)
 {
-  concord_utils_st *utils = concord->utils;
+  concord_utils_st *utils = &concord->utils;
 
   int transfers_running = 0; /* keep number of running handles */
   int repeats = 0;
@@ -387,12 +392,12 @@ concord_request_method(concord_st *concord, concord_request_method_et method)
       exit(EXIT_FAILURE);
   }
 
-  concord->utils->method = method;
+  concord->utils.method = method;
 }
 
 /* @todo create distinction between bot and user token */
 static struct curl_slist*
-_concord_init_request_header(concord_utils_st *utils)
+_curl_init_request_header(concord_utils_st *utils)
 {
   char auth[MAX_HEADER_LENGTH] = "Authorization: Bot "; 
 
@@ -412,13 +417,13 @@ _concord_init_request_header(concord_utils_st *utils)
   return new_header;
 }
 
-static concord_utils_st*
-_concord_utils_init(char token[])
+static void
+_concord_utils_init(char token[], concord_utils_st *new_utils)
 {
-  concord_utils_st *new_utils = safe_malloc(sizeof *new_utils + strlen(token));
-  strncpy(new_utils->token, token, strlen(token)-1);
+  new_utils->token = strndup(token, strlen(token)-1);
+  assert(NULL != new_utils->token);
 
-  new_utils->request_header = _concord_init_request_header(new_utils);
+  new_utils->request_header = _curl_init_request_header(new_utils);
 
   new_utils->multi_handle = curl_multi_init();
 
@@ -439,8 +444,6 @@ _concord_utils_init(char token[])
 
   /* defaults to synchronous transfers method */
   new_utils->method = SYNC_IO;
-
-  return new_utils;
 }
 
 static void
@@ -456,7 +459,7 @@ _concord_utils_destroy(concord_utils_st *utils)
 
   dictionary_destroy(utils->header);
 
-  safe_free(utils);
+  safe_free(utils->token);
 }
 
 void
@@ -493,6 +496,7 @@ Concord_http_request(
                  http_method,
                  task_key,
                  url_route);
+
       break;
    }
   case SYNC_IO:
@@ -515,12 +519,12 @@ concord_init(char token[])
 {
   concord_st *new_concord = safe_malloc(sizeof *new_concord);
 
-  new_concord->utils = _concord_utils_init(token);
+  _concord_utils_init(token, &new_concord->utils);
 
-  new_concord->channel = concord_channel_init(new_concord->utils);
-  new_concord->guild = concord_guild_init(new_concord->utils);
-  new_concord->user = concord_user_init(new_concord->utils);
-  new_concord->client = concord_user_init(new_concord->utils);
+  new_concord->channel = concord_channel_init(&new_concord->utils);
+  new_concord->guild = concord_guild_init(&new_concord->utils);
+  new_concord->user = concord_user_init(&new_concord->utils);
+  new_concord->client = concord_user_init(&new_concord->utils);
 
   return new_concord;
 }
@@ -528,11 +532,12 @@ concord_init(char token[])
 void
 concord_cleanup(concord_st *concord)
 {
+  _concord_utils_destroy(&concord->utils);
+
   concord_channel_destroy(concord->channel);
   concord_guild_destroy(concord->guild);
   concord_user_destroy(concord->user);
   concord_user_destroy(concord->client);
-  _concord_utils_destroy(concord->utils);
 
   safe_free(concord);
 }
