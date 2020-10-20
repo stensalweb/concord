@@ -156,17 +156,16 @@ struct curl_response_s {
   size_t size;
 };
 
-typedef void (concord_ld_object_ft)(void **p_object, struct curl_response_s *response_body);
+typedef void (concord_load_obj_ft)(void **p_object, struct curl_response_s *response_body);
 
 struct concord_clist_s {
-  CURL *easy_handle; //easy handle used to perform the request
-
   char *conn_key; //conn_ht key, based on connection endpoint
-  char *easy_key; //string format easy_handle address to use as easy_ht key
+
+  CURL *easy_handle; //easy handle used to perform the request
 
   struct curl_response_s response_body; //stores response body associated with the easy_handle
 
-  concord_ld_object_ft *load_cb; //object load callback
+  concord_load_obj_ft *load_cb; //object load callback
   void **p_object; //hold onto object to be passed as a load_cb parameter
 
   struct concord_clist_s *next;
@@ -189,7 +188,8 @@ typedef struct concord_utils_s {
 
   /* hashtables used for easy handles lookup */
   struct hashtable_s *conn_ht; //reuse connections by their endpoints
-  struct hashtable_s *easy_ht; //keys are easy handles addr
+  struct dictionary_s *easy_dict; //get connection nodes by their easy_handle unique address
+
   struct concord_clist_s *conn_list; // easy handle linked list for connection reuse
 
   char token[]; /* @todo hash/unhash token */

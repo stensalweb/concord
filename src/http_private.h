@@ -36,7 +36,7 @@ enum http_method {
 void Concord_http_request(
     concord_utils_st *utils,
     void **p_object,
-    concord_ld_object_ft *load_cb,
+    concord_load_obj_ft *load_cb,
     enum http_method http_method,
     char endpoint[], 
     ...);

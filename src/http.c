@@ -139,7 +139,6 @@ _concord_clist_free_all(struct concord_clist_s *conn)
     next_conn = conn->next;
     curl_easy_cleanup(conn->easy_handle);
     safe_free(conn->conn_key);
-    safe_free(conn->easy_key);
     safe_free(conn);
     conn = next_conn;
   } while (next_conn);
@@ -205,7 +204,7 @@ static void
 _concord_http_syncio(
   concord_utils_st *utils,
   void **p_object, 
-  concord_ld_object_ft *load_cb,
+  concord_load_obj_ft *load_cb,
   enum http_method http_method,
   char conn_key[],
   char endpoint[])
@@ -235,10 +234,7 @@ _concord_http_syncio(
        will be used when checking for multi_perform completed transfers */
     char easy_key[18];
     sprintf(easy_key, "%p", conn->easy_handle);
-    conn->easy_key = strdup(easy_key);
-    assert(NULL != conn->easy_key);
-
-    hashtable_set(utils->easy_ht, conn->easy_key, conn);
+    dictionary_set(utils->easy_dict, easy_key, conn, NULL);
   }
 
   _http_set_method(conn, http_method);
@@ -263,7 +259,7 @@ static void
 _concord_http_asyncio(
   concord_utils_st *utils,
   void **p_object, 
-  concord_ld_object_ft *load_cb,
+  concord_load_obj_ft *load_cb,
   enum http_method http_method,
   char conn_key[],
   char endpoint[])
@@ -284,10 +280,7 @@ _concord_http_asyncio(
        will be used when checking for multi_perform completed transfers */
     char easy_key[18];
     sprintf(easy_key, "%p", conn->easy_handle);
-    conn->easy_key = strdup(easy_key);
-    assert(NULL != conn->easy_key);
-
-    hashtable_set(utils->easy_ht, conn->easy_key, conn);
+    dictionary_set(utils->easy_dict, easy_key, conn, NULL);
   }
 
   _http_set_method(conn, http_method);
@@ -315,7 +308,7 @@ _curl_check_multi_info(concord_utils_st *utils)
     /* Find out which handle this message is about */
     char easy_key[18];
     sprintf(easy_key, "%p", msg->easy_handle);
-    struct concord_clist_s *conn = hashtable_get(utils->easy_ht, easy_key);
+    struct concord_clist_s *conn = dictionary_get(utils->easy_dict, easy_key);
     assert (NULL != conn);
 
     /* execute load callback to perform change in object */
@@ -438,8 +431,8 @@ _concord_utils_init(char token[])
   new_utils->conn_ht = hashtable_init();
   hashtable_build(new_utils->conn_ht, UTILS_HASHTABLE_SIZE);
 
-  new_utils->easy_ht = hashtable_init();
-  hashtable_build(new_utils->easy_ht, UTILS_HASHTABLE_SIZE);
+  new_utils->easy_dict = dictionary_init();
+  dictionary_build(new_utils->easy_dict, UTILS_HASHTABLE_SIZE);
 
   new_utils->header = dictionary_init();
   dictionary_build(new_utils->header, 15);
@@ -459,7 +452,7 @@ _concord_utils_destroy(concord_utils_st *utils)
   curl_share_cleanup(utils->easy_share);
 
   hashtable_destroy(utils->conn_ht);
-  hashtable_destroy(utils->easy_ht);
+  dictionary_destroy(utils->easy_dict);
 
   dictionary_destroy(utils->header);
 
@@ -470,7 +463,7 @@ void
 Concord_http_request(
   concord_utils_st *utils, 
   void **p_object, 
-  concord_ld_object_ft *load_cb,
+  concord_load_obj_ft *load_cb,
   enum http_method http_method,
   char endpoint[],
   ...)
