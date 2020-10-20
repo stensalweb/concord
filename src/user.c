@@ -101,9 +101,6 @@ _concord_ld_user(void **p_user, struct curl_response_s *response_body)
 void
 concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user)
 {
-  char endpoint[ENDPOINT_LENGTH] = "/users/";
-  strcat(endpoint, user_id);
-
   if (NULL == p_user){
     p_user = &concord->user;
   }
@@ -113,17 +110,13 @@ concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user)
   Concord_http_request( 
     concord->utils,
     (void**)p_user,
-    "GetUser",
-    endpoint,
     &_concord_ld_user,
-    GET);
+    GET, USERS, user_id);
 }
 
 void 
 concord_get_client(concord_st *concord, concord_user_st **p_client)
 {
-  char endpoint[] = "/users/@me";
-
   if (NULL == p_client){
     p_client = &concord->client;
   }
@@ -133,10 +126,8 @@ concord_get_client(concord_st *concord, concord_user_st **p_client)
   Concord_http_request( 
     concord->utils,
     (void**)p_client,
-    "GetClient",
-    endpoint,
     &_concord_ld_user,
-    GET);
+    GET, USERS, "@me");
 }
 
 static void
@@ -156,8 +147,6 @@ _concord_ld_client_guilds(void **p_client, struct curl_response_s *response_body
 void 
 concord_get_client_guilds(concord_st *concord, concord_user_st **p_client)
 {
-  char endpoint[] = "/users/@me/guilds";
-
   if (NULL == p_client){
     p_client = &concord->client;
   }
@@ -167,8 +156,6 @@ concord_get_client_guilds(concord_st *concord, concord_user_st **p_client)
   Concord_http_request( 
     concord->utils,
     (void**)p_client,
-    "GetClientGuilds",
-    endpoint,
     &_concord_ld_client_guilds,
-    GET);
+    GET, USERS_GUILDS, "@me");
 }

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <assert.h>
 #include <string.h>
 #include <ctype.h>
@@ -13,12 +14,13 @@
 #include "utils_private.h"
 
 
-/* this is a very crude http header parser, it splits value and keys
+/* this is a very crude http header parser, it splitskey/value pairs 
     at ':' char */
+/* @todo replace \r\n with a \0 before passing the value to dict */
 static size_t
 _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
-  int realsize = size * nmemb;
+  size_t realsize = size * nmemb;
   struct dictionary_s *header = (struct dictionary_s*)p_userdata;
 
   /* splits key from value at the current header line being read */
@@ -30,24 +32,23 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
       ++len;
       continue;
     } 
-    char key[30];
-    strncpy(key, content, len); //isolate key found
-    key[len] = '\0';
+    content[len] = '\0'; //isolate key from value at ':'
+    /* equivalent to "key\0value\0" */
 
     //len+2 to skip ':' between key and value
     char *field = strndup(&content[len+2], realsize - len+2);
     assert(NULL != field);
 
     /* update field to dictionary */
-    char *str = dictionary_set(header, key, field, true);
-    assert(NULL != str);
+    void *ret = dictionary_set(header, content, field, true);
+    logger_excep(NULL == ret, "ERROR: couldn't fetch header content");
     
-    //fprintf(stderr, "%s:%s\n", key, field);
+    //fprintf(stdout, "%s:%s\n", content, field);
     
     break;
   }
 
-  return (size_t)realsize; //return value for curl internals
+  return realsize; //return value for curl internals
 }
 
 /* get curl response body */
@@ -205,10 +206,10 @@ static void
 _concord_http_syncio(
   concord_utils_st *utils,
   void **p_object, 
-  char conn_key[],
-  char endpoint[],
   concord_ld_object_ft *load_cb,
-  enum http_method http_method)
+  enum http_method http_method,
+  char conn_key[],
+  char endpoint[])
 {
   struct concord_clist_s *conn = hashtable_get(utils->syncio_ht, conn_key);
   if (NULL == conn){
@@ -264,10 +265,10 @@ static void
 _concord_http_asyncio(
   concord_utils_st *utils,
   void **p_object, 
-  char conn_key[],
-  char endpoint[],
   concord_ld_object_ft *load_cb,
-  enum http_method http_method)
+  enum http_method http_method,
+  char conn_key[],
+  char endpoint[])
 {
   struct concord_clist_s *conn = hashtable_get(utils->asyncio_ht, conn_key);
   if (NULL == conn){
@@ -475,11 +476,19 @@ void
 Concord_http_request(
   concord_utils_st *utils, 
   void **p_object, 
-  char conn_key[],
-  char endpoint[], 
-  concord_ld_object_ft *load_cb, 
-  enum http_method http_method)
+  concord_ld_object_ft *load_cb,
+  enum http_method http_method,
+  char endpoint[],
+  ...)
 {
+  char url_route[ENDPOINT_LENGTH];
+  /* join endpoint with given arguments */
+  va_list args;
+  va_start (args, endpoint);
+  vsprintf(url_route, endpoint, args);
+  va_end(args);
+
+
   switch (utils->method){
   case ASYNC_IO:
    {
@@ -493,20 +502,20 @@ Concord_http_request(
       _concord_http_asyncio(
                  utils,
                  p_object,
-                 task_key,
-                 endpoint,
                  load_cb,
-                 http_method);
+                 http_method,
+                 task_key,
+                 url_route);
       break;
    }
   case SYNC_IO:
       _concord_http_syncio(
                  utils,
                  p_object,
-                 conn_key,
-                 endpoint,
                  load_cb,
-                 http_method);
+                 http_method,
+                 endpoint,
+                 url_route);
       break;
   default:
       logger_throw("ERROR: undefined request method");

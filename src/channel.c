@@ -127,9 +127,6 @@ _concord_ld_channel(void **p_channel, struct curl_response_s *response_body)
 void
 concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st **p_channel)
 {
-  char endpoint[ENDPOINT_LENGTH] = "/channels/";
-  strcat(endpoint, channel_id);
-
   if (NULL == p_channel){
     p_channel = &concord->channel;
   }
@@ -139,10 +136,8 @@ concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st *
   Concord_http_request( 
     concord->utils,
     (void**)p_channel,
-    "GetChannel",
-    endpoint,
     &_concord_ld_channel,
-    GET);
+    GET, CHANNELS, channel_id);
 }
 
 static void
@@ -162,9 +157,6 @@ _concord_ld_channel_messages(void **p_channel, struct curl_response_s *response_
 void
 concord_get_channel_messages(concord_st *concord, char channel_id[], concord_channel_st **p_channel)
 {
-  char endpoint[ENDPOINT_LENGTH];
-  sprintf(endpoint, "/channels/%s/messages", channel_id);
-
   if (NULL == p_channel){
     p_channel = &concord->channel;
   }
@@ -174,8 +166,6 @@ concord_get_channel_messages(concord_st *concord, char channel_id[], concord_cha
   Concord_http_request( 
     concord->utils,
     (void**)p_channel,
-    "GetChannelMessages",
-    endpoint,
     &_concord_ld_channel_messages,
-    GET);
+    GET, CHANNELS_MESSAGES, channel_id);
 }

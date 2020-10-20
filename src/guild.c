@@ -112,9 +112,6 @@ _concord_ld_guild(void **p_guild, struct curl_response_s *response_body)
 void
 concord_get_guild(concord_st *concord, char guild_id[], concord_guild_st **p_guild)
 {
-  char endpoint[ENDPOINT_LENGTH] = "/guilds/";
-  strcat(endpoint, guild_id);
-
   if (NULL == p_guild){
     p_guild = &concord->guild;
   }
@@ -124,10 +121,8 @@ concord_get_guild(concord_st *concord, char guild_id[], concord_guild_st **p_gui
   Concord_http_request( 
     concord->utils,
     (void**)p_guild,
-    "GetGuild",
-    endpoint,
     &_concord_ld_guild,
-    GET);
+    GET, GUILDS, guild_id);
 }
 
 static void
@@ -148,7 +143,7 @@ void
 concord_get_guild_channels(concord_st *concord, char guild_id[], concord_guild_st **p_guild)
 {
   char endpoint[ENDPOINT_LENGTH];
-  sprintf(endpoint, "/guilds/%s/channels", guild_id);
+  sprintf(endpoint, GUILDS_CHANNELS, guild_id);
 
   if (NULL == p_guild){
     p_guild = &concord->guild;
@@ -159,8 +154,6 @@ concord_get_guild_channels(concord_st *concord, char guild_id[], concord_guild_s
   Concord_http_request( 
     concord->utils,
     (void**)p_guild,
-    "GetGuildChannels",
-    endpoint,
     &_concord_ld_guild_channels,
-    GET);
+    GET, GUILDS_CHANNELS, guild_id);
 }
