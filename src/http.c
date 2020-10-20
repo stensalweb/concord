@@ -13,12 +13,6 @@
 #include "logger.h"
 #include "utils_private.h"
 
-static void
-my_free(void *ptr)
-{
-  free(ptr);
-}
-
 /* this is a very crude http header parser, it splitskey/value pairs 
     at ':' char */
 /* @todo replace \r\n with a \0 before passing the value to dict */
@@ -45,7 +39,7 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
     assert(NULL != field);
 
     /* update field to dictionary */
-    void *ret = dictionary_set(header, content, field, my_free);
+    void *ret = dictionary_set(header, content, field, &free);
     logger_excep(NULL == ret, "ERROR: couldn't fetch header content");
     
     //fprintf(stdout, "%s:%s\n", content, field);
@@ -216,7 +210,7 @@ _concord_http_syncio(
   char conn_key[],
   char endpoint[])
 {
-  struct concord_clist_s *conn = hashtable_get(utils->syncio_ht, conn_key);
+  struct concord_clist_s *conn = hashtable_get(utils->conn_ht, conn_key);
   if (NULL == conn){
     /* didn't find connection node, create a new one and return it */
     _concord_clist_append(utils, &conn);
@@ -234,7 +228,7 @@ _concord_http_syncio(
         where entries keys are the requests within each
         function
       this allows for easy_handles reusability */
-    hashtable_set(utils->syncio_ht, conn->conn_key, conn);
+    hashtable_set(utils->conn_ht, conn->conn_key, conn);
 
     /* this stores connection node inside a hashtable where entries
         keys are easy handle memory address converted to string
@@ -274,7 +268,7 @@ _concord_http_asyncio(
   char conn_key[],
   char endpoint[])
 {
-  struct concord_clist_s *conn = hashtable_get(utils->asyncio_ht, conn_key);
+  struct concord_clist_s *conn = hashtable_get(utils->conn_ht, conn_key);
   if (NULL == conn){
     /* didn't find connection node, create a new one */
     _concord_clist_append(utils, &conn);
@@ -283,7 +277,7 @@ _concord_http_asyncio(
     conn->conn_key = strdup(conn_key);
     assert(NULL != conn->conn_key);
     
-    hashtable_set(utils->asyncio_ht, conn->conn_key, conn);
+    hashtable_set(utils->conn_ht, conn->conn_key, conn);
 
     /* this stores connection node inside a hashtable where entries
         keys are easy handle memory address converted to string
@@ -441,11 +435,8 @@ _concord_utils_init(char token[])
   curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
   curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
 
-  new_utils->asyncio_ht = hashtable_init();
-  hashtable_build(new_utils->asyncio_ht, UTILS_HASHTABLE_SIZE);
-
-  new_utils->syncio_ht = hashtable_init();
-  hashtable_build(new_utils->syncio_ht, UTILS_HASHTABLE_SIZE);
+  new_utils->conn_ht = hashtable_init();
+  hashtable_build(new_utils->conn_ht, UTILS_HASHTABLE_SIZE);
 
   new_utils->easy_ht = hashtable_init();
   hashtable_build(new_utils->easy_ht, UTILS_HASHTABLE_SIZE);
@@ -467,8 +458,7 @@ _concord_utils_destroy(concord_utils_st *utils)
   _concord_clist_free_all(utils->conn_list);
   curl_share_cleanup(utils->easy_share);
 
-  hashtable_destroy(utils->asyncio_ht);
-  hashtable_destroy(utils->syncio_ht);
+  hashtable_destroy(utils->conn_ht);
   hashtable_destroy(utils->easy_ht);
 
   dictionary_destroy(utils->header);
