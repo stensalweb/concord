@@ -3,14 +3,14 @@
 #include "utils_private.h"
 #include "hashtable.h"
 
-#define DEFAULT_WAITMS 1000
+#define DEFAULT_WAITMS 750
 
 
 long long
 Utils_parse_ratelimit_header(dictionary_st *header, bool use_clock)
 {
   long long reset_after = dictionary_get_strtoll(header, "x-ratelimit-reset-after");
-  if (0 < reset_after) reset_after = DEFAULT_WAITMS;
+  if (0 > reset_after) reset_after = DEFAULT_WAITMS;
 
   if (true == use_clock || !reset_after){
     uv_timeval64_t te;

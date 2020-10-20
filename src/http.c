@@ -184,10 +184,10 @@ _concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
         doing blocking, find out why */
     long long timeout_ms;
     int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
-    if (0 != remaining){
+    if (0 == remaining){
       timeout_ms = Utils_parse_ratelimit_header(utils->header, false);
     } else {
-      timeout_ms = 100;
+      timeout_ms = 1;
     }
 
     uv_sleep(timeout_ms);
@@ -217,8 +217,6 @@ _concord_http_syncio(
     _concord_clist_append(utils, &conn);
     assert(NULL != conn);
 
-    _http_set_method(conn, http_method);
-
     /* share resources between SYNC_IO type easy_handles */
     curl_easy_setopt(conn->easy_handle, CURLOPT_SHARE, utils->easy_share);
 
@@ -244,6 +242,7 @@ _concord_http_syncio(
     hashtable_set(utils->easy_ht, conn->easy_key, conn);
   }
 
+  _http_set_method(conn, http_method);
   _http_set_url(conn, endpoint);
   conn->p_object = p_object; //save object for when load_cb is executed
   
@@ -371,10 +370,10 @@ concord_dispatch(concord_st *concord)
       }
     } else {
       int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
-      if (0 != remaining){
+      if (0 == remaining){
         timeout_ms = Utils_parse_ratelimit_header(utils->header, true);
       } else {
-        timeout_ms = 100;
+        timeout_ms = 1;
       }
 
       repeats = 0;

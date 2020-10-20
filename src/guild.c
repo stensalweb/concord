@@ -142,9 +142,6 @@ _concord_ld_guild_channels(void **p_guild, struct curl_response_s *response_body
 void
 concord_get_guild_channels(concord_st *concord, char guild_id[], concord_guild_st **p_guild)
 {
-  char endpoint[ENDPOINT_LENGTH];
-  sprintf(endpoint, GUILDS_CHANNELS, guild_id);
-
   if (NULL == p_guild){
     p_guild = &concord->guild;
   }
