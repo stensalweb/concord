@@ -40,7 +40,7 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
     assert(NULL != field);
 
     /* update field to dictionary */
-    void *ret = dictionary_set(header, content, field, true);
+    void *ret = dictionary_set(header, content, field, free);
     logger_excep(NULL == ret, "ERROR: couldn't fetch header content");
     
     //fprintf(stdout, "%s:%s\n", content, field);
