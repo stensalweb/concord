@@ -13,6 +13,11 @@
 #include "logger.h"
 #include "utils_private.h"
 
+static void
+my_free(void *ptr)
+{
+  free(ptr);
+}
 
 /* this is a very crude http header parser, it splitskey/value pairs 
     at ':' char */
@@ -40,7 +45,7 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
     assert(NULL != field);
 
     /* update field to dictionary */
-    void *ret = dictionary_set(header, content, field, free);
+    void *ret = dictionary_set(header, content, field, my_free);
     logger_excep(NULL == ret, "ERROR: couldn't fetch header content");
     
     //fprintf(stdout, "%s:%s\n", content, field);
