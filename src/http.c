@@ -70,7 +70,7 @@ _concord_curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata
 
 /* init easy handle with some default opt */
 CURL*
-_concord_curl_easy_init(concord_utils_st *utils, struct concord_clist_s *conn)
+_concord_curl_easy_init(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   CURL *new_easy_handle = curl_easy_init();
   assert(NULL != new_easy_handle);
@@ -84,68 +84,36 @@ _concord_curl_easy_init(concord_utils_st *utils, struct concord_clist_s *conn)
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, &conn->response_body);
 
   curl_easy_setopt(new_easy_handle, CURLOPT_HEADERFUNCTION, &_concord_curl_header_cb);
-  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERDATA, utils->header);
+  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERDATA, utils->header); /* @todo change to bucket->header */
 
   return new_easy_handle;
 }
 
-/* @todo as the number of active easy_handle increases, this function 
-    becomes unnecessarily slow (i think? didn't really check but seems
-    like it would), this can be solved by storing a reference to the
-    last node at all times */
-static struct concord_clist_s*
-_concord_clist_get_last(struct concord_clist_s *conn_list)
-{
-  if (!conn_list) return NULL;
-
-  struct concord_clist_s *iter = conn_list;
-  while (NULL != iter->next){
-    iter = iter->next;
-  }
-
-  return iter;
-}
-
 /* appends new connection node to the end of the list */
-static void
-_concord_clist_append(concord_utils_st *utils, struct concord_clist_s **p_new_conn)
+static struct concord_conn_s*
+_concord_conn_init(concord_utils_st *utils)
 {
-  struct concord_clist_s *last;
-  struct concord_clist_s *new_conn = safe_malloc(sizeof *new_conn);
+  struct concord_conn_s *new_conn = safe_malloc(sizeof *new_conn);
 
   new_conn->easy_handle = _concord_curl_easy_init(utils, new_conn);
 
-  if (NULL != p_new_conn){
-    *p_new_conn = new_conn;
-  }
-
-  if (NULL == utils->conn_list){
-    utils->conn_list = new_conn;
-    return;
-  }
-
-  /* @todo probably better to implement a circular list */
-  last = _concord_clist_get_last(utils->conn_list);
-  last->next = new_conn;
+  return new_conn;
 }
 
+/* @param ptr is NULL because we want to pass this function as a
+    template to dictionary_set, which only accepts void* param */
 void
-_concord_clist_free_all(struct concord_clist_s *conn)
+_concord_conn_destroy(void *ptr)
 {
-  if (NULL == conn) return;
+  struct concord_conn_s *conn = ptr;
 
-  struct concord_clist_s *next_conn;
-  do {
-    next_conn = conn->next;
-    curl_easy_cleanup(conn->easy_handle);
-    safe_free(conn->conn_key);
-    safe_free(conn);
-    conn = next_conn;
-  } while (next_conn);
+  curl_easy_cleanup(conn->easy_handle);
+  safe_free(conn->conn_key);
+  safe_free(conn);
 }
 
 static void
-_http_set_method(struct concord_clist_s *conn, enum http_method method)
+_http_set_method(struct concord_conn_s *conn, enum http_method method)
 {
   /* @todo to implement commented out ones */
   switch (method){
@@ -165,14 +133,14 @@ _http_set_method(struct concord_clist_s *conn, enum http_method method)
 }
 
 static void
-_http_set_url(struct concord_clist_s *conn, char endpoint[])
+_http_set_url(struct concord_conn_s *conn, char endpoint[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
   curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
 }
 
 static void
-_concord_set_curl_easy(concord_utils_st *utils, struct concord_clist_s *conn)
+_concord_set_curl_easy(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   CURLcode ecode = curl_easy_perform(conn->easy_handle);
   logger_excep(CURLE_OK != ecode, curl_easy_strerror(ecode));
@@ -209,10 +177,10 @@ _concord_http_syncio(
   char conn_key[],
   char endpoint[])
 {
-  struct concord_clist_s *conn = hashtable_get(utils->conn_ht, conn_key);
+  struct concord_conn_s *conn = hashtable_get(utils->conn_ht, conn_key);
   if (NULL == conn){
     /* didn't find connection node, create a new one and return it */
-    _concord_clist_append(utils, &conn);
+    conn = _concord_conn_init(utils);
     assert(NULL != conn);
 
     /* share resources between SYNC_IO type easy_handles */
@@ -234,7 +202,7 @@ _concord_http_syncio(
        will be used when checking for multi_perform completed transfers */
     char easy_key[18];
     sprintf(easy_key, "%p", conn->easy_handle);
-    dictionary_set(utils->easy_dict, easy_key, conn, NULL);
+    dictionary_set(utils->easy_dict, easy_key, conn, &_concord_conn_destroy);
   }
 
   _http_set_method(conn, http_method);
@@ -247,7 +215,7 @@ _concord_http_syncio(
 }
 
 static void
-_concord_set_curl_multi(concord_utils_st *utils, struct concord_clist_s *conn)
+_concord_set_curl_multi(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   if (NULL != conn->easy_handle){
     curl_multi_add_handle(utils->multi_handle, conn->easy_handle);
@@ -269,10 +237,10 @@ _concord_http_asyncio(
   char conn_key[],
   char endpoint[])
 {
-  struct concord_clist_s *conn = hashtable_get(utils->conn_ht, conn_key);
+  struct concord_conn_s *conn = hashtable_get(utils->conn_ht, conn_key);
   if (NULL == conn){
     /* didn't find connection node, create a new one */
-    _concord_clist_append(utils, &conn);
+    conn = _concord_conn_init(utils);
     assert(NULL != conn);
 
     conn->conn_key = strdup(conn_key);
@@ -285,7 +253,7 @@ _concord_http_asyncio(
        will be used when checking for multi_perform completed transfers */
     char easy_key[18];
     sprintf(easy_key, "%p", conn->easy_handle);
-    dictionary_set(utils->easy_dict, easy_key, conn, NULL);
+    dictionary_set(utils->easy_dict, easy_key, conn, &_concord_conn_destroy);
   }
 
   _http_set_method(conn, http_method);
@@ -313,7 +281,7 @@ _curl_check_multi_info(concord_utils_st *utils)
     /* Find out which handle this message is about */
     char easy_key[18];
     sprintf(easy_key, "%p", msg->easy_handle);
-    struct concord_clist_s *conn = dictionary_get(utils->easy_dict, easy_key);
+    struct concord_conn_s *conn = dictionary_get(utils->easy_dict, easy_key);
     assert (NULL != conn);
 
     /* execute load callback to perform change in object */
@@ -451,7 +419,6 @@ _concord_utils_destroy(concord_utils_st *utils)
 {
   curl_slist_free_all(utils->request_header);
   curl_multi_cleanup(utils->multi_handle);
-  _concord_clist_free_all(utils->conn_list);
   curl_share_cleanup(utils->easy_share);
 
   hashtable_destroy(utils->conn_ht);
