@@ -7,6 +7,8 @@
 int main(void)
 {
   FILE *f_bot_token = fopen("bot_token","rb");
+  assert(NULL != f_bot_token);
+
   char bot_token[100];
   fgets(bot_token, 99, f_bot_token);
   fclose(f_bot_token);
