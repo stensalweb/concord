@@ -10,13 +10,12 @@ OBJS  = $(addprefix $(OBJDIR)/, $(_OBJS))
 
 CONCORD_DLIB = $(LIBDIR)/libconcord.so
 # path to JSCON lib folder here
-JSCON_DIR   = ./JSCON
 
 CFLAGS = -Wall -Werror -pedantic -g \
-	 -I$(INCLDIR) -IJSCON/$(INCLDIR)
+	 -I$(INCLDIR)
 
-LDLIBS  = -L$(JSCON_DIR)/lib -ljscon -lcurl -luv
-LDFLAGS = "-Wl,-rpath,$(JSCON_DIR)/lib" 
+LDLIBS  = -L$(LIBDIR) -ljscon -lcurl -luv
+LDFLAGS = "-Wl,-rpath,$(LIBDIR)" 
 
 .PHONY : all clean purge
 
@@ -29,14 +28,11 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	$(CC) -c -fPIC $< -o $@ $(CFLAGS)
 
 
-$(CONCORD_DLIB): $(JSCON_DIR)/lib
+$(CONCORD_DLIB):
 	$(CC) $(OBJS) -shared -o $(CONCORD_DLIB) $(LDLIBS)
 
-$(JSCON_DIR)/lib:
-	$(MAKE) -C $(JSCON_DIR)
-	cp $(JSCON_DIR)/lib/* lib
-
 install: all
+	cp $(INCL_DIR)/* /usr/local/include
 	cp $(CONCORD_DLIB) /usr/local/lib && \
 	ldconfig
 
@@ -45,5 +41,4 @@ clean :
 
 purge : clean
 	rm -rf $(LIBDIR)
-	$(MAKE) -C JSCON purge
 	$(MAKE) -C test clean

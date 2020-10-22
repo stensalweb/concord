@@ -6,7 +6,7 @@ EXEC = run
 SRC  = test.c
 
 CFLAGS = -Wall -Werror -pedantic -g \
-	 -I$(TOP)/include -I$(TOP)/JSCON/include
+	 -I$(TOP)/include
 
 LDLIBS  = -L$(LIBDIR) -ljscon -lcurl -luv -lconcord
 LDFLAGS = "-Wl,-rpath,$(LIBDIR)"
