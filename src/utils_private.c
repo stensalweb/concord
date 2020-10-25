@@ -1,10 +1,31 @@
+#include <string.h>
+
 #include <libconcord.h>
 
+#include "http_private.h"
 #include "utils_private.h"
 #include "hashtable.h"
 
 #define DEFAULT_WAITMS 750
 
+void
+__Utils_assert(const char *expr_str, int expr, const char *file, int line, const char *func, const char *msg)
+{
+  if (!expr){
+    fprintf(stderr,"[%s:%d]%s()\n\tASSERT FAILED:\t%s\n\tEXPECTED:\t%s\n",
+      file, line, func, msg, expr_str);
+    abort();
+  }
+}
+
+char*
+Utils_tryget_major(char endpoint[])
+{
+  if (strstr(endpoint, CHANNELS)) return "channel_major";
+  if (strstr(endpoint, GUILDS)) return "guild_major";
+  //if (0 == strstr(endpoint, WEBHOOK)) return "webhook_major";
+  return endpoint;
+}
 
 /* @todo if bucket hash is unknown, use reset_after timeout value */
 long long
