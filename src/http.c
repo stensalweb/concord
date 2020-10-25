@@ -57,7 +57,6 @@ _concord_curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata
   char *tmp = realloc(response_body->str, response_body->size + realsize + 1);
   Utils_assert(NULL != tmp, "Out of memory");
 
-  //assert(NULL == response_body->str);
   response_body->str = tmp;
   memcpy(response_body->str + response_body->size, content, realsize);
   response_body->size += realsize;
@@ -121,19 +120,24 @@ _concord_conn_init(concord_utils_st *utils, char bucket_key[])
 static void
 _http_set_method(struct concord_conn_s *conn, enum http_method method)
 {
-  /* @todo to implement commented out ones */
   switch (method){
-  //case DELETE:
+  case DELETE:
+      curl_easy_setopt(conn->easy_handle, CURLOPT_CUSTOMREQUEST, "DELETE");
+      return;
   case GET:
       curl_easy_setopt(conn->easy_handle, CURLOPT_HTTPGET, 1L);
       return;
   case POST:
       curl_easy_setopt(conn->easy_handle, CURLOPT_POST, 1L);
       return;
-  //case PATCH:
-  //case PUT:
+  case PATCH:
+      curl_easy_setopt(conn->easy_handle, CURLOPT_CUSTOMREQUEST, "PATCH");
+      return;
+  case PUT:
+      curl_easy_setopt(conn->easy_handle, CURLOPT_UPLOAD, 1L);
+      return;
   default:
-    Utils_print_debug("ERROR: Unknown HTTP Method");
+    Utils_print_debug("Unknown HTTP Method");
     exit(EXIT_FAILURE);
   }
 }
@@ -152,17 +156,11 @@ _concord_sync_perform(concord_utils_st *utils, struct concord_conn_s *conn)
   Utils_assert(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
   if (NULL != conn->response_body.str){
-    /* @todo for some reason only getting a single header when
-        doing blocking, find out why */
-    long long timeout_ms;
     int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
     if (0 == remaining){
-      timeout_ms = Utils_parse_ratelimit_header(utils->header, false);
-    } else {
-      timeout_ms = 1;
+      long long timeout_ms = Utils_parse_ratelimit_header(utils->header, false);
+      uv_sleep(timeout_ms);
     }
-
-    uv_sleep(timeout_ms);
 
     //Utils_print_debug(conn->response_body.str);
     (*conn->load_cb)(conn->p_object, &conn->response_body);
@@ -203,7 +201,7 @@ _concord_bucket_destroy(void *ptr)
 }
 
 static void
-_concord_recycle_queue(concord_utils_st *utils, struct concord_bucket_s *bucket)
+_concord_queue_recycle(concord_utils_st *utils, struct concord_bucket_s *bucket)
 {
   Utils_assert(NULL != bucket->queue[bucket->top], "Can't recycle empty slot");
   Utils_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
@@ -222,7 +220,7 @@ _concord_recycle_queue(concord_utils_st *utils, struct concord_bucket_s *bucket)
 
 /* push new connection to queue */
 static void
-_concord_push_queue(concord_utils_st *utils, struct concord_bucket_s *bucket, struct concord_conn_s *conn)
+_concord_queue_push(concord_utils_st *utils, struct concord_bucket_s *bucket, struct concord_conn_s *conn)
 {
   Utils_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
 
@@ -242,7 +240,7 @@ _concord_push_queue(concord_utils_st *utils, struct concord_bucket_s *bucket, st
 }
 
 static void
-_concord_pop_queue(concord_utils_st *utils, struct concord_bucket_s *bucket)
+_concord_queue_pop(concord_utils_st *utils, struct concord_bucket_s *bucket)
 {
   if (bucket->bottom == bucket->top) return; //nothing to pop
 
@@ -276,7 +274,7 @@ _concord_start_client_buckets(concord_utils_st *utils)
 {
   for (size_t i=0; i < utils->num_buckets; ++i){
     Utils_print_debug(utils->client_buckets[i]->hash_key);
-    _concord_pop_queue(utils, utils->client_buckets[i]);
+    _concord_queue_pop(utils, utils->client_buckets[i]);
     //fprintf(stderr, "\tactive handles: %ld\n", utils->client_buckets[i]->top);
   }
 }
@@ -367,7 +365,6 @@ _concord_start_conn(
 
     Utils_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
 
-    /* @todo this looks fishy, check this */
     struct concord_conn_s *new_conn = bucket->queue[bucket->top];
     if (NULL == new_conn){
       Utils_print_debug("bucket exists but needs a new connection pushed to it (not recycling)");
@@ -375,10 +372,10 @@ _concord_start_conn(
       new_conn = _concord_conn_init(utils, bucket_key);
       Utils_assert(NULL != new_conn, "Out of memory");
 
-      _concord_push_queue(utils, bucket, new_conn);
-    } else { /* @todo create recycling function instead of using push */
+      _concord_queue_push(utils, bucket, new_conn);
+    } else { 
       Utils_print_debug("recycling existing connection");
-      _concord_recycle_queue(utils, bucket);
+      _concord_queue_recycle(utils, bucket);
     }
 
     _http_set_method(new_conn, http_method);
@@ -455,16 +452,16 @@ _curl_check_multi_info(concord_utils_st *utils)
     curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
 
     int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
-    
     if (0 == remaining){
       long long timeout_ms = Utils_parse_ratelimit_header(utils->header, true);
 //      fprintf(stderr, "\tTIMEOUT_MS: %lld\n", timeout_ms); 
+      /* @todo sleep is blocking, we don't want this */
       uv_sleep(timeout_ms);
     }
 
 //    fprintf(stderr, "\tREMAINING: %d\n", remaining); 
     do {
-      _concord_pop_queue(utils, conn->bucket);
+      _concord_queue_pop(utils, conn->bucket);
     } while (remaining--);
   }
 }
@@ -522,7 +519,7 @@ concord_request_method(concord_st *concord, concord_request_method_et method)
   case SYNC_IO:
       break;
   default:
-      Utils_print_debug("ERROR: undefined request method");
+      Utils_print_debug("Undefined request method");
       exit(EXIT_FAILURE);
   }
 

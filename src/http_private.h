@@ -6,8 +6,8 @@ enum http_method {
   NONE    = 0,
   DELETE  = 1,
   GET     = 2,
-  PATCH   = 3,
-  POST    = 4,
+  POST    = 3,
+  PATCH   = 4,
   PUT     = 5,
 };
 
