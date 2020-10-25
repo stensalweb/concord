@@ -23,12 +23,6 @@ enum http_method {
 #define USERS              "/users/%s"
 #define USERS_GUILDS       "/users/%s/guilds"
 
-struct client_bucket_s {
-  char *endpoint; 
-  char *major_param;
-  char *hash;
-};
-
 /* 
   @param utils contains useful tools
   @param p_object is a pointer to the object to be loaded by load_cb

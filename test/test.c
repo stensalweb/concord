@@ -48,7 +48,7 @@ int main(void)
     concord_get_channel_messages(concord, channel_id, channels+i);
   }
   concord_dispatch(concord);
-/*
+
   FILE *f_out = fopen("a.out", "w");
   assert(NULL != f_out);
 
@@ -62,7 +62,7 @@ int main(void)
     free(buffer);
   }
   fclose(f_out);
-*/
+
   // DELETE ALLOCATED OBJECTS
   for (long i=0; i < jscon_size(guilds[0]->channels); ++i){
     concord_channel_destroy(channels[i]);

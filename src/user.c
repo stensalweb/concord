@@ -10,7 +10,6 @@
 #include <libconcord.h>
 
 #include "http_private.h"
-#include "logger.h"
 
 concord_user_st*
 concord_user_init(concord_utils_st *utils)

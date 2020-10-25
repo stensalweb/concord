@@ -159,24 +159,39 @@ struct curl_response_s {
 
 typedef void (concord_load_obj_ft)(void **p_object, struct curl_response_s *response_body);
 
+struct concord_bucket_s; //forward declaration
+
 struct concord_conn_s {
-  char *conn_key; //conn_ht key, based on connection endpoint
+  char *key; //conn_ht key, based on connection endpoint/major param
 
   CURL *easy_handle; //easy handle used to perform the request
 
   struct curl_response_s response_body; //stores response body associated with the easy_handle
 
-  concord_load_obj_ft *load_cb; //object load callback
   void **p_object; //hold onto object to be passed as a load_cb parameter
+  concord_load_obj_ft *load_cb; //object load callback
+
+  struct concord_bucket_s *bucket; //bucket this connection node is a part of
+};
+
+struct concord_bucket_s {
+  char *hash_key;
+  int remaining;
+
+  struct concord_conn_s **queue;
+  size_t num_conn;
+
+  size_t bottom;
+  size_t top;
 };
 
 
 typedef struct concord_utils_s {
   concord_request_method_et method; /* is SYNC_IO or ASYNC_IO */
 
-  struct curl_slist *request_header; /* @todo this could be a global, as it is a READ-ONLY variable */
+  struct curl_slist *request_header; /* the default request header sent to discord servers */
 
-  struct dictionary_s *header; /* this holds the http response header */
+  struct dictionary_s *header; /* this holds the http response header @todo this will be removed once I add buckets logic */
 
   /* ASYNC_IO METHOD USAGE */
   CURLM *multi_handle;
@@ -184,16 +199,23 @@ typedef struct concord_utils_s {
 
   /* SYNC_IO METHOD USAGE */
   CURLSH *easy_share;
+  
+  struct concord_bucket_s **client_buckets;
+  size_t num_buckets;
 
-  /* hashtables used for easy handles lookup */
-  struct hashtable_s *conn_ht; //reuse connections by their endpoints
-  struct dictionary_s *easy_dict; //get connection nodes by their easy_handle unique address
+  struct dictionary_s *bucket_dict; //get buckets by their endpoints/major parameters
+
+  /* get connection nodes by their easy_handle unique address
+      @todo this will be rendered useless I switch to sockets */
+  struct dictionary_s *easy_dict;
 
   char *token; /* @todo hash/unhash token */
 } concord_utils_st;
 
 
 typedef struct concord_s {
+  /* because of alignment, utils can be expanded to the concord_st its a part of
+      concord == (concord_st)concord->utils */
   concord_utils_st utils;
 
   concord_channel_st *channel;
