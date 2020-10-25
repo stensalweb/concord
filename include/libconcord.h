@@ -162,8 +162,6 @@ typedef void (concord_load_obj_ft)(void **p_object, struct curl_response_s *resp
 struct concord_bucket_s; //forward declaration
 
 struct concord_conn_s {
-  char *key; //conn_ht key, based on connection endpoint/major param
-
   CURL *easy_handle; //easy handle used to perform the request
 
   struct curl_response_s response_body; //stores response body associated with the easy_handle
@@ -176,7 +174,6 @@ struct concord_conn_s {
 
 struct concord_bucket_s {
   char *hash_key;
-  int remaining;
 
   struct concord_conn_s **queue;
   size_t num_conn;

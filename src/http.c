@@ -75,7 +75,7 @@ _concord_curl_easy_init(concord_utils_st *utils, struct concord_conn_s *conn)
 
   curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->request_header);
   curl_easy_setopt(new_easy_handle, CURLOPT_FAILONERROR, 1L);
-//  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 2L);
+  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 2L);
 
   // SET CURL_EASY CALLBACKS //
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_body_cb);
@@ -97,7 +97,6 @@ _concord_conn_destroy(void *ptr)
 
   curl_easy_cleanup(conn->easy_handle);
   safe_free(conn->response_body.str);
-  safe_free(conn->key);
   safe_free(conn);
 }
 
@@ -111,8 +110,6 @@ _concord_conn_init(concord_utils_st *utils, char bucket_key[])
   struct concord_conn_s *new_conn = safe_malloc(sizeof *new_conn);
 
   new_conn->easy_handle = _concord_curl_easy_init(utils, new_conn);
-  new_conn->key = strndup(bucket_key, strlen(bucket_key));
-  Utils_assert(NULL != new_conn->key, "Out of memory");
 
   char easy_key[18];
   sprintf(easy_key, "%p", new_conn->easy_handle);
@@ -185,7 +182,7 @@ _concord_bucket_init(char bucket_hash[])
   new_bucket->num_conn = MAX_CONCURRENT_CONNS;
   new_bucket->queue = safe_malloc(sizeof *new_bucket->queue * new_bucket->num_conn);
 
-  new_bucket->hash_key = strdup(bucket_hash);
+  new_bucket->hash_key = strndup(bucket_hash, strlen(bucket_hash));
   Utils_assert(NULL != new_bucket->hash_key, "Out of memory");
 
   return new_bucket;
@@ -206,18 +203,16 @@ _concord_bucket_destroy(void *ptr)
 }
 
 static void
-_concord_push_queue_recycle(concord_utils_st *utils, struct concord_bucket_s *bucket)
+_concord_recycle_queue(concord_utils_st *utils, struct concord_bucket_s *bucket)
 {
   Utils_assert(NULL != bucket->queue[bucket->top], "Can't recycle empty slot");
   Utils_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
-  /* if bucket->top == bucket->num_conn autoperform */
 
   ++bucket->top;
   ++utils->active_handles;
 
-  fprintf(stderr, "\tconn is: %s\n", bucket->queue[bucket->top-1]->key);
-  fprintf(stderr, "\tbucket top is: %ld\n", bucket->top);
-  fprintf(stderr, "\tbucket size is: %ld\n", bucket->num_conn);
+  //fprintf(stderr, "\tbucket top is: %ld\n", bucket->top);
+  //fprintf(stderr, "\tbucket size is: %ld\n", bucket->num_conn);
 
   if (MAX_CONCURRENT_CONNS == utils->active_handles){
     Utils_print_debug("Reach max concurrent connections threshold, auto performing connections on hold ...");
@@ -230,7 +225,6 @@ static void
 _concord_push_queue(concord_utils_st *utils, struct concord_bucket_s *bucket, struct concord_conn_s *conn)
 {
   Utils_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
-  /* if bucket->top == bucket->num_conn autoperform */
 
   bucket->queue[bucket->top] = conn; 
   conn->bucket = bucket;
@@ -238,9 +232,8 @@ _concord_push_queue(concord_utils_st *utils, struct concord_bucket_s *bucket, st
   ++bucket->top;
   ++utils->active_handles;
 
-  fprintf(stderr, "\tconn is: %s\n", conn->key);
-  fprintf(stderr, "\tbucket top is: %ld\n", bucket->top);
-  fprintf(stderr, "\tbucket size is: %ld\n", bucket->num_conn);
+  //fprintf(stderr, "\tbucket top is: %ld\n", bucket->top);
+  //fprintf(stderr, "\tbucket size is: %ld\n", bucket->num_conn);
 
   if (MAX_CONCURRENT_CONNS == utils->active_handles){
     Utils_print_debug("Reach max concurrent connections threshold, auto performing connections on hold ...");
@@ -257,26 +250,25 @@ _concord_pop_queue(concord_utils_st *utils, struct concord_bucket_s *bucket)
   Utils_assert(NULL != conn, "Can't pop empty queue's slot");
 
   curl_multi_add_handle(utils->multi_handle, conn->easy_handle);
-  fprintf(stderr, "\tADD HANDLE: %s\n\tQUEUE SLOT: %ld\n", conn->key, bucket->bottom);
+  //fprintf(stderr, "\tQUEUE SLOT: %ld\n", bucket->bottom);
 
   ++bucket->bottom;
   --utils->active_handles;
 
-  fprintf(stderr, "\tconn is: %s\n", conn->key);
-  fprintf(stderr, "\tbucket top is:%ld\n", bucket->top);
-  fprintf(stderr, "\tbucket size is: %ld\n", bucket->num_conn);
+  //fprintf(stderr, "\tbucket top is:%ld\n", bucket->top);
+  //fprintf(stderr, "\tbucket size is: %ld\n", bucket->num_conn);
 }
 
 static void
 _concord_client_buckets_append(concord_utils_st *utils, struct concord_bucket_s *bucket)
 {
+  ++utils->num_buckets;
   void *tmp = realloc(utils->client_buckets, sizeof *utils->client_buckets * utils->num_buckets);
   Utils_assert(NULL != tmp, "Out of memory");
 
   utils->client_buckets = tmp;
 
-  utils->client_buckets[utils->num_buckets] = bucket;
-  ++utils->num_buckets;
+  utils->client_buckets[utils->num_buckets-1] = bucket;
 }
 
 static void
@@ -285,7 +277,7 @@ _concord_start_client_buckets(concord_utils_st *utils)
   for (size_t i=0; i < utils->num_buckets; ++i){
     Utils_print_debug(utils->client_buckets[i]->hash_key);
     _concord_pop_queue(utils, utils->client_buckets[i]);
-    fprintf(stderr, "\tactive handles: %ld\n", utils->client_buckets[i]->top);
+    //fprintf(stderr, "\tactive handles: %ld\n", utils->client_buckets[i]->top);
   }
 }
 
@@ -371,7 +363,7 @@ _concord_start_conn(
   else {
     /* add connection to bucket or reuse innactive existing one */
     Utils_print_debug("matching hashbucket found");
-    fprintf(stderr, "\t%s\n", bucket->hash_key);
+    //fprintf(stderr, "\t%s\n", bucket->hash_key);
 
     Utils_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
 
@@ -386,7 +378,7 @@ _concord_start_conn(
       _concord_push_queue(utils, bucket, new_conn);
     } else { /* @todo create recycling function instead of using push */
       Utils_print_debug("recycling existing connection");
-      _concord_push_queue_recycle(utils, bucket);
+      _concord_recycle_queue(utils, bucket);
     }
 
     _http_set_method(new_conn, http_method);
@@ -435,6 +427,7 @@ _curl_check_multi_info(concord_utils_st *utils)
   /* See how the transfers went */
   CURLMsg *msg; /* for picking up messages with the transfer status */
   int pending; /*how many messages are left */
+  long http_code; /* http response code */
   while ((msg = curl_multi_info_read(utils->multi_handle, &pending)))
   {
     if (CURLMSG_DONE != msg->msg)
@@ -444,6 +437,9 @@ _curl_check_multi_info(concord_utils_st *utils)
     char easy_key[18];
     sprintf(easy_key, "%p", msg->easy_handle);
     struct concord_conn_s *conn = dictionary_get(utils->easy_dict, easy_key);
+
+    curl_easy_getinfo(conn->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
+    Utils_assert(429 != http_code, "GLOBAL TIMEOUT RECEIVED");
 
     /* execute load callback to perform change in object */
     if (NULL != conn->response_body.str){
@@ -456,9 +452,20 @@ _curl_check_multi_info(concord_utils_st *utils)
       conn->response_body.size = 0;
     }
 
-    fprintf(stderr, "\tREMOVE HANDLE: %s\n", conn->key);
     curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
-    _concord_pop_queue(utils, conn->bucket);
+
+    int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
+    
+    if (0 == remaining){
+      long long timeout_ms = Utils_parse_ratelimit_header(utils->header, true);
+//      fprintf(stderr, "\tTIMEOUT_MS: %lld\n", timeout_ms); 
+      uv_sleep(timeout_ms);
+    }
+
+//    fprintf(stderr, "\tREMAINING: %d\n", remaining); 
+    do {
+      _concord_pop_queue(utils, conn->bucket);
+    } while (remaining--);
   }
 }
 
@@ -473,7 +480,6 @@ concord_dispatch(concord_st *concord)
 
   int transfers_running = 0; /* keep number of running handles */
   int repeats = 0;
-  long timeout_ms = 1000;
   do {
     CURLMcode mcode;
     int numfds;
@@ -481,9 +487,9 @@ concord_dispatch(concord_st *concord)
     mcode = curl_multi_perform(utils->multi_handle, &transfers_running);
     if (CURLM_OK == mcode){
       /* wait for activity, timeout or "nothing" */
-      mcode = curl_multi_wait(utils->multi_handle, NULL, 0, timeout_ms, &numfds);
+      mcode = curl_multi_wait(utils->multi_handle, NULL, 0, 500, &numfds);
       _curl_check_multi_info(utils);
-      fprintf(stderr, "\tTRANSFERS RUNNING: %d\n", transfers_running);
+      //fprintf(stderr, "\tTRANSFERS RUNNING: %d\n", transfers_running);
     }
 
     Utils_assert(CURLM_OK == mcode, curl_easy_strerror(mcode));
@@ -498,21 +504,13 @@ concord_dispatch(concord_st *concord)
         uv_sleep(100); /* sleep 100 milliseconds */
       }
     } else {
-      /*
-      int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
-      if (0 == remaining){
-        timeout_ms = Utils_parse_ratelimit_header(utils->header, true);
-      } else {
-        timeout_ms = 1;
-      }
-      */
       repeats = 0;
     }
   } while (utils->active_handles);
 
   _concord_reset_client_buckets(utils);
 
-  fprintf(stderr, "\tactive handles: %ld\n", utils->active_handles);
+  //fprintf(stderr, "\tactive handles: %ld\n", utils->active_handles);
   Utils_assert(0 == utils->active_handles, "There are still active handles waiting for curl_multi_perform()");
 }
 

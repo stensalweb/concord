@@ -6,7 +6,6 @@
 #include "utils_private.h"
 #include "hashtable.h"
 
-#define DEFAULT_WAITMS 750
 
 void
 __Utils_assert(const char *expr_str, int expr, const char *file, int line, const char *func, const char *msg)
@@ -42,8 +41,8 @@ Utils_parse_ratelimit_header(dictionary_st *header, bool use_clock)
     long long reset = dictionary_get_strtoll(header, "x-ratelimit-reset") * 1000;
     long long delay_ms = reset - utc;
 
-    if (0 <= delay_ms){
-      delay_ms = DEFAULT_WAITMS;
+    if (delay_ms < 0){
+      delay_ms = 0;
     }
 
     return delay_ms;
