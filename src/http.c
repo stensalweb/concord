@@ -208,12 +208,11 @@ _concord_queue_recycle(concord_utils_st *utils, struct concord_bucket_s *bucket)
   logger_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
 
   ++bucket->top;
-  ++utils->active_handles;
+  ++utils->transfers_onhold;
 
-  logger_print("Bucket top is: %ld", bucket->top);
-  logger_print("Bucket size is: %ld", bucket->num_conn);
+  logger_print("Bucket top: %ld\n\tBucket size: %ld", bucket->top, bucket->num_conn);
 
-  if (MAX_CONCURRENT_CONNS == utils->active_handles){
+  if (MAX_CONCURRENT_CONNS == utils->transfers_onhold){
     logger_puts("Reach max concurrent connections threshold, auto performing connections on hold ...");
     concord_dispatch((concord_st*)utils);
   }
@@ -229,12 +228,11 @@ _concord_queue_push(concord_utils_st *utils, struct concord_bucket_s *bucket, st
   conn->bucket = bucket;
 
   ++bucket->top;
-  ++utils->active_handles;
+  ++utils->transfers_onhold;
 
-  logger_print("Bucket top is: %ld", bucket->top);
-  logger_print("Bucket size is: %ld", bucket->num_conn);
+  logger_print("Bucket top: %ld\n\tBucket size: %ld", bucket->top, bucket->num_conn);
 
-  if (MAX_CONCURRENT_CONNS == utils->active_handles){
+  if (MAX_CONCURRENT_CONNS == utils->transfers_onhold){
     logger_puts("Reach max concurrent connections threshold, auto performing connections on hold ...");
     concord_dispatch((concord_st*)utils);
   }
@@ -249,13 +247,11 @@ _concord_queue_pop(concord_utils_st *utils, struct concord_bucket_s *bucket)
   logger_assert(NULL != conn, "Can't pop empty queue's slot");
 
   curl_multi_add_handle(utils->multi_handle, conn->easy_handle);
-  logger_print("Queue Slot: %ld", bucket->bottom);
 
   ++bucket->bottom;
-  --utils->active_handles;
+  --utils->transfers_onhold;
 
-  logger_print("Bucket top is: %ld", bucket->top);
-  logger_print("Bucket size is: %ld", bucket->num_conn);
+  logger_print("Bucket Bottom: %ld\n\tBucket top: %ld\n\tBucket size: %ld", bucket->bottom, bucket->top, bucket->num_conn);
 }
 
 static void
@@ -297,7 +293,7 @@ _concord_get_hashbucket(concord_utils_st *utils, char bucket_hash[])
   struct concord_bucket_s *bucket = dictionary_get(utils->bucket_dict, bucket_hash);
 
   if (NULL != bucket){
-    logger_puts("returning existing bucket");
+    logger_puts("Returning existing bucket");
     return bucket; //bucket exists return it
   }
 
@@ -308,7 +304,7 @@ _concord_get_hashbucket(concord_utils_st *utils, char bucket_hash[])
 
   _concord_client_buckets_append(utils, bucket);
 
-  logger_puts("returning new bucket");
+  logger_puts("Returning new bucket");
   return bucket;
 }
 
@@ -329,7 +325,7 @@ _concord_start_conn(
         connection to the Discord API, in order to link this bucket_key with a bucket hash */
     struct concord_conn_s *new_conn = _concord_conn_init(utils, bucket_key);
     logger_assert(NULL != new_conn, "Out of memory");
-    logger_puts("new conn created");
+    logger_puts("New conn created");
 
 
     _http_set_method(new_conn, http_method); //set the http request method (GET, POST, ...)
@@ -340,7 +336,7 @@ _concord_start_conn(
     
     _concord_sync_perform(utils, new_conn); //execute a blocking connection to generate this bucket hash
 
-    logger_puts("fetched conn matching hashbucket");
+    logger_puts("Fetched conn matching hashbucket");
 
     char *bucket_hash = dictionary_get(utils->header, "x-ratelimit-bucket");
     logger_puts(bucket_hash);
@@ -366,14 +362,14 @@ _concord_start_conn(
 
     struct concord_conn_s *new_conn = bucket->queue[bucket->top];
     if (NULL == new_conn){
-      logger_puts("bucket exists but needs a new connection pushed to it (not recycling)");
+      logger_puts("Bucket exists but needs a new connection pushed to it (not recycling)");
 
       new_conn = _concord_conn_init(utils, bucket_key);
       logger_assert(NULL != new_conn, "Out of memory");
 
       _concord_queue_push(utils, bucket, new_conn);
     } else { 
-      logger_puts("recycling existing connection");
+      logger_puts("Recycling existing connection");
       _concord_queue_recycle(utils, bucket);
     }
 
@@ -485,7 +481,7 @@ concord_dispatch(concord_st *concord)
       /* wait for activity, timeout or "nothing" */
       mcode = curl_multi_wait(utils->multi_handle, NULL, 0, 500, &numfds);
       _curl_check_multi_info(utils);
-      logger_print("Transfers Running: %d", transfers_running);
+      logger_print("Transfers Running: %d\n\tTransfers On Hold: %ld", transfers_running, utils->transfers_onhold);
     }
 
     logger_assert(CURLM_OK == mcode, curl_easy_strerror(mcode));
@@ -502,12 +498,11 @@ concord_dispatch(concord_st *concord)
     } else {
       repeats = 0;
     }
-  } while (utils->active_handles || transfers_running);
+  } while (utils->transfers_onhold || transfers_running);
 
   _concord_reset_client_buckets(utils);
 
-  logger_print("Active Handles: %ld", utils->active_handles);
-  logger_assert(0 == utils->active_handles, "There are still active handles waiting for curl_multi_perform()");
+  logger_assert(0 == utils->transfers_onhold, "There are still transfers on hold");
 }
 
 void

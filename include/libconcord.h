@@ -7,7 +7,7 @@
 #include <libjscon.h>
 #include <uv.h>
 
-#define CONCORD_DEBUG_MODE  0 //set to 1 to activate debug mode
+#define CONCORD_DEBUG_MODE  1 //set to 1 to activate debug mode
 
 #define BASE_URL "https://discord.com/api"
 
@@ -194,7 +194,7 @@ typedef struct concord_utils_s {
 
   /* ASYNC_IO METHOD USAGE */
   CURLM *multi_handle;
-  size_t active_handles;
+  size_t transfers_onhold;
 
   /* SYNC_IO METHOD USAGE */
   CURLSH *easy_share;
