@@ -402,12 +402,6 @@ _concord_utils_init(char token[], concord_utils_st *new_utils)
 
   new_utils->multi_handle = curl_multi_init();
 
-  /* @todo i need to benchmark this to see if there's actual benefit */
-  new_utils->easy_share = curl_share_init();
-  curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_COOKIE);
-  curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
-  curl_share_setopt(new_utils->easy_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
-
   new_utils->bucket_dict = dictionary_init();
   dictionary_build(new_utils->bucket_dict, UTILS_HASHTABLE_SIZE);
 
@@ -423,7 +417,6 @@ _concord_utils_destroy(concord_utils_st *utils)
 {
   curl_slist_free_all(utils->request_header);
   curl_multi_cleanup(utils->multi_handle);
-  curl_share_cleanup(utils->easy_share);
 
   dictionary_destroy(utils->bucket_dict);
   dictionary_destroy(utils->easy_dict);

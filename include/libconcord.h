@@ -189,9 +189,6 @@ typedef struct concord_utils_s {
   CURLM *multi_handle;
   size_t transfers_onhold;
 
-  /* SYNC_IO METHOD USAGE */
-  CURLSH *easy_share;
-  
   struct concord_bucket_s **client_buckets;
   size_t num_buckets;
 
