@@ -9,7 +9,7 @@
 #include "hashtable.h"
 #include "logger.h"
 #include "http_private.h"
-#include "utils.h"
+#include "ratelimit.h"
 
 /* this is a very crude http header parser, it splitskey/value pairs 
     at ':' char */
@@ -158,7 +158,7 @@ _concord_sync_perform(concord_utils_st *utils, struct concord_conn_s *conn)
     int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
     logger_print("Remaining connections: %d", remaining);
     if (0 == remaining){
-      long long delay_ms = Utils_parse_ratelimit_header(utils->header, false);
+      long long delay_ms = Concord_parse_ratelimit_header(utils->header, false);
       logger_print("Delay_ms: %lld", delay_ms);
       uv_sleep(delay_ms);
     }
@@ -171,141 +171,6 @@ _concord_sync_perform(concord_utils_st *utils, struct concord_conn_s *conn)
     safe_free(conn->response_body.str);
     conn->response_body.size = 0;
   }
-}
-
-static struct concord_bucket_s*
-_concord_bucket_init(char bucket_hash[])
-{
-  struct concord_bucket_s *new_bucket = safe_malloc(sizeof *new_bucket);
-
-  new_bucket->num_conn = MAX_CONCURRENT_CONNS;
-  new_bucket->queue = safe_malloc(sizeof *new_bucket->queue * new_bucket->num_conn);
-
-  new_bucket->hash_key = strndup(bucket_hash, strlen(bucket_hash));
-  logger_assert(NULL != new_bucket->hash_key, "Out of memory");
-
-  return new_bucket;
-}
-
-/* @param ptr is NULL because we want to pass this function as a
-    destructor callback to dictionary_set, which only accepts
-    destructors with void* param */
-static void
-_concord_bucket_destroy(void *ptr)
-{
-  struct concord_bucket_s *bucket = ptr;
-
-  safe_free(bucket->queue);
-
-  safe_free(bucket->hash_key);
-  safe_free(bucket);
-}
-
-static void
-_concord_queue_recycle(concord_utils_st *utils, struct concord_bucket_s *bucket)
-{
-  logger_assert(NULL != bucket->queue[bucket->top], "Can't recycle empty slot");
-  logger_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
-
-  ++bucket->top;
-  ++utils->transfers_onhold;
-
-  logger_print("Bucket top: %ld\n\tBucket size: %ld", bucket->top, bucket->num_conn);
-
-  if (MAX_CONCURRENT_CONNS == utils->transfers_onhold){
-    logger_puts("Reach max concurrent connections threshold, auto performing connections on hold ...");
-    concord_dispatch((concord_st*)utils);
-  }
-}
-
-/* push new connection to queue */
-static void
-_concord_queue_push(concord_utils_st *utils, struct concord_bucket_s *bucket, struct concord_conn_s *conn)
-{
-  logger_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
-
-  bucket->queue[bucket->top] = conn; 
-  conn->bucket = bucket;
-
-  ++bucket->top;
-  ++utils->transfers_onhold;
-
-  logger_print("Bucket top: %ld\n\tBucket size: %ld", bucket->top, bucket->num_conn);
-
-  if (MAX_CONCURRENT_CONNS == utils->transfers_onhold){
-    logger_puts("Reach max concurrent connections threshold, auto performing connections on hold ...");
-    concord_dispatch((concord_st*)utils);
-  }
-}
-
-static void
-_concord_queue_pop(concord_utils_st *utils, struct concord_bucket_s *bucket)
-{
-  if (bucket->bottom == bucket->top) return; //nothing to pop
-
-  struct concord_conn_s *conn = bucket->queue[bucket->bottom];
-  logger_assert(NULL != conn, "Can't pop empty queue's slot");
-
-  curl_multi_add_handle(utils->multi_handle, conn->easy_handle);
-
-  ++bucket->bottom;
-  --utils->transfers_onhold;
-
-  logger_print("Bucket Bottom: %ld\n\tBucket top: %ld\n\tBucket size: %ld", bucket->bottom, bucket->top, bucket->num_conn);
-}
-
-static void
-_concord_client_buckets_append(concord_utils_st *utils, struct concord_bucket_s *bucket)
-{
-  ++utils->num_buckets;
-  void *tmp = realloc(utils->client_buckets, sizeof *utils->client_buckets * utils->num_buckets);
-  logger_assert(NULL != tmp, "Out of memory");
-
-  utils->client_buckets = tmp;
-
-  utils->client_buckets[utils->num_buckets-1] = bucket;
-}
-
-static void
-_concord_start_client_buckets(concord_utils_st *utils)
-{
-  for (size_t i=0; i < utils->num_buckets; ++i){
-    _concord_queue_pop(utils, utils->client_buckets[i]);
-    logger_print("Bucket Hash: %s\n\tBucket Size: %ld", utils->client_buckets[i]->hash_key, utils->client_buckets[i]->top);
-  }
-}
-
-static void
-_concord_reset_client_buckets(concord_utils_st *utils)
-{
-  for (size_t i=0; i < utils->num_buckets; ++i){
-    utils->client_buckets[i]->top = 0;
-    utils->client_buckets[i]->bottom = 0;
-  }
-}
-
-static struct concord_bucket_s*
-_concord_get_hashbucket(concord_utils_st *utils, char bucket_hash[])
-{
-  logger_assert(NULL != bucket_hash, "Bucket hash unspecified (NULL)");
-
-  /* check if hashbucket with bucket_hash already exists */
-  struct concord_bucket_s *bucket = dictionary_get(utils->bucket_dict, bucket_hash);
-
-  if (NULL != bucket){
-    logger_puts("Returning existing bucket");
-    return bucket; //bucket exists return it
-  }
-
-  /* hashbucket doesn't exist, create it */
-  bucket = _concord_bucket_init(bucket_hash);
-
-  dictionary_set(utils->bucket_dict, bucket_hash, bucket, &_concord_bucket_destroy);
-
-  _concord_client_buckets_append(utils, bucket);
-
-  logger_puts("Returning new bucket");
-  return bucket;
 }
 
 static void
@@ -341,7 +206,7 @@ _concord_start_conn(
     char *bucket_hash = dictionary_get(utils->header, "x-ratelimit-bucket");
     logger_puts(bucket_hash);
 
-    bucket = _concord_get_hashbucket(utils, bucket_hash); //return created/found bucket matching bucket hash
+    bucket = Concord_get_hashbucket(utils, bucket_hash); //return created/found bucket matching bucket hash
 
     /* add inactive connection to first empty slot encountered */
     size_t i = bucket->top;
@@ -367,10 +232,10 @@ _concord_start_conn(
       new_conn = _concord_conn_init(utils, bucket_key);
       logger_assert(NULL != new_conn, "Out of memory");
 
-      _concord_queue_push(utils, bucket, new_conn);
+      Concord_queue_push(utils, bucket, new_conn);
     } else { 
       logger_puts("Recycling existing connection");
-      _concord_queue_recycle(utils, bucket);
+      Concord_queue_recycle(utils, bucket);
     }
 
     _http_set_method(new_conn, http_method);
@@ -401,7 +266,7 @@ Concord_http_request(
 
   /* try to get major parameter for bucket key, if doesn't
       exists then will return the endpoint instead */
-  char *bucket_key = Utils_tryget_major(endpoint);
+  char *bucket_key = Concord_tryget_major(endpoint);
   logger_puts(bucket_key);
 
   _concord_start_conn(
@@ -449,14 +314,14 @@ _curl_check_multi_info(concord_utils_st *utils)
     int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
     logger_print("Remaining connections: %d", remaining);
     if (0 == remaining){
-      long long delay_ms = Utils_parse_ratelimit_header(utils->header, true);
+      long long delay_ms = Concord_parse_ratelimit_header(utils->header, true);
       logger_print("Delay_ms: %lld", delay_ms);
       /* @todo sleep is blocking, we don't want this */
       uv_sleep(delay_ms);
     }
 
     do {
-      _concord_queue_pop(utils, conn->bucket);
+      Concord_queue_pop(utils, conn->bucket);
     } while (remaining--);
   }
 }
@@ -468,7 +333,7 @@ concord_dispatch(concord_st *concord)
 {
   concord_utils_st *utils = &concord->utils;
 
-  _concord_start_client_buckets(utils);
+  Concord_start_client_buckets(utils);
 
   int transfers_running = 0; /* keep number of running handles */
   int repeats = 0;
@@ -500,24 +365,9 @@ concord_dispatch(concord_st *concord)
     }
   } while (utils->transfers_onhold || transfers_running);
 
-  _concord_reset_client_buckets(utils);
+  Concord_reset_client_buckets(utils);
 
   logger_assert(0 == utils->transfers_onhold, "There are still transfers on hold");
-}
-
-void
-concord_request_method(concord_st *concord, concord_request_method_et method)
-{
-  switch (method){
-  case ASYNC_IO:
-  case SYNC_IO:
-      break;
-  default:
-      logger_puts("Undefined request method");
-      exit(EXIT_FAILURE);
-  }
-
-  concord->utils.method = method;
 }
 
 /* @todo create distinction between bot and user token */
@@ -566,9 +416,6 @@ _concord_utils_init(char token[], concord_utils_st *new_utils)
 
   new_utils->header = dictionary_init();
   dictionary_build(new_utils->header, 15);
-
-  /* defaults to synchronous transfers method */
-  new_utils->method = SYNC_IO;
 }
 
 static void

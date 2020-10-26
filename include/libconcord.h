@@ -149,11 +149,6 @@ typedef struct {
   jscon_item_st *guilds;
 } concord_user_st;
 
-typedef enum {
-  SYNC_IO  = 0,
-  ASYNC_IO = 1,
-} concord_request_method_et;
-
 struct curl_response_s {
   char *str;
   size_t size;
@@ -186,8 +181,6 @@ struct concord_bucket_s {
 
 
 typedef struct concord_utils_s {
-  concord_request_method_et method; /* is SYNC_IO or ASYNC_IO */
-
   struct curl_slist *request_header; /* the default request header sent to discord servers */
 
   struct dictionary_s *header; /* this holds the http response header @todo this will be removed once I add buckets logic */
@@ -229,7 +222,6 @@ void __safe_free(void **p_ptr);
 void* __safe_malloc(size_t size, unsigned long line, char file[]);
 #define safe_malloc(n) __safe_malloc(n, __LINE__, __FILE__)
 
-void concord_request_method(concord_st *concord, concord_request_method_et method);
 void concord_dispatch(concord_st *concord);
 
 void concord_global_init();
