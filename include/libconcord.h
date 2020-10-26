@@ -7,6 +7,8 @@
 #include <libjscon.h>
 #include <uv.h>
 
+#define CONCORD_DEBUG_MODE  0 //set to 1 to activate debug mode
+
 #define BASE_URL "https://discord.com/api"
 
 #define MAX_URL_LENGTH       1 << 9

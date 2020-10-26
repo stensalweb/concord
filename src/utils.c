@@ -3,19 +3,9 @@
 #include <libconcord.h>
 
 #include "http_private.h"
-#include "utils_private.h"
+#include "utils.h"
 #include "hashtable.h"
 
-
-void
-__Utils_assert(const char *expr_str, int expr, const char *file, int line, const char *func, const char *msg)
-{
-  if (!expr){
-    fprintf(stderr,"[%s:%d]%s()\n\tASSERT FAILED:\t%s\n\tEXPECTED:\t%s\n",
-      file, line, func, msg, expr_str);
-    abort();
-  }
-}
 
 char*
 Utils_tryget_major(char endpoint[])

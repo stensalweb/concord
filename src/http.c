@@ -1,16 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <assert.h>
 #include <string.h>
 #include <ctype.h>
 
 #include <libconcord.h>
 
-#include "http_private.h"
-
 #include "hashtable.h"
-#include "utils_private.h"
+#include "logger.h"
+#include "http_private.h"
+#include "utils.h"
 
 /* this is a very crude http header parser, it splitskey/value pairs 
     at ':' char */
@@ -35,11 +34,11 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
 
     /* len+2 to skip ':' between key and value */
     char *field = strndup(&content[len+2], realsize - len+2);
-    Utils_assert(NULL != field, "Out of memory");
+    logger_assert(NULL != field, "Out of memory");
 
     /* update field to dictionary */
     void *ret = dictionary_set(header, content, field, &free);
-    Utils_assert(NULL != ret, "Couldn't fetch header content");
+    logger_assert(NULL != ret, "Couldn't fetch header content");
     
     break;
   }
@@ -55,7 +54,7 @@ _concord_curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata
   struct curl_response_s *response_body = (struct curl_response_s*)p_userdata;
 
   char *tmp = realloc(response_body->str, response_body->size + realsize + 1);
-  Utils_assert(NULL != tmp, "Out of memory");
+  logger_assert(NULL != tmp, "Out of memory");
 
   response_body->str = tmp;
   memcpy(response_body->str + response_body->size, content, realsize);
@@ -70,11 +69,11 @@ CURL*
 _concord_curl_easy_init(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   CURL *new_easy_handle = curl_easy_init();
-  Utils_assert(NULL != new_easy_handle, "Out of memory");
+  logger_assert(NULL != new_easy_handle, "Out of memory");
 
   curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->request_header);
   curl_easy_setopt(new_easy_handle, CURLOPT_FAILONERROR, 1L);
-  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 2L);
+//  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 2L);
 
   // SET CURL_EASY CALLBACKS //
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_body_cb);
@@ -104,7 +103,7 @@ _concord_conn_destroy(void *ptr)
 static struct concord_conn_s*
 _concord_conn_init(concord_utils_st *utils, char bucket_key[])
 {
-  Utils_assert(NULL != bucket_key, "Bucket key not specified (NULL)");
+  logger_assert(NULL != bucket_key, "Bucket key not specified (NULL)");
 
   struct concord_conn_s *new_conn = safe_malloc(sizeof *new_conn);
 
@@ -137,7 +136,7 @@ _http_set_method(struct concord_conn_s *conn, enum http_method method)
       curl_easy_setopt(conn->easy_handle, CURLOPT_UPLOAD, 1L);
       return;
   default:
-    Utils_print_debug("Unknown HTTP Method");
+    logger_puts("Unknown HTTP Method");
     exit(EXIT_FAILURE);
   }
 }
@@ -153,16 +152,18 @@ static void
 _concord_sync_perform(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   CURLcode ecode = curl_easy_perform(conn->easy_handle);
-  Utils_assert(CURLE_OK == ecode, curl_easy_strerror(ecode));
+  logger_assert(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
   if (NULL != conn->response_body.str){
     int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
+    logger_print("Remaining connections: %d", remaining);
     if (0 == remaining){
-      long long timeout_ms = Utils_parse_ratelimit_header(utils->header, false);
-      uv_sleep(timeout_ms);
+      long long delay_ms = Utils_parse_ratelimit_header(utils->header, false);
+      logger_print("Delay_ms: %lld", delay_ms);
+      uv_sleep(delay_ms);
     }
 
-    //Utils_print_debug(conn->response_body.str);
+    //logger_puts(conn->response_body.str);
     (*conn->load_cb)(conn->p_object, &conn->response_body);
 
     conn->p_object = NULL;
@@ -181,7 +182,7 @@ _concord_bucket_init(char bucket_hash[])
   new_bucket->queue = safe_malloc(sizeof *new_bucket->queue * new_bucket->num_conn);
 
   new_bucket->hash_key = strndup(bucket_hash, strlen(bucket_hash));
-  Utils_assert(NULL != new_bucket->hash_key, "Out of memory");
+  logger_assert(NULL != new_bucket->hash_key, "Out of memory");
 
   return new_bucket;
 }
@@ -203,17 +204,17 @@ _concord_bucket_destroy(void *ptr)
 static void
 _concord_queue_recycle(concord_utils_st *utils, struct concord_bucket_s *bucket)
 {
-  Utils_assert(NULL != bucket->queue[bucket->top], "Can't recycle empty slot");
-  Utils_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
+  logger_assert(NULL != bucket->queue[bucket->top], "Can't recycle empty slot");
+  logger_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
 
   ++bucket->top;
   ++utils->active_handles;
 
-  //fprintf(stderr, "\tbucket top is: %ld\n", bucket->top);
-  //fprintf(stderr, "\tbucket size is: %ld\n", bucket->num_conn);
+  logger_print("Bucket top is: %ld", bucket->top);
+  logger_print("Bucket size is: %ld", bucket->num_conn);
 
   if (MAX_CONCURRENT_CONNS == utils->active_handles){
-    Utils_print_debug("Reach max concurrent connections threshold, auto performing connections on hold ...");
+    logger_puts("Reach max concurrent connections threshold, auto performing connections on hold ...");
     concord_dispatch((concord_st*)utils);
   }
 }
@@ -222,7 +223,7 @@ _concord_queue_recycle(concord_utils_st *utils, struct concord_bucket_s *bucket)
 static void
 _concord_queue_push(concord_utils_st *utils, struct concord_bucket_s *bucket, struct concord_conn_s *conn)
 {
-  Utils_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
+  logger_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
 
   bucket->queue[bucket->top] = conn; 
   conn->bucket = bucket;
@@ -230,11 +231,11 @@ _concord_queue_push(concord_utils_st *utils, struct concord_bucket_s *bucket, st
   ++bucket->top;
   ++utils->active_handles;
 
-  //fprintf(stderr, "\tbucket top is: %ld\n", bucket->top);
-  //fprintf(stderr, "\tbucket size is: %ld\n", bucket->num_conn);
+  logger_print("Bucket top is: %ld", bucket->top);
+  logger_print("Bucket size is: %ld", bucket->num_conn);
 
   if (MAX_CONCURRENT_CONNS == utils->active_handles){
-    Utils_print_debug("Reach max concurrent connections threshold, auto performing connections on hold ...");
+    logger_puts("Reach max concurrent connections threshold, auto performing connections on hold ...");
     concord_dispatch((concord_st*)utils);
   }
 }
@@ -245,16 +246,16 @@ _concord_queue_pop(concord_utils_st *utils, struct concord_bucket_s *bucket)
   if (bucket->bottom == bucket->top) return; //nothing to pop
 
   struct concord_conn_s *conn = bucket->queue[bucket->bottom];
-  Utils_assert(NULL != conn, "Can't pop empty queue's slot");
+  logger_assert(NULL != conn, "Can't pop empty queue's slot");
 
   curl_multi_add_handle(utils->multi_handle, conn->easy_handle);
-  //fprintf(stderr, "\tQUEUE SLOT: %ld\n", bucket->bottom);
+  logger_print("Queue Slot: %ld", bucket->bottom);
 
   ++bucket->bottom;
   --utils->active_handles;
 
-  //fprintf(stderr, "\tbucket top is:%ld\n", bucket->top);
-  //fprintf(stderr, "\tbucket size is: %ld\n", bucket->num_conn);
+  logger_print("Bucket top is: %ld", bucket->top);
+  logger_print("Bucket size is: %ld", bucket->num_conn);
 }
 
 static void
@@ -262,7 +263,7 @@ _concord_client_buckets_append(concord_utils_st *utils, struct concord_bucket_s 
 {
   ++utils->num_buckets;
   void *tmp = realloc(utils->client_buckets, sizeof *utils->client_buckets * utils->num_buckets);
-  Utils_assert(NULL != tmp, "Out of memory");
+  logger_assert(NULL != tmp, "Out of memory");
 
   utils->client_buckets = tmp;
 
@@ -273,9 +274,8 @@ static void
 _concord_start_client_buckets(concord_utils_st *utils)
 {
   for (size_t i=0; i < utils->num_buckets; ++i){
-    Utils_print_debug(utils->client_buckets[i]->hash_key);
     _concord_queue_pop(utils, utils->client_buckets[i]);
-    //fprintf(stderr, "\tactive handles: %ld\n", utils->client_buckets[i]->top);
+    logger_print("Bucket Hash: %s\n\tBucket Size: %ld", utils->client_buckets[i]->hash_key, utils->client_buckets[i]->top);
   }
 }
 
@@ -291,13 +291,13 @@ _concord_reset_client_buckets(concord_utils_st *utils)
 static struct concord_bucket_s*
 _concord_get_hashbucket(concord_utils_st *utils, char bucket_hash[])
 {
-  Utils_assert(NULL != bucket_hash, "Bucket hash unspecified (NULL)");
+  logger_assert(NULL != bucket_hash, "Bucket hash unspecified (NULL)");
 
   /* check if hashbucket with bucket_hash already exists */
   struct concord_bucket_s *bucket = dictionary_get(utils->bucket_dict, bucket_hash);
 
   if (NULL != bucket){
-    Utils_print_debug("returning existing bucket");
+    logger_puts("returning existing bucket");
     return bucket; //bucket exists return it
   }
 
@@ -308,7 +308,7 @@ _concord_get_hashbucket(concord_utils_st *utils, char bucket_hash[])
 
   _concord_client_buckets_append(utils, bucket);
 
-  Utils_print_debug("returning new bucket");
+  logger_puts("returning new bucket");
   return bucket;
 }
 
@@ -322,14 +322,14 @@ _concord_start_conn(
   char url_route[])
 {
   struct concord_bucket_s *bucket = dictionary_get(utils->bucket_dict, bucket_key);
-  Utils_print_debug(bucket_key);
+  logger_puts(bucket_key);
   
   if (NULL == bucket){
     /* because this is the first time using this bucket_key, we will perform a blocking
         connection to the Discord API, in order to link this bucket_key with a bucket hash */
     struct concord_conn_s *new_conn = _concord_conn_init(utils, bucket_key);
-    Utils_assert(NULL != new_conn, "Out of memory");
-    Utils_print_debug("new conn created");
+    logger_assert(NULL != new_conn, "Out of memory");
+    logger_puts("new conn created");
 
 
     _http_set_method(new_conn, http_method); //set the http request method (GET, POST, ...)
@@ -340,10 +340,10 @@ _concord_start_conn(
     
     _concord_sync_perform(utils, new_conn); //execute a blocking connection to generate this bucket hash
 
-    Utils_print_debug("fetched conn matching hashbucket");
+    logger_puts("fetched conn matching hashbucket");
 
     char *bucket_hash = dictionary_get(utils->header, "x-ratelimit-bucket");
-    Utils_print_debug(bucket_hash);
+    logger_puts(bucket_hash);
 
     bucket = _concord_get_hashbucket(utils, bucket_hash); //return created/found bucket matching bucket hash
 
@@ -352,7 +352,7 @@ _concord_start_conn(
     while (NULL != bucket->queue[i]){
       ++i;
     }
-    Utils_assert(i < bucket->num_conn, "Queue top has reached threshold");
+    logger_assert(i < bucket->num_conn, "Queue top has reached threshold");
     bucket->queue[i] = new_conn;
     new_conn->bucket = bucket;
 
@@ -360,21 +360,20 @@ _concord_start_conn(
   }
   else {
     /* add connection to bucket or reuse innactive existing one */
-    Utils_print_debug("matching hashbucket found");
-    //fprintf(stderr, "\t%s\n", bucket->hash_key);
+    logger_print("Matching hashbucket found: %s", bucket->hash_key);
 
-    Utils_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
+    logger_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
 
     struct concord_conn_s *new_conn = bucket->queue[bucket->top];
     if (NULL == new_conn){
-      Utils_print_debug("bucket exists but needs a new connection pushed to it (not recycling)");
+      logger_puts("bucket exists but needs a new connection pushed to it (not recycling)");
 
       new_conn = _concord_conn_init(utils, bucket_key);
-      Utils_assert(NULL != new_conn, "Out of memory");
+      logger_assert(NULL != new_conn, "Out of memory");
 
       _concord_queue_push(utils, bucket, new_conn);
     } else { 
-      Utils_print_debug("recycling existing connection");
+      logger_puts("recycling existing connection");
       _concord_queue_recycle(utils, bucket);
     }
 
@@ -407,14 +406,14 @@ Concord_http_request(
   /* try to get major parameter for bucket key, if doesn't
       exists then will return the endpoint instead */
   char *bucket_key = Utils_tryget_major(endpoint);
-  Utils_print_debug(bucket_key);
+  logger_puts(bucket_key);
 
   _concord_start_conn(
              utils,
              p_object,
              load_cb,
              http_method,
-             endpoint,
+             bucket_key,
              url_route);
 }
 
@@ -436,11 +435,11 @@ _curl_check_multi_info(concord_utils_st *utils)
     struct concord_conn_s *conn = dictionary_get(utils->easy_dict, easy_key);
 
     curl_easy_getinfo(conn->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
-    Utils_assert(429 != http_code, "GLOBAL TIMEOUT RECEIVED");
+    logger_assert(429 != http_code, "GLOBAL TIMEOUT RECEIVED");
 
     /* execute load callback to perform change in object */
     if (NULL != conn->response_body.str){
-      //Utils_print_debug(conn->response_body.str);
+      //logger_puts(conn->response_body.str);
       (*conn->load_cb)(conn->p_object, &conn->response_body);
 
       conn->p_object = NULL;
@@ -452,14 +451,14 @@ _curl_check_multi_info(concord_utils_st *utils)
     curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
 
     int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
+    logger_print("Remaining connections: %d", remaining);
     if (0 == remaining){
-      long long timeout_ms = Utils_parse_ratelimit_header(utils->header, true);
-//      fprintf(stderr, "\tTIMEOUT_MS: %lld\n", timeout_ms); 
+      long long delay_ms = Utils_parse_ratelimit_header(utils->header, true);
+      logger_print("Delay_ms: %lld", delay_ms);
       /* @todo sleep is blocking, we don't want this */
-      uv_sleep(timeout_ms);
+      uv_sleep(delay_ms);
     }
 
-//    fprintf(stderr, "\tREMAINING: %d\n", remaining); 
     do {
       _concord_queue_pop(utils, conn->bucket);
     } while (remaining--);
@@ -486,10 +485,10 @@ concord_dispatch(concord_st *concord)
       /* wait for activity, timeout or "nothing" */
       mcode = curl_multi_wait(utils->multi_handle, NULL, 0, 500, &numfds);
       _curl_check_multi_info(utils);
-      //fprintf(stderr, "\tTRANSFERS RUNNING: %d\n", transfers_running);
+      logger_print("Transfers Running: %d", transfers_running);
     }
 
-    Utils_assert(CURLM_OK == mcode, curl_easy_strerror(mcode));
+    logger_assert(CURLM_OK == mcode, curl_easy_strerror(mcode));
 
     /* numfds being zero means either a timeout or no file descriptor to
         wait for. Try timeout on first occurrences, then assume no file
@@ -503,12 +502,12 @@ concord_dispatch(concord_st *concord)
     } else {
       repeats = 0;
     }
-  } while (utils->active_handles);
+  } while (utils->active_handles || transfers_running);
 
   _concord_reset_client_buckets(utils);
 
-  //fprintf(stderr, "\tactive handles: %ld\n", utils->active_handles);
-  Utils_assert(0 == utils->active_handles, "There are still active handles waiting for curl_multi_perform()");
+  logger_print("Active Handles: %ld", utils->active_handles);
+  logger_assert(0 == utils->active_handles, "There are still active handles waiting for curl_multi_perform()");
 }
 
 void
@@ -519,7 +518,7 @@ concord_request_method(concord_st *concord, concord_request_method_et method)
   case SYNC_IO:
       break;
   default:
-      Utils_print_debug("Undefined request method");
+      logger_puts("Undefined request method");
       exit(EXIT_FAILURE);
   }
 
@@ -534,16 +533,16 @@ _curl_init_request_header(concord_utils_st *utils)
 
   struct curl_slist *new_header = NULL;
   new_header = curl_slist_append(new_header,"X-RateLimit-Precision: millisecond");
-  Utils_assert(NULL != new_header, "Couldn't create request header");
+  logger_assert(NULL != new_header, "Couldn't create request header");
 
   new_header = curl_slist_append(new_header, strcat(auth, utils->token));
-  Utils_assert(NULL != new_header, "Couldn't create request header");
+  logger_assert(NULL != new_header, "Couldn't create request header");
 
   new_header = curl_slist_append(new_header,"User-Agent: concord (http://github.com/LucasMull/concord, v0.0)");
-  Utils_assert(NULL != new_header, "Couldn't create request header");
+  logger_assert(NULL != new_header, "Couldn't create request header");
 
   new_header = curl_slist_append(new_header,"Content-Type: application/json");
-  Utils_assert(NULL != new_header, "Couldn't create request header");
+  logger_assert(NULL != new_header, "Couldn't create request header");
 
   return new_header;
 }
@@ -552,7 +551,7 @@ static void
 _concord_utils_init(char token[], concord_utils_st *new_utils)
 {
   new_utils->token = strndup(token, strlen(token)-1);
-  Utils_assert(NULL != new_utils->token, "Out of memory");
+  logger_assert(NULL != new_utils->token, "Out of memory");
 
   new_utils->request_header = _curl_init_request_header(new_utils);
 
@@ -625,7 +624,7 @@ concord_cleanup(concord_st *concord)
 void
 concord_global_init(){
   int code = curl_global_init(CURL_GLOBAL_DEFAULT);
-  Utils_assert(0 == code, "Couldn't start curl_global_init()");
+  logger_assert(0 == code, "Couldn't start curl_global_init()");
 }
 
 void

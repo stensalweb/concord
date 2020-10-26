@@ -1,14 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <curl/curl.h>
-#include <assert.h>
 #include <string.h>
-
-//#include <curl/curl.h>
-//#include <libjscon.h>
 
 #include <libconcord.h>
 
+#include "logger.h"
 #include "http_private.h"
 
 concord_guild_st*

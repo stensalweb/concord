@@ -1,15 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <curl/curl.h>
-#include <assert.h>
 #include <string.h>
-
-//#include <curl/curl.h>
-//#include <libjscon.h>
 
 #include <libconcord.h>
 
 #include "http_private.h"
+#include "logger.h"
 
 concord_channel_st*
 concord_channel_init(concord_utils_st *utils)
