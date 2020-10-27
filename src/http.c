@@ -22,14 +22,13 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
   if ( NULL == (ptr = strchr(content, ':')) ){
     return realsize; //couldn't find key/value pair, return
   }
-
   *ptr = '\0'; /* isolate key from value at ':' */
+  
   char *key = content;
 
   if ( NULL == (ptr = strstr(ptr+1, "\r\n")) ){
     return realsize; //couldn't find CRLF
   }
-
   *ptr = '\0'; /* remove CRLF from value */
 
   /* trim space from start of value string if necessary */
@@ -40,9 +39,9 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
   char *field = strdup(&content[strlen(content)+i]);
   debug_assert(NULL != field, "Out of memory");
 
-  /* update field to dictionary */
-  void *ret = dictionary_set(header, key, field, &free);
-  debug_assert(NULL != ret, "Couldn't fetch header content");
+  /* store key/value pair in a dictionary */
+  char *ret = dictionary_set(header, key, field, &free);
+  debug_assert(ret == field, "Couldn't fetch header content");
 
   return realsize; /* return value for curl internals */
 }
@@ -81,7 +80,7 @@ _concord_curl_easy_init(concord_utils_st *utils, struct concord_conn_s *conn)
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, &conn->response_body);
 
   curl_easy_setopt(new_easy_handle, CURLOPT_HEADERFUNCTION, &_concord_curl_header_cb);
-  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERDATA, utils->header); /* @todo change to bucket->header */
+  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERDATA, utils->header);
 
   return new_easy_handle;
 }
@@ -118,7 +117,7 @@ _concord_conn_init(concord_utils_st *utils, char bucket_key[])
 }
 
 static void
-_http_set_method(struct concord_conn_s *conn, enum http_method method)
+_curl_set_method(struct concord_conn_s *conn, enum http_method method)
 {
   switch (method){
   case DELETE:
@@ -143,7 +142,7 @@ _http_set_method(struct concord_conn_s *conn, enum http_method method)
 }
 
 static void
-_http_set_url(struct concord_conn_s *conn, char endpoint[])
+_curl_set_url(struct concord_conn_s *conn, char endpoint[])
 {
   char base_url[MAX_URL_LENGTH] = BASE_URL;
   curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
@@ -175,7 +174,7 @@ _concord_sync_perform(concord_utils_st *utils, struct concord_conn_s *conn)
 }
 
 static void
-_concord_start_conn(
+_concord_build_bucket(
   concord_utils_st *utils,
   void **p_object, 
   concord_load_obj_ft *load_cb,
@@ -194,8 +193,8 @@ _concord_start_conn(
     debug_puts("New conn created");
 
 
-    _http_set_method(new_conn, http_method); //set the http request method (GET, POST, ...)
-    _http_set_url(new_conn, url_route); //set the http request url
+    _curl_set_method(new_conn, http_method); //set the http request method (GET, POST, ...)
+    _curl_set_url(new_conn, url_route); //set the http request url
 
     new_conn->load_cb = load_cb;
     new_conn->p_object = p_object; //save object for when load_cb is executed
@@ -228,7 +227,7 @@ _concord_start_conn(
 
     struct concord_conn_s *new_conn = bucket->queue[bucket->top];
     if (NULL == new_conn){
-      debug_puts("Bucket exists but needs a new connection pushed to it (not recycling)");
+      debug_puts("Bucket exists but needs a new connection pushed to it (can't recycle)");
 
       new_conn = _concord_conn_init(utils, bucket_key);
       debug_assert(NULL != new_conn, "Out of memory");
@@ -239,8 +238,8 @@ _concord_start_conn(
       Concord_queue_recycle(utils, bucket);
     }
 
-    _http_set_method(new_conn, http_method);
-    _http_set_url(new_conn, url_route);
+    _curl_set_method(new_conn, http_method);
+    _curl_set_url(new_conn, url_route);
 
     new_conn->load_cb = load_cb;
     new_conn->p_object = p_object;
@@ -270,106 +269,13 @@ Concord_http_request(
   char *bucket_key = Concord_tryget_major(endpoint);
   debug_puts(bucket_key);
 
-  _concord_start_conn(
+  _concord_build_bucket(
              utils,
              p_object,
              load_cb,
              http_method,
              bucket_key,
              url_route);
-}
-
-static void
-_curl_check_multi_info(concord_utils_st *utils)
-{
-  /* See how the transfers went */
-  CURLMsg *msg; /* for picking up messages with the transfer status */
-  int pending; /*how many messages are left */
-  long http_code; /* http response code */
-  while ((msg = curl_multi_info_read(utils->multi_handle, &pending)))
-  {
-    if (CURLMSG_DONE != msg->msg)
-      continue;
-
-    /* Find out which handle this message is about */
-    char easy_key[18];
-    sprintf(easy_key, "%p", msg->easy_handle);
-    struct concord_conn_s *conn = dictionary_get(utils->easy_dict, easy_key);
-
-    curl_easy_getinfo(conn->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
-    debug_assert(429 != http_code, "Being ratelimited");
-
-    /* execute load callback to perform change in object */
-    if (NULL != conn->response_body.str){
-      //debug_puts(conn->response_body.str);
-      (*conn->load_cb)(conn->p_object, &conn->response_body);
-
-      conn->p_object = NULL;
-
-      safe_free(conn->response_body.str);
-      conn->response_body.size = 0;
-    }
-
-    curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
-
-    int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
-    debug_print("Remaining connections: %d", remaining);
-    if (0 == remaining){
-      long long delay_ms = Concord_parse_ratelimit_header(utils->header, true);
-      debug_print("Delay_ms: %lld", delay_ms);
-      /* @todo sleep is blocking, we don't want this */
-      uv_sleep(delay_ms);
-    }
-
-    do {
-      Concord_queue_pop(utils, conn->bucket);
-    } while (remaining--);
-  }
-}
-
-/* wrapper around curl_multi_perform() , using poll() */
-void
-concord_dispatch(concord_st *concord)
-{
-  concord_utils_st *utils = &concord->utils;
-
-  Concord_start_client_buckets(utils);
-
-  int transfers_running = 0, tmp = 0; /* keep number of running handles */
-  int repeats = 0;
-  do {
-    CURLMcode mcode;
-    int numfds;
-
-    mcode = curl_multi_perform(utils->multi_handle, &transfers_running);
-    if (CURLM_OK == mcode){
-      /* wait for activity, timeout or "nothing" */
-      mcode = curl_multi_wait(utils->multi_handle, NULL, 0, 500, &numfds);
-    }
-    debug_assert(CURLM_OK == mcode, curl_easy_strerror(mcode));
-
-    if (tmp != transfers_running){
-      debug_print("Transfers Running: %d\n\tTransfers On Hold: %ld", transfers_running, utils->transfers_onhold);
-      _curl_check_multi_info(utils);
-      tmp = transfers_running;
-    }
-
-    /* numfds being zero means either a timeout or no file descriptor to
-        wait for. Try timeout on first occurrences, then assume no file
-        descriptors and no file descriptors to wait for mean wait for
-        100 milliseconds. */
-    if (0 == numfds){
-      ++repeats; /* count number of repeated zero numfds */
-      if (repeats > 1){
-        uv_sleep(100); /* sleep 100 milliseconds */
-      }
-    } else {
-      repeats = 0;
-    }
-  } while (utils->transfers_onhold || transfers_running);
-  debug_assert(0 == utils->transfers_onhold, "There are still transfers on hold");
-
-  Concord_reset_client_buckets(utils);
 }
 
 /* @todo create distinction between bot and user token */
