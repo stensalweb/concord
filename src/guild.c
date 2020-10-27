@@ -5,7 +5,7 @@
 
 #include <libconcord.h>
 
-#include "logger.h"
+#include "debug.h"
 #include "http_private.h"
 
 concord_guild_st*

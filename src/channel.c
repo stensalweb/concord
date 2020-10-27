@@ -6,7 +6,7 @@
 #include <libconcord.h>
 
 #include "http_private.h"
-#include "logger.h"
+#include "debug.h"
 
 concord_channel_st*
 concord_channel_init(concord_utils_st *utils)
