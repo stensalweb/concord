@@ -10,25 +10,27 @@
 #include "debug.h"
 #include "http_private.h"
 #include "ratelimit.h"
+#include "dispatch.h"
+
 
 /* this is a very crude http header parser, splits key/value pairs at ':' */
 static size_t
-_concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
+_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   size_t realsize = size * nmemb;
-  struct dictionary_s *header = (struct dictionary_s*)p_userdata;
+  struct dictionary_s *header = p_userdata;
 
   char *ptr;
-  if ( NULL == (ptr = strchr(content, ':')) ){
+  if ( NULL == (ptr = strchr(content, ':')) )
     return realsize; //couldn't find key/value pair, return
-  }
+
   *ptr = '\0'; /* isolate key from value at ':' */
   
   char *key = content;
 
-  if ( NULL == (ptr = strstr(ptr+1, "\r\n")) ){
+  if ( NULL == (ptr = strstr(ptr+1, "\r\n")) )
     return realsize; //couldn't find CRLF
-  }
+
   *ptr = '\0'; /* remove CRLF from value */
 
   /* trim space from start of value string if necessary */
@@ -48,10 +50,10 @@ _concord_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userda
 
 /* get curl response body */
 static size_t
-_concord_curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
+_curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   size_t realsize = size * nmemb;
-  struct curl_response_s *response_body = (struct curl_response_s*)p_userdata;
+  struct curl_response_s *response_body = p_userdata;
 
   char *tmp = realloc(response_body->str, response_body->size + realsize + 1);
   debug_assert(NULL != tmp, "Out of memory");
@@ -66,7 +68,7 @@ _concord_curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata
 
 /* init easy handle with some default opt */
 CURL*
-_concord_curl_easy_init(concord_utils_st *utils, struct concord_conn_s *conn)
+_curl_easy_default_init(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   CURL *new_easy_handle = curl_easy_init();
   debug_assert(NULL != new_easy_handle, "Out of memory");
@@ -76,10 +78,10 @@ _concord_curl_easy_init(concord_utils_st *utils, struct concord_conn_s *conn)
 //  curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 2L);
 
   // SET CURL_EASY CALLBACKS //
-  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_concord_curl_body_cb);
+  curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_curl_body_cb);
   curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, &conn->response_body);
 
-  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERFUNCTION, &_concord_curl_header_cb);
+  curl_easy_setopt(new_easy_handle, CURLOPT_HEADERFUNCTION, &_curl_header_cb);
   curl_easy_setopt(new_easy_handle, CURLOPT_HEADERDATA, utils->header);
 
   return new_easy_handle;
@@ -107,7 +109,7 @@ _concord_conn_init(concord_utils_st *utils, char bucket_key[])
 
   struct concord_conn_s *new_conn = safe_malloc(sizeof *new_conn);
 
-  new_conn->easy_handle = _concord_curl_easy_init(utils, new_conn);
+  new_conn->easy_handle = _curl_easy_default_init(utils, new_conn);
 
   char easy_key[18];
   sprintf(easy_key, "%p", new_conn->easy_handle);
@@ -215,7 +217,7 @@ _concord_build_bucket(
     }
     debug_assert(i < bucket->num_conn, "Queue top has reached threshold");
     bucket->queue[i] = new_conn;
-    new_conn->bucket = bucket;
+    new_conn->p_bucket = bucket;
 
     dictionary_set(utils->bucket_dict, bucket_key, bucket, NULL); //link this bucket_key with created/found hashbucket
   }
@@ -303,12 +305,21 @@ _curl_init_request_header(concord_utils_st *utils)
 static void
 _concord_utils_init(char token[], concord_utils_st *new_utils)
 {
+  new_utils->loop = uv_default_loop();
+
   new_utils->token = strndup(token, strlen(token)-1);
   debug_assert(NULL != new_utils->token, "Out of memory");
 
   new_utils->request_header = _curl_init_request_header(new_utils);
 
+  uv_timer_init(new_utils->loop, &new_utils->timeout);
+  new_utils->timeout.data = new_utils;
+
   new_utils->multi_handle = curl_multi_init();
+  curl_multi_setopt(new_utils->multi_handle, CURLMOPT_SOCKETFUNCTION, &Curl_handle_socket_cb);
+  curl_multi_setopt(new_utils->multi_handle, CURLMOPT_SOCKETDATA, new_utils);
+  curl_multi_setopt(new_utils->multi_handle, CURLMOPT_TIMERFUNCTION, &Curl_start_timeout_cb);
+  curl_multi_setopt(new_utils->multi_handle, CURLMOPT_TIMERDATA, &new_utils->timeout);
 
   new_utils->bucket_dict = dictionary_init();
   dictionary_build(new_utils->bucket_dict, UTILS_HASHTABLE_SIZE);
@@ -321,8 +332,25 @@ _concord_utils_init(char token[], concord_utils_st *new_utils)
 }
 
 static void
+_uv_on_walk_cb(uv_handle_t *handle, void *arg)
+{
+  uv_close(handle, NULL);
+}
+
+static void
 _concord_utils_destroy(concord_utils_st *utils)
 {
+  int uvcode = uv_loop_close(utils->loop);
+  if (UV_EBUSY == uvcode){
+    uv_walk(utils->loop, &_uv_on_walk_cb, NULL);
+
+    uvcode = uv_run(utils->loop, UV_RUN_DEFAULT);
+    debug_assert(!uvcode, uv_strerror(uvcode));
+
+    uvcode = uv_loop_close(utils->loop);
+    debug_assert(!uvcode, uv_strerror(uvcode));
+  }
+  
   curl_slist_free_all(utils->request_header);
   curl_multi_cleanup(utils->multi_handle);
 

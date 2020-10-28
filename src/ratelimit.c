@@ -41,8 +41,34 @@ Concord_parse_ratelimit_header(dictionary_st *header, bool use_clock)
   return reset_after;
 }
 
-struct concord_bucket_s*
-Concord_bucket_init(char bucket_hash[])
+static void
+_concord_client_buckets_append(concord_utils_st *utils, struct concord_bucket_s *bucket)
+{
+  ++utils->num_buckets;
+  void *tmp = realloc(utils->client_buckets, sizeof *utils->client_buckets * utils->num_buckets);
+  debug_assert(NULL != tmp, "Out of memory");
+
+  utils->client_buckets = tmp;
+
+  utils->client_buckets[utils->num_buckets-1] = bucket;
+}
+
+/* @param ptr is NULL because we want to pass this function as a
+    destructor callback to dictionary_set, which only accepts
+    destructors with void* param */
+static void
+_concord_bucket_destroy(void *ptr)
+{
+  struct concord_bucket_s *bucket = ptr;
+
+  safe_free(bucket->queue);
+
+  safe_free(bucket->hash_key);
+  safe_free(bucket);
+}
+
+static struct concord_bucket_s*
+_concord_bucket_init(concord_utils_st *utils, char bucket_hash[])
 {
   struct concord_bucket_s *new_bucket = safe_malloc(sizeof *new_bucket);
 
@@ -52,21 +78,17 @@ Concord_bucket_init(char bucket_hash[])
   new_bucket->hash_key = strndup(bucket_hash, strlen(bucket_hash));
   debug_assert(NULL != new_bucket->hash_key, "Out of memory");
 
+  int uvcode = uv_timer_init(utils->loop, &new_bucket->timer);
+  debug_assert(!uvcode, uv_strerror(uvcode));
+
+  new_bucket->p_utils = utils;
+  new_bucket->timer.data = new_bucket;
+
+  dictionary_set(utils->bucket_dict, bucket_hash, new_bucket, &_concord_bucket_destroy);
+
+  _concord_client_buckets_append(utils, new_bucket);
+
   return new_bucket;
-}
-
-/* @param ptr is NULL because we want to pass this function as a
-    destructor callback to dictionary_set, which only accepts
-    destructors with void* param */
-void
-Concord_bucket_destroy(void *ptr)
-{
-  struct concord_bucket_s *bucket = ptr;
-
-  safe_free(bucket->queue);
-
-  safe_free(bucket->hash_key);
-  safe_free(bucket);
 }
 
 void
@@ -93,7 +115,7 @@ Concord_queue_push(concord_utils_st *utils, struct concord_bucket_s *bucket, str
   debug_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
 
   bucket->queue[bucket->top] = conn; 
-  conn->bucket = bucket;
+  conn->p_bucket = bucket;
 
   ++bucket->top;
   ++utils->transfers_onhold;
@@ -120,18 +142,6 @@ Concord_queue_pop(concord_utils_st *utils, struct concord_bucket_s *bucket)
   --utils->transfers_onhold;
 
   debug_print("Bucket Bottom: %ld\n\tBucket top: %ld\n\tBucket size: %ld", bucket->bottom, bucket->top, bucket->num_conn);
-}
-
-void
-Concord_client_buckets_append(concord_utils_st *utils, struct concord_bucket_s *bucket)
-{
-  ++utils->num_buckets;
-  void *tmp = realloc(utils->client_buckets, sizeof *utils->client_buckets * utils->num_buckets);
-  debug_assert(NULL != tmp, "Out of memory");
-
-  utils->client_buckets = tmp;
-
-  utils->client_buckets[utils->num_buckets-1] = bucket;
 }
 
 void
@@ -166,11 +176,7 @@ Concord_get_hashbucket(concord_utils_st *utils, char bucket_hash[])
   }
 
   /* hashbucket doesn't exist, create it */
-  bucket = Concord_bucket_init(bucket_hash);
-
-  dictionary_set(utils->bucket_dict, bucket_hash, bucket, &Concord_bucket_destroy);
-
-  Concord_client_buckets_append(utils, bucket);
+  bucket = _concord_bucket_init(utils, bucket_hash);
 
   debug_puts("Returning new bucket");
   return bucket;

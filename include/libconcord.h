@@ -156,9 +156,15 @@ struct curl_response_s {
 
 typedef void (concord_load_obj_ft)(void **p_object, struct curl_response_s *response_body);
 
+typedef struct concord_context_s {
+  uv_poll_t poll_handle;
+  curl_socket_t sockfd;
+} concord_context_st;
+
 struct concord_bucket_s; //forward declaration
 
 struct concord_conn_s {
+  concord_context_st *context;
   CURL *easy_handle; //easy handle used to perform the request
 
   struct curl_response_s response_body; //stores response body associated with the easy_handle
@@ -166,10 +172,17 @@ struct concord_conn_s {
   void **p_object; //hold onto object to be passed as a load_cb parameter
   concord_load_obj_ft *load_cb; //object load callback
 
-  struct concord_bucket_s *bucket; //bucket this connection node is a part of
+  struct concord_bucket_s *p_bucket; //bucket this connection node is a part of
 };
 
+struct concord_utils_s; //forward declaration
+
 struct concord_bucket_s {
+  struct concord_utils_s *p_utils;
+
+  uv_timer_t timer;
+  int remaining;
+
   char *hash_key;
 
   struct concord_conn_s **queue;
@@ -179,15 +192,16 @@ struct concord_bucket_s {
   size_t top;
 };
 
-
 typedef struct concord_utils_s {
   struct curl_slist *request_header; /* the default request header sent to discord servers */
 
-  struct dictionary_s *header; /* this holds the http response header @todo this will be removed once I add buckets logic */
+  struct dictionary_s *header; /* this holds the http response header */
 
-  /* ASYNC_IO METHOD USAGE */
+  uv_loop_t *loop;
   CURLM *multi_handle;
-  size_t transfers_onhold;
+  int transfers_onhold;
+  int transfers_running;
+  uv_timer_t timeout;
 
   struct concord_bucket_s **client_buckets;
   size_t num_buckets;
