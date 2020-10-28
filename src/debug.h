@@ -6,7 +6,10 @@
 
 #if CONCORD_DEBUG_MODE == 1
   void __debug_assert(const char * expr_str, int expr, const char *file, int line, const char *func, const char *msg);
-  #define debug_assert(expr, msg) __debug_assert(#expr, expr, __FILE__, __LINE__, __func__, msg)
+  #define debug_assert(expr, msg) do { \
+      if (!(expr)) \
+        __debug_assert(#expr, expr, __FILE__, __LINE__, __func__, msg); \
+  } while(0)
 
   #define debug_puts(msg) fprintf(stderr, "[%s:%d]%s()\n\t%s\n", __FILE__, __LINE__, __func__, msg)
 
