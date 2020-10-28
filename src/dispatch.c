@@ -39,7 +39,7 @@ _concord_context_destroy(concord_context_st *context)
   uv_close((uv_handle_t*)&context->poll_handle, &_curl_close_cb);
 }
 
-void
+static void
 _concord_queue_update(uv_timer_t *req)
 {
   debug_puts("Updating bucket queue");
@@ -50,6 +50,30 @@ _concord_queue_update(uv_timer_t *req)
   } while (bucket->remaining--);
 }
 
+/* if is global, then sleep for x amount inside the function and
+    return 0, otherwise return the retry_after amount in ms */
+static long long
+_concord_ratelimit_handle(struct curl_response_s *response_body)
+{
+  debug_puts("Being ratelimited");
+
+  jscon_item_st *item = jscon_parse(response_body->str);
+
+  bool global = jscon_get_boolean(jscon_get_branch(item, "global"));
+  long long retry_after = jscon_get_double(jscon_get_branch(item, "retry_after"));
+
+  if (global == true){
+    debug_print("Global ratelimit, retry after %lld seconds", retry_after);
+    uv_sleep(retry_after * 1000);
+
+    retry_after = 0;
+  }
+
+  jscon_destroy(item);
+
+  return retry_after * 1000;
+}
+
 static void
 _concord_tryupdate_queue(concord_utils_st *utils)
 {
@@ -57,6 +81,7 @@ _concord_tryupdate_queue(concord_utils_st *utils)
   CURLMsg *msg; /* for picking up messages with the transfer status */
   int pending; /*how many messages are left */
   long http_code; /* http response code */
+  char *url = NULL; /* last used url */
   while ((msg = curl_multi_info_read(utils->multi_handle, &pending)))
   {
     if (CURLMSG_DONE != msg->msg)
@@ -69,30 +94,46 @@ _concord_tryupdate_queue(concord_utils_st *utils)
     sprintf(easy_key, "%p", msg->easy_handle);
     struct concord_conn_s *conn = dictionary_get(utils->easy_dict, easy_key);
 
-    curl_easy_getinfo(conn->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
-    debug_assert(429 != http_code, "Being ratelimited");
-
-    /* execute load callback to perform change in object */
-    if (NULL != conn->response_body.str){
-      //debug_puts(conn->response_body.str);
-      (*conn->load_cb)(conn->p_object, &conn->response_body);
-
-      conn->p_object = NULL;
-
-      safe_free(conn->response_body.str);
-      conn->response_body.size = 0;
-    }
-
     curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
-    
-    conn->p_bucket->remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
-    debug_print("Ratelimit remaining: %d", conn->p_bucket->remaining);
 
+    curl_easy_getinfo(conn->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
+    curl_easy_getinfo(conn->easy_handle, CURLINFO_EFFECTIVE_URL, &url);
+    debug_print("Current URL: %s", url);
+
+    /* @todo create enum for http_code, move description to header */
+    /* HTTP RESPONSE CODES
+      https://discord.com/developers/docs/topics/opcodes-and-status-codes#http-http-response-codes */
     long long delay_ms;
-    if (0 == conn->p_bucket->remaining){
-      delay_ms = Concord_parse_ratelimit_header(utils->header, true);
-    } else {
-      delay_ms = 0;
+    switch (http_code){
+    case 200: /* OK */
+        (*conn->load_cb)(conn->p_object, &conn->response_body);
+
+        conn->p_object = NULL;
+
+        safe_free(conn->response_body.str);
+        conn->response_body.size = 0;
+
+        conn->p_bucket->remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
+        debug_print("Ratelimit remaining: %d", conn->p_bucket->remaining);
+
+        if (0 == conn->p_bucket->remaining){
+          delay_ms = Concord_parse_ratelimit_header(utils->header, true);
+        } else {
+          delay_ms = 0;
+        }
+        break;
+    case 429: /*TOO MANY REQUESTS */
+        delay_ms = _concord_ratelimit_handle(&conn->response_body);
+        break;
+    case 0: 
+        /* @todo look into this, for some reason sometimes the easy handle
+            has an empty url, which gives us a 0 http_code */
+        debug_assert(!*url, "No server response has been received");
+        // !*url means URL is empty, aka url[0] == '\0'
+        return;
+    default:
+        debug_print("HTTP CODE: %ld", http_code);
+        abort();
     }
     
     uv_timer_start(&conn->p_bucket->timer, &_concord_queue_update, delay_ms, 0);
