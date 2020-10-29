@@ -24,7 +24,7 @@ Concord_http_request(
   va_list args;
   va_start (args, endpoint);
 
-  char url_route[ENDPOINT_LENGTH];
+  char url_route[MAX_URL_LEN];
   vsprintf(url_route, endpoint, args);
 
   va_end(args);
@@ -59,13 +59,13 @@ _concord_utils_init(char token[], concord_utils_st *new_utils)
   new_utils->multi_handle = Curl_multi_default_init(new_utils);
 
   new_utils->bucket_dict = dictionary_init();
-  dictionary_build(new_utils->bucket_dict, UTILS_HASHTABLE_SIZE);
+  dictionary_build(new_utils->bucket_dict, BUCKET_DICTIONARY_SIZE);
 
   new_utils->easy_dict = dictionary_init();
-  dictionary_build(new_utils->easy_dict, UTILS_HASHTABLE_SIZE);
+  dictionary_build(new_utils->easy_dict, CONN_DICTIONARY_SIZE);
 
   new_utils->header = dictionary_init();
-  dictionary_build(new_utils->header, 15);
+  dictionary_build(new_utils->header, HEADER_DICTIONARY_SIZE);
 }
 
 static void

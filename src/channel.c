@@ -14,10 +14,10 @@ concord_channel_init(concord_utils_st *utils)
   concord_channel_st *new_channel = safe_malloc(sizeof *new_channel);
   new_channel->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_channel->guild_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->name = safe_malloc(NAME_LENGTH);
-  new_channel->topic = safe_malloc(TOPIC_LENGTH);
+  new_channel->name = safe_malloc(MAX_NAME_LEN);
+  new_channel->topic = safe_malloc(MAX_TOPIC_LEN);
   new_channel->last_message_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_channel->icon = safe_malloc(MAX_HASH_LENGTH);
+  new_channel->icon = safe_malloc(MAX_HASH_LEN);
   new_channel->owner_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_channel->application_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_channel->parent_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
@@ -52,7 +52,7 @@ concord_channel_destroy(concord_channel_st *channel)
 }
 
 static void
-_concord_ld_channel(void **p_channel, struct curl_response_s *response_body)
+_concord_load_channel(void **p_channel, struct concord_response_s *response_body)
 {
   concord_channel_st *channel = *p_channel;
 
@@ -133,12 +133,12 @@ concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st *
   Concord_http_request( 
     &concord->utils,
     (void**)p_channel,
-    &_concord_ld_channel,
+    &_concord_load_channel,
     GET, CHANNELS, channel_id);
 }
 
 static void
-_concord_ld_channel_messages(void **p_channel, struct curl_response_s *response_body)
+_concord_load_channel_messages(void **p_channel, struct concord_response_s *response_body)
 {
   concord_channel_st *channel = *p_channel;
 
@@ -163,6 +163,6 @@ concord_get_channel_messages(concord_st *concord, char channel_id[], concord_cha
   Concord_http_request( 
     &concord->utils,
     (void**)p_channel,
-    &_concord_ld_channel_messages,
+    &_concord_load_channel_messages,
     GET, CHANNELS_MESSAGES, channel_id);
 }

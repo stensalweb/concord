@@ -15,7 +15,7 @@
 struct curl_slist*
 Curl_request_header_init(concord_utils_st *utils)
 {
-  char auth[MAX_HEADER_LENGTH] = "Authorization: Bot "; 
+  char auth[MAX_HEADER_LEN] = "Authorization: Bot "; 
 
   struct curl_slist *new_header = NULL;
   void *tmp;
@@ -74,7 +74,7 @@ size_t
 Curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   size_t realsize = size * nmemb;
-  struct curl_response_s *response_body = p_userdata;
+  struct concord_response_s *response_body = p_userdata;
 
   char *tmp = realloc(response_body->str, response_body->size + realsize + 1);
   DEBUG_ASSERT(NULL != tmp, "Out of memory");
@@ -97,8 +97,8 @@ Curl_easy_default_init(concord_utils_st *utils, struct concord_conn_s *conn)
 
   CURLcode ecode;
   /*
-  DEBUG_ONLY_ARG( ecode = curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 2L) );
-  DEBUG_ONLY_ARG( DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode)) );
+  DEBUG_EXEC( ecode = curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 2L) );
+  DEBUG_EXEC( DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode)) );
   */
   ecode = curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->request_header);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
@@ -130,13 +130,13 @@ Curl_multi_default_init(concord_utils_st *utils)
   DEBUG_ASSERT(NULL != new_multi_handle, "Out of memory");
 
   CURLMcode mcode;
-  mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_SOCKETFUNCTION, &Uv_handle_socket_cb);
+  mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_SOCKETFUNCTION, &Curl_handle_socket_cb);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
   mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_SOCKETDATA, utils);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
-  mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_TIMERFUNCTION, &Uv_start_timeout_cb);
+  mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_TIMERFUNCTION, &Curl_start_timeout_cb);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
   mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_TIMERDATA, &utils->timeout);
@@ -179,7 +179,7 @@ Curl_set_method(struct concord_conn_s *conn, enum http_method method)
 void
 Curl_set_url(struct concord_conn_s *conn, char endpoint[])
 {
-  char base_url[MAX_URL_LENGTH] = BASE_URL;
+  char base_url[MAX_URL_LEN] = BASE_URL;
   CURLcode ecode = curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 }

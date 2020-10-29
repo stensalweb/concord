@@ -13,11 +13,11 @@ concord_user_init(concord_utils_st *utils)
 {
   concord_user_st *new_user = safe_malloc(sizeof *new_user);
   new_user->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_user->username = safe_malloc(USERNAME_LENGTH);
-  new_user->discriminator = safe_malloc(DISCRIMINATOR_LENGTH);
-  new_user->avatar = safe_malloc(MAX_HASH_LENGTH);
-  new_user->locale = safe_malloc(MAX_LOCALE_LENGTH);
-  new_user->email = safe_malloc(MAX_EMAIL_LENGTH);
+  new_user->username = safe_malloc(MAX_USERNAME_LEN);
+  new_user->discriminator = safe_malloc(MAX_DISCRIMINATOR_LEN);
+  new_user->avatar = safe_malloc(MAX_HASH_LEN);
+  new_user->locale = safe_malloc(MAX_LOCALE_LEN);
+  new_user->email = safe_malloc(MAX_EMAIL_LEN);
 
   return new_user;
 }
@@ -40,7 +40,7 @@ concord_user_destroy(concord_user_st *user)
 }
 
 static void
-_concord_ld_user(void **p_user, struct curl_response_s *response_body)
+_concord_load_user(void **p_user, struct concord_response_s *response_body)
 {
   concord_user_st *user = *p_user;
 
@@ -106,7 +106,7 @@ concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user)
   Concord_http_request( 
     &concord->utils,
     (void**)p_user,
-    &_concord_ld_user,
+    &_concord_load_user,
     GET, USERS, user_id);
 }
 
@@ -122,12 +122,12 @@ concord_get_client(concord_st *concord, concord_user_st **p_client)
   Concord_http_request( 
     &concord->utils,
     (void**)p_client,
-    &_concord_ld_user,
+    &_concord_load_user,
     GET, USERS, "@me");
 }
 
 static void
-_concord_ld_client_guilds(void **p_client, struct curl_response_s *response_body)
+_concord_load_client_guilds(void **p_client, struct concord_response_s *response_body)
 {
   concord_user_st *client = *p_client;
 
@@ -152,6 +152,6 @@ concord_get_client_guilds(concord_st *concord, concord_user_st **p_client)
   Concord_http_request( 
     &concord->utils,
     (void**)p_client,
-    &_concord_ld_client_guilds,
+    &_concord_load_client_guilds,
     GET, USERS_GUILDS, "@me");
 }

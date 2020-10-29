@@ -9,58 +9,18 @@
 
 #define CONCORD_DEBUG_MODE  1 //set to 1 to activate debug mode
 
-#define BASE_URL "https://discord.com/api"
-
-#define MAX_URL_LENGTH       1 << 9
-#define MAX_RESPONSE_LENGTH  1 << 15
-#define MAX_HEADER_LENGTH    1 << 9
-
-#define ENDPOINT_LENGTH  256
-
-#define UTILS_HASHTABLE_SIZE  50
-
-/* HTTP RESPONSE CODES
-https://discord.com/developers/docs/topics/opcodes-and-status-codes#http-http-response-codes */
-enum http_response_code {
-  CURL_NO_RESPONSE              = 0,
-
-  DISCORD_OK                    = 200,
-  DISCORD_CREATED               = 201,
-  DISCORD_NO_CONTENT            = 204,
-  DISCORD_NOT_MODIFIED          = 304,
-  DISCORD_BAD_REQUEST           = 400,
-  DISCORD_UNAUTHORIZED          = 401,
-  DISCORD_FORBIDDEN             = 403,
-  DISCORD_NOT_FOUND             = 404,
-  DISCORD_METHOD_NOT_ALLOWED    = 405,
-  DISCORD_TOO_MANY_REQUESTS     = 429,
-  DISCORD_GATEWAY_UNAVAILABLE   = 502,
+enum http_method {
+  NONE    = 0,
+  DELETE  = 1,
+  GET     = 2,
+  POST    = 3,
+  PATCH   = 4,
+  PUT     = 5,
 };
-
-/* SNOWFLAKES
-https://discord.com/developers/docs/reference#snowflakes */
-typedef enum {
-  SNOWFLAKE_INCREMENT           = 12,
-  SNOWFLAKE_PROCESS_ID          = 17,
-  SNOWFLAKE_INTERNAL_WORKER_ID  = 22,
-  SNOWFLAKE_TIMESTAMP           = 64,
-} concord_snowflake_et;
-
-typedef enum {
-  NAME_LENGTH           = 100,
-  TOPIC_LENGTH          = 1024,
-  DESCRIPTION_LENGTH    = 1024,
-  USERNAME_LENGTH       = 32,
-  DISCRIMINATOR_LENGTH  = 4,
-  MAX_HASH_LENGTH       = 1024,
-  MAX_LOCALE_LENGTH     = 15,
-  MAX_EMAIL_LENGTH      = 254,
-  MAX_REGION_LENGTH     = 15,
-} concord_limits_et;
 
 /* CHANNEL TYPES
 https://discord.com/developers/docs/resources/channel#channel-object-channel-types */
-typedef enum {
+enum discord_channel_types {
   GUILD_TEXT      = 0,
   DM              = 1,
   GUILD_VOICE     = 2,
@@ -68,7 +28,7 @@ typedef enum {
   GUILD_CATEGORY  = 4,
   GUILD_NEWS      = 5,
   GUILD_STORE     = 6,
-} concord_channel_types_et;
+};
 
 /* CHANNEL OBJECT
 https://discord.com/developers/docs/resources/channel#channel-object-channel-structure */
@@ -167,12 +127,12 @@ typedef struct {
   jscon_item_st *guilds;
 } concord_user_st;
 
-struct curl_response_s {
+struct concord_response_s {
   char *str;
   size_t size;
 };
 
-typedef void (concord_load_obj_ft)(void **p_object, struct curl_response_s *response_body);
+typedef void (concord_load_obj_ft)(void **p_object, struct concord_response_s *response_body);
 
 typedef struct concord_context_s {
   uv_poll_t poll_handle;
@@ -185,7 +145,7 @@ struct concord_conn_s {
   concord_context_st *context;
   CURL *easy_handle; //easy handle used to perform the request
 
-  struct curl_response_s response_body; //stores response body associated with the easy_handle
+  struct concord_response_s response_body; //stores response body associated with the easy_handle
 
   void **p_object; //hold onto object to be passed as a load_cb parameter
   concord_load_obj_ft *load_cb; //object load callback

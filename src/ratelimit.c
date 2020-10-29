@@ -5,7 +5,7 @@
 #include "concord-common.h"
 
 #include "hashtable.h"
-#include "curl_ext.h"
+#include "curl-ext.h"
 #include "debug.h"
 
 

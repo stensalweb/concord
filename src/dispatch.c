@@ -52,7 +52,7 @@ _uv_add_remaining_cb(uv_timer_t *req)
 /* if is global, then sleep for x amount inside the function and
     return 0, otherwise return the retry_after amount in ms */
 static long long
-_concord_429_handle(struct curl_response_s *response_body)
+_concord_429_handle(struct concord_response_s *response_body)
 {
   DEBUG_PUTS("Being ratelimited");
 
@@ -76,7 +76,7 @@ _concord_429_handle(struct curl_response_s *response_body)
 static void
 _concord_conn_response_perform(concord_utils_st *utils, struct concord_conn_s *conn)
 {
-  enum http_response_code http_code; /* http response code */
+  enum discord_http_code http_code; /* http response code */
   char *url = NULL; /* URL from request */
   
   CURLcode ecode;
@@ -181,7 +181,7 @@ _uv_on_timeout_cb(uv_timer_t *req)
 }
 
 int
-Uv_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
+Curl_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
 {
   uv_timer_t *timeout = p_userdata;
 
@@ -200,7 +200,7 @@ Uv_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
 }
 
 int
-Uv_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket)
+Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket)
 {
   concord_utils_st *utils = p_userdata;
   CURLMcode mcode;
