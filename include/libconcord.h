@@ -19,6 +19,24 @@
 
 #define UTILS_HASHTABLE_SIZE  50
 
+/* HTTP RESPONSE CODES
+https://discord.com/developers/docs/topics/opcodes-and-status-codes#http-http-response-codes */
+enum http_response_code {
+  CURL_NO_RESPONSE              = 0,
+
+  DISCORD_OK                    = 200,
+  DISCORD_CREATED               = 201,
+  DISCORD_NO_CONTENT            = 204,
+  DISCORD_NOT_MODIFIED          = 304,
+  DISCORD_BAD_REQUEST           = 400,
+  DISCORD_UNAUTHORIZED          = 401,
+  DISCORD_FORBIDDEN             = 403,
+  DISCORD_NOT_FOUND             = 404,
+  DISCORD_METHOD_NOT_ALLOWED    = 405,
+  DISCORD_TOO_MANY_REQUESTS     = 429,
+  DISCORD_GATEWAY_UNAVAILABLE   = 502,
+};
+
 /* SNOWFLAKES
 https://discord.com/developers/docs/reference#snowflakes */
 typedef enum {

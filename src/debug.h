@@ -4,23 +4,37 @@
 //#include <libconcord.h> implicit
 
 
-#if CONCORD_DEBUG_MODE == 1
-  void __debug_assert(const char * expr_str, int expr, const char *file, int line, const char *func, const char *msg);
-  #define debug_assert(expr, msg) do { \
-      if (!(expr)) \
-        __debug_assert(#expr, expr, __FILE__, __LINE__, __func__, msg); \
+#if CONCORD_DEBUG_MODE == 1 /*DEBUG MODE ACTIVATED */
+  /* @param msg string to be printed in debug mode */
+  #define DEBUG_PUTS(msg) fprintf(stderr, "[%s:%d]%s()\n\t%s\n", __FILE__, __LINE__, __func__, msg)
+
+  /* @param fmt like printf
+     @param ... arguments to be parsed into fmt */
+  #define __DEBUG_PRINT_HELPER(fmt, ...) fprintf(stderr, "[%s:%d]%s()\n\t"fmt"\n%s",__FILE__, __LINE__, __func__,  __VA_ARGS__)
+  #define DEBUG_PRINT(...) __DEBUG_PRINT_HELPER(__VA_ARGS__, "")
+
+  /* @param expr to be checked for its validity
+     @param msg to be printed in case of invalidity */
+  #define DEBUG_ASSERT(expr, msg) do { \
+      if (!(expr)){ \
+        DEBUG_PRINT("ASSERT FAILED:\t%s\n\tEXPECTED:\t%s", msg, #expr); \
+        abort(); \
+      } \
   } while(0)
 
-  #define debug_puts(msg) fprintf(stderr, "[%s:%d]%s()\n\t%s\n", __FILE__, __LINE__, __func__, msg)
+  /* @param argument to be performed if debug mode is active */
+  #define DEBUG_ONLY_ARG(arg) (arg)
 
-  #define __debug_print_helper(fmt, ...) fprintf(stderr, "[%s:%d]%s()\n\t"fmt"\n%s",__FILE__, __LINE__, __func__,  __VA_ARGS__)
-  #define debug_print(...) __debug_print_helper(__VA_ARGS__, "")
-#else
+#else /* NO EFFECT FROM ANY PREPROCESSOR DIRECTIVES */
+
+  #define DEBUG_PUTS(msg) 
+
+  #define DEBUG_PRINT(...)
+
   #include <assert.h>
-  #define debug_assert(expr, msg) assert(expr)
+  #define DEBUG_ASSERT(expr, msg) assert(expr)
+  #define DEBUG_ONLY_ARG(arg)
 
-  #define debug_puts(msg) 
-
-  #define debug_print(...)
 #endif
+
 #endif

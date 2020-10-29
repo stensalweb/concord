@@ -12,13 +12,13 @@
 static concord_context_st*
 _concord_context_init(concord_utils_st *utils, curl_socket_t sockfd)
 {
-  debug_puts("Creating new context");
+  DEBUG_PUTS("Creating new context");
   concord_context_st *new_context = safe_malloc(sizeof *new_context);
 
   new_context->sockfd = sockfd;
 
   int uvcode = uv_poll_init_socket(utils->loop, &new_context->poll_handle, sockfd);
-  debug_assert(!uvcode, uv_strerror(uvcode));
+  DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
   new_context->poll_handle.data = utils;
 
@@ -26,9 +26,9 @@ _concord_context_init(concord_utils_st *utils, curl_socket_t sockfd)
 }
 
 static void
-_curl_close_cb(uv_handle_t *handle)
+_uv_context_destroy_cb(uv_handle_t *handle)
 {
-  debug_puts("Destroying context");
+  DEBUG_PUTS("Destroying context");
   concord_context_st *context = (concord_context_st*)handle;
   safe_free(context);
 }
@@ -36,13 +36,13 @@ _curl_close_cb(uv_handle_t *handle)
 static void
 _concord_context_destroy(concord_context_st *context)
 {
-  uv_close((uv_handle_t*)&context->poll_handle, &_curl_close_cb);
+  uv_close((uv_handle_t*)&context->poll_handle, &_uv_context_destroy_cb);
 }
 
 static void
-_concord_queue_update(uv_timer_t *req)
+_concord_queue_pop_remaining(uv_timer_t *req)
 {
-  debug_puts("Updating bucket queue");
+  DEBUG_PUTS("Updating bucket queue");
   struct concord_bucket_s *bucket = req->data;
 
   do {
@@ -53,9 +53,9 @@ _concord_queue_update(uv_timer_t *req)
 /* if is global, then sleep for x amount inside the function and
     return 0, otherwise return the retry_after amount in ms */
 static long long
-_concord_ratelimit_handle(struct curl_response_s *response_body)
+_concord_429_handle(struct curl_response_s *response_body)
 {
-  debug_puts("Being ratelimited");
+  DEBUG_PUTS("Being ratelimited");
 
   jscon_item_st *item = jscon_parse(response_body->str);
 
@@ -63,7 +63,7 @@ _concord_ratelimit_handle(struct curl_response_s *response_body)
   long long retry_after = jscon_get_double(jscon_get_branch(item, "retry_after"));
 
   if (global == true){
-    debug_print("Global ratelimit, retry after %lld seconds", retry_after);
+    DEBUG_PRINT("Global ratelimit, retry after %lld seconds", retry_after);
     uv_sleep(retry_after * 1000);
 
     retry_after = 0;
@@ -77,17 +77,19 @@ _concord_ratelimit_handle(struct curl_response_s *response_body)
 static void
 _concord_tryupdate_queue(concord_utils_st *utils)
 {
-  /* See how the transfers went */
+  /* These are related to the current easy_handle being read */
   CURLMsg *msg; /* for picking up messages with the transfer status */
   int pending; /*how many messages are left */
-  long http_code; /* http response code */
-  char *url = NULL; /* last used url */
+  enum http_response_code http_code; /* http response code */
+  char *url = NULL; /* URL from request */
+
+
   while ((msg = curl_multi_info_read(utils->multi_handle, &pending)))
   {
     if (CURLMSG_DONE != msg->msg)
       continue;
 
-    debug_print("Transfers Running: %d\n\tTransfers On Hold: %d", utils->transfers_running, utils->transfers_onhold);
+    DEBUG_PRINT("Transfers Running: %d\n\tTransfers On Hold: %d", utils->transfers_running, utils->transfers_onhold);
 
     /* Find out which handle this message is about */
     char easy_key[18];
@@ -97,15 +99,12 @@ _concord_tryupdate_queue(concord_utils_st *utils)
     curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
 
     curl_easy_getinfo(conn->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
-    curl_easy_getinfo(conn->easy_handle, CURLINFO_EFFECTIVE_URL, &url);
-    debug_print("Current URL: %s", url);
+    DEBUG_ONLY_ARG( curl_easy_getinfo(conn->easy_handle, CURLINFO_EFFECTIVE_URL, &url) );
+    DEBUG_PRINT("Current URL: %s", url);
 
-    /* @todo create enum for http_code, move description to header */
-    /* HTTP RESPONSE CODES
-      https://discord.com/developers/docs/topics/opcodes-and-status-codes#http-http-response-codes */
     long long delay_ms;
     switch (http_code){
-    case 200: /* OK */
+    case DISCORD_OK:
         (*conn->load_cb)(conn->p_object, &conn->response_body);
 
         conn->p_object = NULL;
@@ -114,29 +113,29 @@ _concord_tryupdate_queue(concord_utils_st *utils)
         conn->response_body.size = 0;
 
         conn->p_bucket->remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
-        debug_print("Ratelimit remaining: %d", conn->p_bucket->remaining);
+        DEBUG_PRINT("Ratelimit remaining: %d", conn->p_bucket->remaining);
 
-        if (0 == conn->p_bucket->remaining){
+        if (!conn->p_bucket->remaining){
           delay_ms = Concord_parse_ratelimit_header(utils->header, true);
         } else {
           delay_ms = 0;
         }
         break;
-    case 429: /*TOO MANY REQUESTS */
-        delay_ms = _concord_ratelimit_handle(&conn->response_body);
+    case DISCORD_TOO_MANY_REQUESTS:
+        delay_ms = _concord_429_handle(&conn->response_body);
         break;
-    case 0: 
+    case CURL_NO_RESPONSE: 
         /* @todo look into this, for some reason sometimes the easy handle
-            has an empty url, which gives us a 0 http_code */
-        debug_assert(!*url, "No server response has been received");
-        // !*url means URL is empty, aka url[0] == '\0'
+            has an empty url, which gives us a 0 http_code response */
+        // !url means URL string is NULL , !*url means URL string is empty
+        DEBUG_ASSERT(!url || !*url, "No server response has been received");
         return;
     default:
-        debug_print("HTTP CODE: %ld", http_code);
+        DEBUG_PRINT("HTTP CODE: %d", http_code);
         abort();
     }
     
-    uv_timer_start(&conn->p_bucket->timer, &_concord_queue_update, delay_ms, 0);
+    uv_timer_start(&conn->p_bucket->timer, &_concord_queue_pop_remaining, delay_ms, 0);
   }
 }
 
@@ -151,7 +150,7 @@ _uv_perform_cb(uv_poll_t *req, int status, int events)
   if (events & UV_WRITABLE) flags |= CURL_CSELECT_OUT;
 
   CURLMcode mcode = curl_multi_socket_action(utils->multi_handle, context->sockfd, flags, &utils->transfers_running);
-  debug_assert(CURLM_OK == mcode, curl_multi_strerror(mcode));
+  DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
   _concord_tryupdate_queue(utils);
 }
@@ -160,10 +159,9 @@ static void
 _uv_on_timeout_cb(uv_timer_t *req)
 {
   concord_utils_st *utils = req->data;
-  debug_assert(NULL != utils, "Handle data is empty");
 
   CURLMcode mcode = curl_multi_socket_action(utils->multi_handle, CURL_SOCKET_TIMEOUT, 0, &utils->transfers_running);
-  debug_assert(CURLM_OK == mcode, curl_multi_strerror(mcode));
+  DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
   _concord_tryupdate_queue(utils);
 }
@@ -172,17 +170,16 @@ int
 Curl_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
 {
   uv_timer_t *timeout = p_userdata;
-  debug_assert(NULL != timeout, "Timeout handle unspecified");
 
   if (timeout_ms < 0){
     int uvcode = uv_timer_stop(timeout);
-    debug_assert(!uvcode, uv_strerror(uvcode));
+    DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
   } else {
     if (0 == timeout_ms)
       timeout_ms = 1;
 
     int uvcode = uv_timer_start(timeout, &_uv_on_timeout_cb, timeout_ms, 0);
-    debug_assert(!uvcode, uv_strerror(uvcode));
+    DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
   }
 
   return 0;
@@ -194,44 +191,41 @@ Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void 
   concord_utils_st *utils = p_userdata;
   CURLMcode mcode;
   int uvcode;
-
+  int events = 0;
   concord_context_st *context;
-  if (action == CURL_POLL_IN || action == CURL_POLL_OUT){
-    if (NULL != p_socket){
-      context = (concord_context_st*)p_socket;
-    } else {
-      context = _concord_context_init(utils, sockfd);
-    }
 
-    mcode = curl_multi_assign(utils->multi_handle, sockfd, context);
-    debug_assert(CURLM_OK == mcode, curl_multi_strerror(mcode));
-  }
 
   switch (action){
   case CURL_POLL_IN:
-      debug_puts("POLL IN FLAG");
-      uvcode = uv_poll_start(&context->poll_handle, UV_READABLE, &_uv_perform_cb);
-      debug_assert(!uvcode, uv_strerror(uvcode));
-      break;
   case CURL_POLL_OUT:
-      debug_puts("POLL OUT FLAG");
-      uvcode = uv_poll_start(&context->poll_handle, UV_WRITABLE, &_uv_perform_cb);
-      debug_assert(!uvcode, uv_strerror(uvcode));
+      if (NULL != p_socket){
+        context = (concord_context_st*)p_socket;
+      } else {
+        context = _concord_context_init(utils, sockfd);
+      }
+
+      mcode = curl_multi_assign(utils->multi_handle, sockfd, context);
+      DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
+
+      if (action != CURL_POLL_IN) events |= UV_WRITABLE;
+      if (action != CURL_POLL_OUT) events |= UV_READABLE;
+
+      uvcode = uv_poll_start(&context->poll_handle, events, &_uv_perform_cb);
+      DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
       break;
   case CURL_POLL_REMOVE:
-      debug_puts("POLL REMOVE FLAG");
-      if (p_socket){
+      if (NULL != p_socket){
         uvcode = uv_poll_stop(&((concord_context_st*)p_socket)->poll_handle);
-        debug_assert(!uvcode, uv_strerror(uvcode));
+        DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
         _concord_context_destroy((concord_context_st*)p_socket);
 
         mcode = curl_multi_assign(utils->multi_handle, sockfd, NULL);
-        debug_assert(CURLM_OK == mcode, curl_multi_strerror(mcode));
+        DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
       }
       break;
   default:
-      debug_puts("An error has occurred");
+      DEBUG_PUTS("Unknown CURL_POLL_XXX option encountered");
       abort();
   }
 
@@ -246,9 +240,9 @@ concord_dispatch(concord_st *concord)
   Concord_start_client_buckets(utils);
 
   int uvcode = uv_run(utils->loop, UV_RUN_DEFAULT);
-  debug_assert(!uvcode, uv_strerror(uvcode));
+  DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
   
-  debug_assert(0 == utils->transfers_onhold, "Left loop with pending transfers");
+  DEBUG_ASSERT(0 == utils->transfers_onhold, "Left loop with pending transfers");
 
   Concord_reset_client_buckets(utils);
 }

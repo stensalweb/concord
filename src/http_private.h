@@ -24,7 +24,7 @@ enum http_method {
 #define USERS_GUILDS       "/users/%s/guilds"
 
 /* 
-  @param utils contains useful tools
+  @param utils contains tools common to every request
   @param p_object is a pointer to the object to be loaded by load_cb
   @param load_cb is the function that will load the object attributes
     once a connection is completed

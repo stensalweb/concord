@@ -46,7 +46,7 @@ _concord_client_buckets_append(concord_utils_st *utils, struct concord_bucket_s 
 {
   ++utils->num_buckets;
   void *tmp = realloc(utils->client_buckets, sizeof *utils->client_buckets * utils->num_buckets);
-  debug_assert(NULL != tmp, "Out of memory");
+  DEBUG_ASSERT(NULL != tmp, "Out of memory");
 
   utils->client_buckets = tmp;
 
@@ -76,10 +76,10 @@ _concord_bucket_init(concord_utils_st *utils, char bucket_hash[])
   new_bucket->queue = safe_malloc(sizeof *new_bucket->queue * new_bucket->num_conn);
 
   new_bucket->hash_key = strndup(bucket_hash, strlen(bucket_hash));
-  debug_assert(NULL != new_bucket->hash_key, "Out of memory");
+  DEBUG_ASSERT(NULL != new_bucket->hash_key, "Out of memory");
 
   int uvcode = uv_timer_init(utils->loop, &new_bucket->timer);
-  debug_assert(!uvcode, uv_strerror(uvcode));
+  DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
   new_bucket->p_utils = utils;
   new_bucket->timer.data = new_bucket;
@@ -94,16 +94,16 @@ _concord_bucket_init(concord_utils_st *utils, char bucket_hash[])
 void
 Concord_queue_recycle(concord_utils_st *utils, struct concord_bucket_s *bucket)
 {
-  debug_assert(NULL != bucket->queue[bucket->top], "Can't recycle empty slot");
-  debug_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
+  DEBUG_ASSERT(NULL != bucket->queue[bucket->top], "Can't recycle empty slot");
+  DEBUG_ASSERT(bucket->top < bucket->num_conn, "Queue top has reached threshold");
 
   ++bucket->top;
   ++utils->transfers_onhold;
 
-  debug_print("Bucket top: %ld\n\tBucket size: %ld", bucket->top, bucket->num_conn);
+  DEBUG_PRINT("Bucket top: %ld\n\tBucket size: %ld", bucket->top, bucket->num_conn);
 
   if (MAX_CONCURRENT_CONNS == utils->transfers_onhold){
-    debug_puts("Reach max concurrent connections threshold, auto performing connections on hold ...");
+    DEBUG_PUTS("Reach max concurrent connections threshold, auto performing connections on hold ...");
     concord_dispatch((concord_st*)utils);
   }
 }
@@ -112,7 +112,7 @@ Concord_queue_recycle(concord_utils_st *utils, struct concord_bucket_s *bucket)
 void
 Concord_queue_push(concord_utils_st *utils, struct concord_bucket_s *bucket, struct concord_conn_s *conn)
 {
-  debug_assert(bucket->top < bucket->num_conn, "Queue top has reached threshold");
+  DEBUG_ASSERT(bucket->top < bucket->num_conn, "Queue top has reached threshold");
 
   bucket->queue[bucket->top] = conn; 
   conn->p_bucket = bucket;
@@ -120,10 +120,10 @@ Concord_queue_push(concord_utils_st *utils, struct concord_bucket_s *bucket, str
   ++bucket->top;
   ++utils->transfers_onhold;
 
-  debug_print("Bucket top: %ld\n\tBucket size: %ld", bucket->top, bucket->num_conn);
+  DEBUG_PRINT("Bucket top: %ld\n\tBucket size: %ld", bucket->top, bucket->num_conn);
 
   if (MAX_CONCURRENT_CONNS == utils->transfers_onhold){
-    debug_puts("Reach max concurrent connections threshold, auto performing connections on hold ...");
+    DEBUG_PUTS("Reach max concurrent connections threshold, auto performing connections on hold ...");
     concord_dispatch((concord_st*)utils);
   }
 }
@@ -134,14 +134,14 @@ Concord_queue_pop(concord_utils_st *utils, struct concord_bucket_s *bucket)
   if (bucket->bottom == bucket->top) return; //nothing to pop
 
   struct concord_conn_s *conn = bucket->queue[bucket->bottom];
-  debug_assert(NULL != conn, "Can't pop empty queue's slot");
+  DEBUG_ASSERT(NULL != conn, "Can't pop empty queue's slot");
 
   curl_multi_add_handle(utils->multi_handle, conn->easy_handle);
 
   ++bucket->bottom;
   --utils->transfers_onhold;
 
-  debug_print("Bucket Bottom: %ld\n\tBucket top: %ld\n\tBucket size: %ld", bucket->bottom, bucket->top, bucket->num_conn);
+  DEBUG_PRINT("Bucket Bottom: %ld\n\tBucket top: %ld\n\tBucket size: %ld", bucket->bottom, bucket->top, bucket->num_conn);
 }
 
 void
@@ -149,7 +149,7 @@ Concord_start_client_buckets(concord_utils_st *utils)
 {
   for (size_t i=0; i < utils->num_buckets; ++i){
     Concord_queue_pop(utils, utils->client_buckets[i]);
-    debug_print("Bucket Hash: %s\n\tBucket Size: %ld", utils->client_buckets[i]->hash_key, utils->client_buckets[i]->top);
+    DEBUG_PRINT("Bucket Hash: %s\n\tBucket Size: %ld", utils->client_buckets[i]->hash_key, utils->client_buckets[i]->top);
   }
 }
 
@@ -165,19 +165,19 @@ Concord_reset_client_buckets(concord_utils_st *utils)
 struct concord_bucket_s*
 Concord_get_hashbucket(concord_utils_st *utils, char bucket_hash[])
 {
-  debug_assert(NULL != bucket_hash, "Bucket hash unspecified (NULL)");
+  DEBUG_ASSERT(NULL != bucket_hash, "Bucket hash unspecified (NULL)");
 
   /* check if hashbucket with bucket_hash already exists */
   struct concord_bucket_s *bucket = dictionary_get(utils->bucket_dict, bucket_hash);
 
   if (NULL != bucket){
-    debug_puts("Returning existing bucket");
+    DEBUG_PUTS("Returning existing bucket");
     return bucket; //bucket exists return it
   }
 
   /* hashbucket doesn't exist, create it */
   bucket = _concord_bucket_init(utils, bucket_hash);
 
-  debug_puts("Returning new bucket");
+  DEBUG_PUTS("Returning new bucket");
   return bucket;
 }

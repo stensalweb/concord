@@ -3,6 +3,8 @@
 
 #include <libconcord.h>
 
+#include "debug.h"
+
 /* @todo instead of exit(), it should throw the error
     somewhere */
 //this is redefined as a macro
@@ -12,9 +14,8 @@ __safe_malloc(size_t size, unsigned long line, char file[])
   void *ptr = calloc(1, size);
 
   if (NULL == ptr){
-    fprintf(stderr, "[%s:%lu] Out of memory(%lu bytes)\n",
-              file, line, (unsigned long)size);
-    exit(EXIT_FAILURE);
+    fprintf(stderr, "[%s:%lu] Out of memory(%ld bytes)\n", file, line, size);
+    abort();
   }
 
   return ptr;
