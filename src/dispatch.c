@@ -2,11 +2,10 @@
 #include <stdlib.h>
 
 #include <libconcord.h>
+#include "concord-common.h"
 
 #include "hashtable.h"
 #include "debug.h"
-#include "ratelimit.h"
-#include "dispatch.h"
 
 
 static concord_context_st*
@@ -91,7 +90,7 @@ _concord_conn_response_perform(concord_utils_st *utils, struct concord_conn_s *c
 
   long long delay_ms;
   switch (http_code){
-  case DISCORD_OK:
+  case DISCORD_OK: /* 200 */
       (*conn->load_cb)(conn->p_object, &conn->response_body);
 
       conn->p_object = NULL;
@@ -108,10 +107,10 @@ _concord_conn_response_perform(concord_utils_st *utils, struct concord_conn_s *c
         delay_ms = 0;
       }
       break;
-  case DISCORD_TOO_MANY_REQUESTS:
+  case DISCORD_TOO_MANY_REQUESTS: /* 429 */
       delay_ms = _concord_429_handle(&conn->response_body);
       break;
-  case CURL_NO_RESPONSE: 
+  case CURL_NO_RESPONSE: /* 0 */
       /* @todo look into this, for some reason sometimes the easy handle
           has an empty url, which gives us a 0 http_code response */
       // !url means URL string is NULL , !*url means URL string is empty
@@ -122,17 +121,20 @@ _concord_conn_response_perform(concord_utils_st *utils, struct concord_conn_s *c
       abort();
   }
   
+  /* after delay_ms time has elapsed, the event loop will add the
+      remaining connections to the multi stack (if there are any) */
   uv_timer_start(&conn->p_bucket->timer, &_uv_add_remaining_cb, delay_ms, 0);
 }
 
 static void
-_concord_tryupdate_queue(concord_utils_st *utils)
+_concord_tryperform_response(concord_utils_st *utils)
 {
   /* These are related to the current easy_handle being read */
   CURLMsg *msg; /* for picking up messages with the transfer status */
   int pending; /*how many messages are left */
 
-
+  /* search for completed easy_handle transfers, and perform the
+      instructions given by the transfer response */
   while ((msg = curl_multi_info_read(utils->multi_handle, &pending)))
   {
     if (CURLMSG_DONE != msg->msg)
@@ -164,7 +166,7 @@ _uv_perform_cb(uv_poll_t *req, int status, int events)
   CURLMcode mcode = curl_multi_socket_action(utils->multi_handle, context->sockfd, flags, &utils->transfers_running);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
-  _concord_tryupdate_queue(utils);
+  _concord_tryperform_response(utils);
 }
 
 static void
@@ -175,11 +177,11 @@ _uv_on_timeout_cb(uv_timer_t *req)
   CURLMcode mcode = curl_multi_socket_action(utils->multi_handle, CURL_SOCKET_TIMEOUT, 0, &utils->transfers_running);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
-  _concord_tryupdate_queue(utils);
+  _concord_tryperform_response(utils);
 }
 
 int
-Curl_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
+Uv_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
 {
   uv_timer_t *timeout = p_userdata;
 
@@ -198,7 +200,7 @@ Curl_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
 }
 
 int
-Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket)
+Uv_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket)
 {
   concord_utils_st *utils = p_userdata;
   CURLMcode mcode;
@@ -257,5 +259,30 @@ concord_dispatch(concord_st *concord)
   DEBUG_ASSERT(!utils->transfers_onhold, "Left loop with pending transfers");
   DEBUG_ASSERT(!utils->transfers_running, "Left loop with running transfers");
 
-  Concord_reset_client_buckets(utils);
+  Concord_stop_client_buckets(utils);
+}
+
+void
+Concord_synchronous_perform(concord_utils_st *utils, struct concord_conn_s *conn)
+{
+  CURLcode ecode = curl_easy_perform(conn->easy_handle);
+  DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
+
+  if (NULL != conn->response_body.str){
+    int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
+    DEBUG_PRINT("Remaining connections: %d", remaining);
+    if (0 == remaining){
+      long long delay_ms = Concord_parse_ratelimit_header(utils->header, false);
+      DEBUG_PRINT("Delay_ms: %lld", delay_ms);
+      uv_sleep(delay_ms);
+    }
+
+    //DEBUG_PUTS(conn->response_body.str);
+    (*conn->load_cb)(conn->p_object, &conn->response_body);
+
+    conn->p_object = NULL;
+
+    safe_free(conn->response_body.str);
+    conn->response_body.size = 0;
+  }
 }

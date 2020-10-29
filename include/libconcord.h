@@ -246,11 +246,6 @@ typedef struct concord_s {
 } concord_st;
 
 
-void __safe_free(void **p_ptr);
-#define safe_free(n) __safe_free((void**)&n)
-void* __safe_malloc(size_t size, unsigned long line, char file[]);
-#define safe_malloc(n) __safe_malloc(n, __LINE__, __FILE__)
-
 void concord_dispatch(concord_st *concord);
 
 void concord_global_init();

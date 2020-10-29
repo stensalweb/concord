@@ -5,7 +5,7 @@
 
 #include <libconcord.h>
 
-#include "http.h"
+#include "concord-common.h"
 #include "debug.h"
 
 concord_channel_st*

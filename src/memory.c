@@ -2,8 +2,8 @@
 #include <stdlib.h>
 
 #include <libconcord.h>
+#include "concord-common.h"
 
-#include "debug.h"
 
 /* @todo instead of exit(), it should throw the error
     somewhere */
