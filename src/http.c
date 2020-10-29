@@ -182,8 +182,8 @@ _curl_set_method(struct concord_conn_s *conn, enum http_method method)
       DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
       return;
   default:
-    DEBUG_PRINT("Unknown http_method code: %d", method);
-    exit(EXIT_FAILURE);
+      DEBUG_PRINT("Unknown http_method\n\tCode: %d", method);
+      abort();
   }
 }
 
@@ -438,7 +438,7 @@ concord_cleanup(concord_st *concord)
 void
 concord_global_init(){
   int code = curl_global_init(CURL_GLOBAL_DEFAULT);
-  DEBUG_ASSERT(0 == code, "Couldn't start curl_global_init()");
+  DEBUG_ASSERT(!code, "Couldn't start curl_global_init()");
 }
 
 void

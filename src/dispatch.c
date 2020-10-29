@@ -99,7 +99,7 @@ _concord_tryupdate_queue(concord_utils_st *utils)
     curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
 
     curl_easy_getinfo(conn->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
-    DEBUG_ONLY_ARG( curl_easy_getinfo(conn->easy_handle, CURLINFO_EFFECTIVE_URL, &url) );
+    curl_easy_getinfo(conn->easy_handle, CURLINFO_EFFECTIVE_URL, &url);
     DEBUG_PRINT("Current URL: %s", url);
 
     long long delay_ms;
@@ -225,7 +225,7 @@ Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void 
       }
       break;
   default:
-      DEBUG_PUTS("Unknown CURL_POLL_XXX option encountered");
+      DEBUG_PRINT("Unknown CURL_POLL_XXX option encountered\n\tCode: %d", action);
       abort();
   }
 
