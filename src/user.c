@@ -6,7 +6,7 @@
 #include <libconcord.h>
 
 #include "debug.h"
-#include "http_private.h"
+#include "http.h"
 
 concord_user_st*
 concord_user_init(concord_utils_st *utils)

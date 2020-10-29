@@ -3,7 +3,7 @@
 #include <libconcord.h>
 
 #include "ratelimit.h"
-#include "http_private.h"
+#include "http.h"
 #include "debug.h"
 #include "hashtable.h"
 

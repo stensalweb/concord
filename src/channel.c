@@ -5,7 +5,7 @@
 
 #include <libconcord.h>
 
-#include "http_private.h"
+#include "http.h"
 #include "debug.h"
 
 concord_channel_st*

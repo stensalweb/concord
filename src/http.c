@@ -8,7 +8,7 @@
 
 #include "hashtable.h"
 #include "debug.h"
-#include "http_private.h"
+#include "http.h"
 #include "ratelimit.h"
 #include "dispatch.h"
 
