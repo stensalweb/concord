@@ -40,7 +40,7 @@ _concord_context_destroy(concord_context_st *context)
 }
 
 static void
-_concord_queue_pop_remaining(uv_timer_t *req)
+_uv_add_remaining_cb(uv_timer_t *req)
 {
   DEBUG_PUTS("Updating bucket queue");
   struct concord_bucket_s *bucket = req->data;
@@ -63,7 +63,7 @@ _concord_429_handle(struct curl_response_s *response_body)
   long long retry_after = jscon_get_double(jscon_get_branch(item, "retry_after"));
 
   if (global == true){
-    DEBUG_PRINT("Global ratelimit, retry after %lld seconds", retry_after);
+    DEBUG_PRINT("Global ratelimit, retrying after %lld seconds", retry_after);
     uv_sleep(retry_after * 1000);
 
     retry_after = 0;
@@ -75,13 +75,62 @@ _concord_429_handle(struct curl_response_s *response_body)
 }
 
 static void
+_concord_conn_response_perform(concord_utils_st *utils, struct concord_conn_s *conn)
+{
+  enum http_response_code http_code; /* http response code */
+  char *url = NULL; /* URL from request */
+  
+  CURLcode ecode;
+  ecode = curl_easy_getinfo(conn->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
+  DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
+
+  ecode = curl_easy_getinfo(conn->easy_handle, CURLINFO_EFFECTIVE_URL, &url);
+  DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
+
+  DEBUG_PRINT("Conn URL: %s", url);
+
+  long long delay_ms;
+  switch (http_code){
+  case DISCORD_OK:
+      (*conn->load_cb)(conn->p_object, &conn->response_body);
+
+      conn->p_object = NULL;
+
+      safe_free(conn->response_body.str);
+      conn->response_body.size = 0;
+
+      conn->p_bucket->remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
+      DEBUG_PRINT("Ratelimit remaining: %d", conn->p_bucket->remaining);
+
+      if (!conn->p_bucket->remaining){
+        delay_ms = Concord_parse_ratelimit_header(utils->header, true);
+      } else {
+        delay_ms = 0;
+      }
+      break;
+  case DISCORD_TOO_MANY_REQUESTS:
+      delay_ms = _concord_429_handle(&conn->response_body);
+      break;
+  case CURL_NO_RESPONSE: 
+      /* @todo look into this, for some reason sometimes the easy handle
+          has an empty url, which gives us a 0 http_code response */
+      // !url means URL string is NULL , !*url means URL string is empty
+      DEBUG_ASSERT(!url || !*url, "No server response has been received");
+      return;
+  default:
+      DEBUG_PRINT("HTTP CODE: %d", http_code);
+      abort();
+  }
+  
+  uv_timer_start(&conn->p_bucket->timer, &_uv_add_remaining_cb, delay_ms, 0);
+}
+
+static void
 _concord_tryupdate_queue(concord_utils_st *utils)
 {
   /* These are related to the current easy_handle being read */
   CURLMsg *msg; /* for picking up messages with the transfer status */
   int pending; /*how many messages are left */
-  enum http_response_code http_code; /* http response code */
-  char *url = NULL; /* URL from request */
 
 
   while ((msg = curl_multi_info_read(utils->multi_handle, &pending)))
@@ -98,44 +147,7 @@ _concord_tryupdate_queue(concord_utils_st *utils)
 
     curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
 
-    curl_easy_getinfo(conn->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
-    curl_easy_getinfo(conn->easy_handle, CURLINFO_EFFECTIVE_URL, &url);
-    DEBUG_PRINT("Current URL: %s", url);
-
-    long long delay_ms;
-    switch (http_code){
-    case DISCORD_OK:
-        (*conn->load_cb)(conn->p_object, &conn->response_body);
-
-        conn->p_object = NULL;
-
-        safe_free(conn->response_body.str);
-        conn->response_body.size = 0;
-
-        conn->p_bucket->remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
-        DEBUG_PRINT("Ratelimit remaining: %d", conn->p_bucket->remaining);
-
-        if (!conn->p_bucket->remaining){
-          delay_ms = Concord_parse_ratelimit_header(utils->header, true);
-        } else {
-          delay_ms = 0;
-        }
-        break;
-    case DISCORD_TOO_MANY_REQUESTS:
-        delay_ms = _concord_429_handle(&conn->response_body);
-        break;
-    case CURL_NO_RESPONSE: 
-        /* @todo look into this, for some reason sometimes the easy handle
-            has an empty url, which gives us a 0 http_code response */
-        // !url means URL string is NULL , !*url means URL string is empty
-        DEBUG_ASSERT(!url || !*url, "No server response has been received");
-        return;
-    default:
-        DEBUG_PRINT("HTTP CODE: %d", http_code);
-        abort();
-    }
-    
-    uv_timer_start(&conn->p_bucket->timer, &_concord_queue_pop_remaining, delay_ms, 0);
+    _concord_conn_response_perform(utils, conn);
   }
 }
 
@@ -242,7 +254,8 @@ concord_dispatch(concord_st *concord)
   int uvcode = uv_run(utils->loop, UV_RUN_DEFAULT);
   DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
   
-  DEBUG_ASSERT(0 == utils->transfers_onhold, "Left loop with pending transfers");
+  DEBUG_ASSERT(!utils->transfers_onhold, "Left loop with pending transfers");
+  DEBUG_ASSERT(!utils->transfers_running, "Left loop with running transfers");
 
   Concord_reset_client_buckets(utils);
 }
