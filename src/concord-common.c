@@ -8,12 +8,11 @@
 
 #include "hashtable.h"
 #include "debug.h"
-#include "curl-ext.h"
 
 
 void
 Concord_http_request(
-  concord_utils_st *utils, 
+  concord_st *concord, 
   void **p_object, 
   concord_load_obj_ft *load_cb,
   enum http_method http_method,
@@ -35,17 +34,24 @@ Concord_http_request(
   DEBUG_PRINT("Bucket key encountered: %s", bucket_key);
 
   Concord_bucket_build(
-             utils,
+             concord->utils,
              p_object,
              load_cb,
              http_method,
              bucket_key,
              url_route);
+
+  if (MAX_CONCURRENT_CONNS == concord->utils->transfers_onhold){
+    DEBUG_PUTS("Reach max concurrent connections threshold, auto performing connections on hold ...");
+    concord_dispatch(concord);
+  }
 }
 
-static void
-_concord_utils_init(char token[], concord_utils_st *new_utils)
+static concord_utils_st*
+_concord_utils_init(char token[])
 {
+  concord_utils_st *new_utils = safe_malloc(sizeof *new_utils);
+
   new_utils->loop = uv_default_loop();
 
   new_utils->token = strndup(token, strlen(token)-1);
@@ -63,6 +69,8 @@ _concord_utils_init(char token[], concord_utils_st *new_utils)
 
   new_utils->header = dictionary_init();
   dictionary_build(new_utils->header, HEADER_DICTIONARY_SIZE);
+
+  return new_utils;
 }
 
 static void
@@ -94,6 +102,8 @@ _concord_utils_destroy(concord_utils_st *utils)
   safe_free(utils->client_buckets);
 
   safe_free(utils->token);
+
+  safe_free(utils);
 }
 
 concord_st*
@@ -101,7 +111,7 @@ concord_init(char token[])
 {
   concord_st *new_concord = safe_malloc(sizeof *new_concord);
 
-  _concord_utils_init(token, &new_concord->utils);
+  new_concord->utils = _concord_utils_init(token);
 
   new_concord->channel = concord_channel_init(&new_concord->utils);
   new_concord->guild = concord_guild_init(&new_concord->utils);
@@ -114,7 +124,7 @@ concord_init(char token[])
 void
 concord_cleanup(concord_st *concord)
 {
-  _concord_utils_destroy(&concord->utils);
+  _concord_utils_destroy(concord->utils);
 
   concord_channel_destroy(concord->channel);
   concord_guild_destroy(concord->guild);

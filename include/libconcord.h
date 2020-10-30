@@ -127,72 +127,8 @@ typedef struct {
   jscon_item_st *guilds;
 } concord_user_st;
 
-struct concord_response_s {
-  char *str;
-  size_t size;
-};
-
-typedef void (concord_load_obj_ft)(void **p_object, struct concord_response_s *response_body);
-
-typedef struct concord_context_s {
-  uv_poll_t poll_handle;
-  curl_socket_t sockfd;
-} concord_context_st;
-
-struct concord_bucket_s; //forward declaration
-
-struct concord_conn_s {
-  concord_context_st *context;
-  CURL *easy_handle; //easy handle used to perform the request
-
-  struct concord_response_s response_body; //stores response body associated with the easy_handle
-
-  void **p_object; //hold onto object to be passed as a load_cb parameter
-  concord_load_obj_ft *load_cb; //object load callback
-
-  struct concord_bucket_s *p_bucket; //bucket this connection node is a part of
-};
-
-struct concord_utils_s; //forward declaration
-
-struct concord_bucket_s {
-  char *hash_key;
-
-  uv_timer_t timer;
-  int remaining;
-
-  struct concord_conn_s **queue;
-  size_t num_conn;
-  size_t bottom;
-  size_t top;
-
-  struct concord_utils_s *p_utils;
-};
-
-typedef struct concord_utils_s {
-  struct curl_slist *request_header; /* the default request header sent to discord servers */
-
-  struct dictionary_s *header; /* this holds the http response header */
-
-  CURLM *multi_handle;
-  int transfers_onhold;
-  int transfers_running;
-
-  uv_loop_t *loop;
-  uv_timer_t timeout;
-
-  struct concord_bucket_s **client_buckets;
-  size_t num_buckets;
-
-  struct dictionary_s *bucket_dict; //get buckets by their endpoints/major parameters
-
-  char *token; /* @todo hash/unhash token */
-} concord_utils_st;
-
-
 typedef struct concord_s {
-  /* utils can be expanded to the concord_st container via casting */
-  concord_utils_st utils;
+  struct concord_utils_s *utils;
 
   concord_channel_st *channel;
   concord_user_st *user;

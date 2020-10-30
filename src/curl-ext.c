@@ -4,11 +4,10 @@
 #include <ctype.h>
 
 #include <libconcord.h>
-#include "curl-ext.h"
+#include "concord-common.h"
 
 #include "hashtable.h"
 #include "debug.h"
-#include "concord-common.h"
 
 
 /* @todo create distinction between bot and user token */

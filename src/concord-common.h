@@ -50,7 +50,6 @@ enum discord_snowflake {
   SNOWFLAKE_TIMESTAMP           = 64,
 };
 
-
 /* ENDPOINTS */
 #define CHANNELS           "/channels/%s"
 #define CHANNELS_MESSAGES  CHANNELS"/messages"
@@ -61,6 +60,73 @@ enum discord_snowflake {
 #define USERS              "/users/%s"
 #define USERS_GUILDS       USERS"/guilds"
 
+
+struct concord_context_s {
+  uv_poll_t poll_handle;
+  curl_socket_t sockfd;
+};
+
+struct concord_response_s {
+  char *str;
+  size_t size;
+};
+
+typedef void (concord_load_obj_ft)(void **p_object, struct concord_response_s *response_body);
+
+struct concord_conn_s {
+  struct concord_context_s *context;
+  CURL *easy_handle; //easy handle used to perform the request
+
+  struct concord_response_s response_body; //stores response body associated with the easy_handle
+
+  void **p_object; //hold onto object to be passed as a load_cb parameter
+  concord_load_obj_ft *load_cb; //object load callback
+
+  struct concord_bucket_s *p_bucket; //bucket this connection node is a part of
+};
+/*
+struct concord_list_s {
+  struct concord_conn_s *conn;
+  struct concord_list_s *next;
+};
+*/
+struct concord_bucket_s {
+  char *hash_key;
+
+  uv_timer_t timer;
+  int remaining;
+/*
+  struct concord_list_s *active_conns;
+  size_t num_active;
+*/
+  struct concord_conn_s **queue_conns;
+  size_t num_queue;
+  size_t bottom;
+  size_t top;
+
+  struct concord_utils_s *p_utils;
+};
+
+typedef struct concord_utils_s {
+  char *token; /* @todo hash/unhash token */
+
+  struct curl_slist *request_header; /* the default request header sent to discord servers */
+
+  CURLM *multi_handle;
+  int transfers_onhold;
+  int transfers_running;
+
+  uv_loop_t *loop;
+  uv_timer_t timeout;
+
+  struct concord_bucket_s **client_buckets;
+  size_t num_buckets;
+
+  struct dictionary_s *bucket_dict; //get buckets by their endpoints/major parameters
+  struct dictionary_s *header; /* holds the http response header */
+} concord_utils_st;
+
+
 /* memory.c */
 
 void __safe_free(void **p_ptr);
@@ -69,7 +135,7 @@ void* __safe_malloc(size_t size, unsigned long line, char file[]);
 #define safe_malloc(n) __safe_malloc(n, __LINE__, __FILE__)
 
 /*************/
-/* http.c */
+/* concord-common.c */
 
 /* 
   @param utils contains tools common to every request
@@ -84,7 +150,7 @@ void* __safe_malloc(size_t size, unsigned long line, char file[]);
     endpoint
 */
 void Concord_http_request(
-    concord_utils_st *utils,
+    concord_st *concord,
     void **p_object,
     concord_load_obj_ft *load_cb,
     enum http_method http_method,
@@ -92,14 +158,16 @@ void Concord_http_request(
     ...);
 
 /*************/
-/* dispatch.c */
+/* concord-dispatch.c */
+
 
 int Curl_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
 int Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
 void Concord_synchronous_perform(concord_utils_st *utils, struct concord_conn_s *conn);
 
 /*************/
-/* ratelimit.c */
+/* concord-ratelimit.c */
+
 
 char* Concord_tryget_major(char endpoint[]);
 long long Concord_parse_ratelimit_header(struct dictionary_s *header, bool use_clock);
@@ -115,6 +183,17 @@ struct concord_bucket_s *Concord_get_hashbucket(concord_utils_st *utils, char bu
 void Concord_bucket_build(concord_utils_st *utils, void **p_object, concord_load_obj_ft *load_cb, enum http_method http_method, char bucket_key[], char url_route[]);
 
 /*************/
+/* curl-ext.c */
+
+size_t Curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata);
+size_t Curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata);
+
+struct curl_slist* Curl_request_header_init(concord_utils_st *utils);
+CURL* Curl_easy_default_init(concord_utils_st *utils, struct concord_conn_s *conn);
+CURLM* Curl_multi_default_init(concord_utils_st *utils);
+
+void Curl_set_method(struct concord_conn_s *conn, enum http_method method);
+void Curl_set_url(struct concord_conn_s *conn, char endpoint[]);
 
 
 #endif

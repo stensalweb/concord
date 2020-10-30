@@ -8,11 +8,11 @@
 #include "debug.h"
 
 
-static concord_context_st*
+static struct concord_context_s*
 _concord_context_init(concord_utils_st *utils, curl_socket_t sockfd)
 {
   DEBUG_PUTS("Creating new context");
-  concord_context_st *new_context = safe_malloc(sizeof *new_context);
+  struct concord_context_s *new_context = safe_malloc(sizeof *new_context);
 
   new_context->sockfd = sockfd;
 
@@ -28,12 +28,12 @@ static void
 _uv_context_destroy_cb(uv_handle_t *handle)
 {
   DEBUG_PUTS("Destroying context");
-  concord_context_st *context = (concord_context_st*)handle;
+  struct concord_context_s *context = (struct concord_context_s*)handle;
   safe_free(context);
 }
 
 static void
-_concord_context_destroy(concord_context_st *context)
+_concord_context_destroy(struct concord_context_s *context)
 {
   uv_close((uv_handle_t*)&context->poll_handle, &_uv_context_destroy_cb);
 }
@@ -158,7 +158,7 @@ static void
 _uv_perform_cb(uv_poll_t *req, int status, int events)
 {
   concord_utils_st *utils = req->data;
-  concord_context_st *context = (concord_context_st*)req;
+  struct concord_context_s *context = (struct concord_context_s*)req;
 
   int flags = 0;
   if (events & UV_READABLE) flags |= CURL_CSELECT_IN;
@@ -207,14 +207,14 @@ Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void 
   CURLMcode mcode;
   int uvcode;
   int events = 0;
-  concord_context_st *context;
+  struct concord_context_s *context;
 
 
   switch (action){
   case CURL_POLL_IN:
   case CURL_POLL_OUT:
       if (NULL != p_socket){
-        context = (concord_context_st*)p_socket;
+        context = (struct concord_context_s*)p_socket;
       } else {
         context = _concord_context_init(utils, sockfd);
       }
@@ -230,10 +230,10 @@ Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void 
       break;
   case CURL_POLL_REMOVE:
       if (NULL != p_socket){
-        uvcode = uv_poll_stop(&((concord_context_st*)p_socket)->poll_handle);
+        uvcode = uv_poll_stop(&((struct concord_context_s*)p_socket)->poll_handle);
         DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
-        _concord_context_destroy((concord_context_st*)p_socket);
+        _concord_context_destroy((struct concord_context_s*)p_socket);
 
         mcode = curl_multi_assign(utils->multi_handle, sockfd, NULL);
         DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
@@ -250,7 +250,7 @@ Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void 
 void
 concord_dispatch(concord_st *concord)
 {
-  concord_utils_st *utils = &concord->utils;
+  concord_utils_st *utils = concord->utils;
 
   Concord_start_client_buckets(utils);
 
