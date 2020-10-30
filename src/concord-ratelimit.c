@@ -42,6 +42,27 @@ Concord_parse_ratelimit_header(dictionary_st *header, bool use_clock)
   return reset_after;
 }
 
+/* appends new connection node to the end of the list */
+static struct concord_conn_s*
+_concord_conn_init(concord_utils_st *utils, char bucket_key[])
+{
+  DEBUG_ASSERT(NULL != bucket_key, "Bucket key not specified (NULL)");
+
+  struct concord_conn_s *new_conn = safe_malloc(sizeof *new_conn);
+
+  new_conn->easy_handle = Curl_easy_default_init(utils, new_conn);
+
+  return new_conn;
+}
+
+static void
+_concord_conn_destroy(struct concord_conn_s *conn)
+{
+  curl_easy_cleanup(conn->easy_handle);
+  safe_free(conn->response_body.str);
+  safe_free(conn);
+}
+
 static void
 _concord_client_buckets_append(concord_utils_st *utils, struct concord_bucket_s *bucket)
 {
@@ -62,9 +83,15 @@ _concord_bucket_destroy(void *ptr)
 {
   struct concord_bucket_s *bucket = ptr;
 
+  for (size_t i=0; i < bucket->num_conn; ++i){
+    if (bucket->queue[i]){
+      _concord_conn_destroy(bucket->queue[i]);
+    }
+  }
   safe_free(bucket->queue);
 
   safe_free(bucket->hash_key);
+
   safe_free(bucket);
 }
 
@@ -181,37 +208,6 @@ Concord_get_hashbucket(concord_utils_st *utils, char bucket_hash[])
 
   DEBUG_PUTS("Returning new bucket");
   return bucket;
-}
-
-/* @param ptr is NULL because we want to pass this function as a
-    destructor callback to dictionary_set, which only accepts
-    destructors with void* param */
-static void
-_concord_conn_destroy(void *ptr)
-{
-  struct concord_conn_s *conn = ptr;
-
-  curl_easy_cleanup(conn->easy_handle);
-  safe_free(conn->response_body.str);
-  safe_free(conn);
-}
-
-/* appends new connection node to the end of the list */
-static struct concord_conn_s*
-_concord_conn_init(concord_utils_st *utils, char bucket_key[])
-{
-  DEBUG_ASSERT(NULL != bucket_key, "Bucket key not specified (NULL)");
-
-  struct concord_conn_s *new_conn = safe_malloc(sizeof *new_conn);
-
-  new_conn->easy_handle = Curl_easy_default_init(utils, new_conn);
-
-  char easy_key[18];
-  sprintf(easy_key, "%p", new_conn->easy_handle);
-  void *tmp = dictionary_set(utils->easy_dict, easy_key, new_conn, &_concord_conn_destroy);
-  DEBUG_ASSERT(NULL != tmp, "Couldn't add new_conn to dictionary");
-
-  return new_conn;
 }
 
 void

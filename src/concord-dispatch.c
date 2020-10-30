@@ -74,16 +74,20 @@ _concord_429_handle(struct concord_response_s *response_body)
 }
 
 static void
-_concord_conn_response_perform(concord_utils_st *utils, struct concord_conn_s *conn)
+_concord_conn_response_perform(concord_utils_st *utils, CURL *easy_handle)
 {
   enum discord_http_code http_code; /* http response code */
   char *url = NULL; /* URL from request */
+  struct concord_conn_s *conn; /* conn referenced by this easy_handle */
   
   CURLcode ecode;
-  ecode = curl_easy_getinfo(conn->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
+  ecode = curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
-  ecode = curl_easy_getinfo(conn->easy_handle, CURLINFO_EFFECTIVE_URL, &url);
+  ecode = curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
+  DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
+
+  ecode = curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &conn);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
   DEBUG_PRINT("Conn URL: %s", url);
@@ -132,6 +136,7 @@ _concord_tryperform_response(concord_utils_st *utils)
   /* These are related to the current easy_handle being read */
   CURLMsg *msg; /* for picking up messages with the transfer status */
   int pending; /*how many messages are left */
+  CURL *easy_handle;
 
   /* search for completed easy_handle transfers, and perform the
       instructions given by the transfer response */
@@ -139,17 +144,13 @@ _concord_tryperform_response(concord_utils_st *utils)
   {
     if (CURLMSG_DONE != msg->msg)
       continue;
-
+    
     DEBUG_PRINT("Transfers Running: %d\n\tTransfers On Hold: %d", utils->transfers_running, utils->transfers_onhold);
+    
+    easy_handle = msg->easy_handle;
+    curl_multi_remove_handle(utils->multi_handle, easy_handle);
 
-    /* Find out which handle this message is about */
-    char easy_key[18];
-    sprintf(easy_key, "%p", msg->easy_handle);
-    struct concord_conn_s *conn = dictionary_get(utils->easy_dict, easy_key);
-
-    curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
-
-    _concord_conn_response_perform(utils, conn);
+    _concord_conn_response_perform(utils, easy_handle);
   }
 }
 

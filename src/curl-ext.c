@@ -106,6 +106,9 @@ Curl_easy_default_init(concord_utils_st *utils, struct concord_conn_s *conn)
   ecode = curl_easy_setopt(new_easy_handle, CURLOPT_FOLLOWLOCATION, 1L);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
+  ecode = curl_easy_setopt(new_easy_handle, CURLOPT_PRIVATE, conn);
+  DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
+
   // SET CURL_EASY CALLBACKS //
   ecode = curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &Curl_body_cb);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));

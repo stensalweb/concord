@@ -156,18 +156,17 @@ struct concord_conn_s {
 struct concord_utils_s; //forward declaration
 
 struct concord_bucket_s {
-  struct concord_utils_s *p_utils;
+  char *hash_key;
 
   uv_timer_t timer;
   int remaining;
 
-  char *hash_key;
-
   struct concord_conn_s **queue;
   size_t num_conn;
-
   size_t bottom;
   size_t top;
+
+  struct concord_utils_s *p_utils;
 };
 
 typedef struct concord_utils_s {
@@ -175,10 +174,11 @@ typedef struct concord_utils_s {
 
   struct dictionary_s *header; /* this holds the http response header */
 
-  uv_loop_t *loop;
   CURLM *multi_handle;
   int transfers_onhold;
   int transfers_running;
+
+  uv_loop_t *loop;
   uv_timer_t timeout;
 
   struct concord_bucket_s **client_buckets;
@@ -186,17 +186,12 @@ typedef struct concord_utils_s {
 
   struct dictionary_s *bucket_dict; //get buckets by their endpoints/major parameters
 
-  /* get connection nodes by their easy_handle unique address
-      @todo this will be rendered useless I switch to sockets */
-  struct dictionary_s *easy_dict;
-
   char *token; /* @todo hash/unhash token */
 } concord_utils_st;
 
 
 typedef struct concord_s {
-  /* because of alignment, utils can be expanded to the concord_st its a part of
-      concord == (concord_st)concord->utils */
+  /* utils can be expanded to the concord_st container via casting */
   concord_utils_st utils;
 
   concord_channel_st *channel;

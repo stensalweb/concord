@@ -61,9 +61,6 @@ _concord_utils_init(char token[], concord_utils_st *new_utils)
   new_utils->bucket_dict = dictionary_init();
   dictionary_build(new_utils->bucket_dict, BUCKET_DICTIONARY_SIZE);
 
-  new_utils->easy_dict = dictionary_init();
-  dictionary_build(new_utils->easy_dict, CONN_DICTIONARY_SIZE);
-
   new_utils->header = dictionary_init();
   dictionary_build(new_utils->header, HEADER_DICTIONARY_SIZE);
 }
@@ -92,7 +89,6 @@ _concord_utils_destroy(concord_utils_st *utils)
   curl_multi_cleanup(utils->multi_handle);
 
   dictionary_destroy(utils->bucket_dict);
-  dictionary_destroy(utils->easy_dict);
   dictionary_destroy(utils->header);
 
   safe_free(utils->client_buckets);
