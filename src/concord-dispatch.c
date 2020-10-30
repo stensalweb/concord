@@ -54,12 +54,19 @@ _uv_add_remaining_cb(uv_timer_t *req)
 static long long
 _concord_429_handle(struct concord_response_s *response_body)
 {
-  DEBUG_PUTS("Being ratelimited");
+  char message[150] = {0};
+  long long retry_after;
+  bool global;
 
-  jscon_item_st *item = jscon_parse(response_body->str);
+  jscon_scanf(response_body->str,
+    "#message%ls " \
+    "#retry_after%jd " \
+    "#global%jb",
+     message,
+     &retry_after,
+     &global);
 
-  bool global = jscon_get_boolean(jscon_get_branch(item, "global"));
-  long long retry_after = jscon_get_double(jscon_get_branch(item, "retry_after"));
+  DEBUG_PRINT("Being ratelimited:\t%s", message);
 
   if (global == true){
     DEBUG_PRINT("Global ratelimit, retrying after %lld seconds", retry_after);
@@ -68,7 +75,8 @@ _concord_429_handle(struct concord_response_s *response_body)
     retry_after = 0;
   }
 
-  jscon_destroy(item);
+  safe_free(response_body->str);
+  response_body->size = 0;
 
   return retry_after * 1000;
 }

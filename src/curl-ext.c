@@ -96,8 +96,8 @@ Curl_easy_default_init(concord_utils_st *utils, struct concord_conn_s *conn)
 
   CURLcode ecode;
   /*
-  DEBUG_EXEC( ecode = curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 2L) );
-  DEBUG_EXEC( DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode)) );
+  DEBUG_ONLY( ecode = curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 2L) );
+  DEBUG_ONLY( DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode)) );
   */
   ecode = curl_easy_setopt(new_easy_handle, CURLOPT_HTTPHEADER, utils->request_header);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));

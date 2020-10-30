@@ -28,7 +28,7 @@
   } while(0)
 
   /* @param snippet to be executed if debug mode is active */
-  #define DEBUG_EXEC(arg) (arg)
+  #define DEBUG_ONLY(arg) (arg)
 
 #else /* DEBUG MODE INNACTIVE */
 
@@ -40,7 +40,7 @@
   #include <assert.h>
   #define DEBUG_ASSERT(expr, msg) assert(expr)
 
-  #define DEBUG_EXEC(arg)
+  #define DEBUG_ONLY(arg)
 
 #endif
 

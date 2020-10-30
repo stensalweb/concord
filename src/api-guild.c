@@ -71,12 +71,12 @@ _concord_load_guild(void **p_guild, struct concord_response_s *response_body)
   concord_guild_st *guild = *p_guild;
 
   jscon_scanf(response_body->str,
-     "#id%js \
-      #name%js \
-      #icon%js \
-      #owner%jb \
-      #permissions%jd \
-      #permissions_new%js",
+     "#id%js " \
+     "#name%js " \
+     "#icon%js " \
+     "#owner%jb " \
+     "#permissions%jd " \
+     "#permissions_new%js",
       guild->id,
       guild->name,
       guild->icon,
