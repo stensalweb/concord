@@ -4,29 +4,38 @@
 #include <libconcord.h>
 #include "concord-common.h"
 
+#include "debug.h"
+
 
 /* @todo instead of exit(), it should throw the error
     somewhere */
 //this is redefined as a macro
 void*
-__safe_malloc(size_t size, unsigned long line, char file[])
+__safe_malloc(size_t size, const char file[], const int line, const char func[])
 {
   void *ptr = calloc(1, size);
 
   if (NULL == ptr){
-    fprintf(stderr, "[%s:%lu] Out of memory(%ld bytes)\n", file, line, size);
+    fprintf(stderr, "[%s:%d] %s()\n\tOut of memory(%ld bytes)\n", file, line, func, size);
     abort();
   }
+#if CONCORD_MEMDEBUG_MODE == 1
+  fprintf(stderr, "[%s:%d] %s()\n\tAlloc:\t%p(%ld bytes)\n", file, line, func, ptr, size);
+#endif
 
   return ptr;
 }
 
 //this is redefined as a macro
 void
-__safe_free(void **p_ptr)
+__safe_free(void **p_ptr, const char file[], const int line, const char func[])
 {
-  if(NULL != p_ptr){
+  if(*p_ptr){
     free(*p_ptr);
+#if CONCORD_MEMDEBUG_MODE == 1
+    fprintf(stderr, "[%s:%d] %s()\n\tFree:\t%p\n", file, line, func, *p_ptr);
+#endif
+
     *p_ptr = NULL;
   } 
 }

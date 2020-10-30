@@ -7,7 +7,6 @@
 #define MAX_CONCURRENT_CONNS  15
 
 #define BUCKET_DICTIONARY_SIZE  30
-#define CONN_DICTIONARY_SIZE    100
 #define HEADER_DICTIONARY_SIZE  15
 
 enum discord_limits {
@@ -129,10 +128,10 @@ typedef struct concord_utils_s {
 
 /* memory.c */
 
-void __safe_free(void **p_ptr);
-#define safe_free(n) __safe_free((void**)&n)
-void* __safe_malloc(size_t size, unsigned long line, char file[]);
-#define safe_malloc(n) __safe_malloc(n, __LINE__, __FILE__)
+void __safe_free(void **p_ptr, const char file[], const int line, const char func[]);
+#define safe_free(n) __safe_free((void**)&(n), __FILE__, __LINE__, __func__)
+void* __safe_malloc(size_t size, const char file[], const int line, const char func[]);
+#define safe_malloc(n) __safe_malloc(n, __FILE__, __LINE__, __func__)
 
 /*************/
 /* concord-common.c */
