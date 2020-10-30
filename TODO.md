@@ -4,10 +4,10 @@ This document describes features to be incorporated in the future.
 
 ## HIGH
 
+- When being ratelimited per-route, I should "freeze" every connection sharing that bucket (even if its already running)
 - Implement Discord Gateway (WebSockets) support
   - Intuitive event handler
   - Resume logic on error
-- [Check rate-limits dynamically](https://discord.com/developers/docs/topics/rate-limits#rate-limits)
 - Hashtable size should be dynamically increased as necessary
 - Token should go through a hashing and dehashing function
 
