@@ -49,6 +49,25 @@ _uv_add_remaining_cb(uv_timer_t *req)
   } while (bucket->remaining--);
 }
 
+static void
+_concord_load_obj_perform(struct concord_conn_s *conn)
+{
+  (*conn->load_cb)(conn->p_object, &conn->response_body);
+
+  conn->p_object = NULL;
+
+  safe_free(conn->response_body.str);
+  conn->response_body.size = 0;
+}
+
+static long long
+_concord_200_handle(concord_utils_st *utils, struct concord_conn_s *conn)
+{
+  _concord_load_obj_perform(conn);
+
+  return Concord_bucket_get_delay(conn->p_bucket, utils->header, true);
+}
+
 /* if is global, then sleep for x amount inside the function and
     return 0, otherwise return the retry_after amount in ms */
 static long long
@@ -70,81 +89,63 @@ _concord_429_handle(struct concord_response_s *response_body)
 
   if (global == true){
     DEBUG_PRINT("Global ratelimit, retrying after %lld seconds", retry_after);
-    uv_sleep(retry_after * 1000);
-
+    uv_sleep(retry_after*1000);
     retry_after = 0;
   }
 
   safe_free(response_body->str);
   response_body->size = 0;
 
-  return retry_after * 1000;
+  return retry_after*1000;
 }
 
-static void
-_concord_conn_response_perform(concord_utils_st *utils, CURL *easy_handle)
+static long long
+_concord_http_response_parse(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   enum discord_http_code http_code; /* http response code */
   char *url = NULL; /* URL from request */
-  struct concord_conn_s *conn; /* conn referenced by this easy_handle */
   
   CURLcode ecode;
-  ecode = curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
+  ecode = curl_easy_getinfo(conn->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
-  ecode = curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
-  DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
-
-  ecode = curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &conn);
+  ecode = curl_easy_getinfo(conn->easy_handle, CURLINFO_EFFECTIVE_URL, &url);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
   DEBUG_PRINT("Conn URL: %s", url);
 
-  long long delay_ms;
   switch (http_code){
-  case DISCORD_OK: /* 200 */
-      (*conn->load_cb)(conn->p_object, &conn->response_body);
-
-      conn->p_object = NULL;
-
-      safe_free(conn->response_body.str);
-      conn->response_body.size = 0;
-
-      conn->p_bucket->remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
-      DEBUG_PRINT("Ratelimit remaining: %d", conn->p_bucket->remaining);
-
-      if (!conn->p_bucket->remaining){
-        delay_ms = Concord_parse_ratelimit_header(utils->header, true);
-      } else {
-        delay_ms = 0;
-      }
-      break;
-  case DISCORD_TOO_MANY_REQUESTS: /* 429 */
-      delay_ms = _concord_429_handle(&conn->response_body);
-      break;
-  case CURL_NO_RESPONSE: /* 0 */
-      /* @todo look into this, for some reason sometimes the easy handle
-          has an empty url, which gives us a 0 http_code response */
-      // !url means URL string is NULL , !*url means URL string is empty
+  case DISCORD_OK: return _concord_200_handle(utils, conn);
+  case DISCORD_TOO_MANY_REQUESTS: return _concord_429_handle(&conn->response_body);
+  case CURL_NO_RESPONSE: 
       DEBUG_ASSERT(!url || !*url, "No server response has been received");
-      return;
+      return 0; 
   default:
-      DEBUG_PRINT("HTTP CODE: %d", http_code);
+      DEBUG_PRINT("Found not yet implemented HTTP Code: %d", http_code);
       abort();
   }
-  
-  /* after delay_ms time has elapsed, the event loop will add the
-      remaining connections to the multi stack (if there are any) */
+}
+
+
+static void
+_concord_asynchronous_perform(concord_utils_st *utils, CURL *easy_handle)
+{
+  CURLcode ecode;
+  struct concord_conn_s *conn; /* conn referenced by this easy_handle */
+  ecode = curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &conn);
+  DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
+
+  long long delay_ms = _concord_http_response_parse(utils, conn);
+  /* after delay_ms time has elapsed, the event loop will add the remaining connections to the multi stack (if there are any) */
   uv_timer_start(&conn->p_bucket->timer, &_uv_add_remaining_cb, delay_ms, 0);
 }
 
 static void
-_concord_tryperform_response(concord_utils_st *utils)
+_concord_tryperform_asynchronous(concord_utils_st *utils)
 {
   /* These are related to the current easy_handle being read */
   CURLMsg *msg; /* for picking up messages with the transfer status */
   int pending; /*how many messages are left */
-  CURL *easy_handle;
 
   /* search for completed easy_handle transfers, and perform the
       instructions given by the transfer response */
@@ -155,10 +156,9 @@ _concord_tryperform_response(concord_utils_st *utils)
     
     DEBUG_PRINT("Transfers Running: %d\n\tTransfers On Hold: %d", utils->transfers_running, utils->transfers_onhold);
     
-    easy_handle = msg->easy_handle;
-    curl_multi_remove_handle(utils->multi_handle, easy_handle);
+    curl_multi_remove_handle(utils->multi_handle, msg->easy_handle);
 
-    _concord_conn_response_perform(utils, easy_handle);
+    _concord_asynchronous_perform(utils, msg->easy_handle);
   }
 }
 
@@ -175,7 +175,7 @@ _uv_perform_cb(uv_poll_t *req, int status, int events)
   CURLMcode mcode = curl_multi_socket_action(utils->multi_handle, context->sockfd, flags, &utils->transfers_running);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
-  _concord_tryperform_response(utils);
+  _concord_tryperform_asynchronous(utils);
 }
 
 static void
@@ -186,7 +186,7 @@ _uv_on_timeout_cb(uv_timer_t *req)
   CURLMcode mcode = curl_multi_socket_action(utils->multi_handle, CURL_SOCKET_TIMEOUT, 0, &utils->transfers_running);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
-  _concord_tryperform_response(utils);
+  _concord_tryperform_asynchronous(utils);
 }
 
 int
@@ -277,21 +277,7 @@ Concord_synchronous_perform(concord_utils_st *utils, struct concord_conn_s *conn
   CURLcode ecode = curl_easy_perform(conn->easy_handle);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
-  if (NULL != conn->response_body.str){
-    int remaining = dictionary_get_strtoll(utils->header, "x-ratelimit-remaining");
-    DEBUG_PRINT("Remaining connections: %d", remaining);
-    if (0 == remaining){
-      long long delay_ms = Concord_parse_ratelimit_header(utils->header, false);
-      DEBUG_PRINT("Delay_ms: %lld", delay_ms);
-      uv_sleep(delay_ms);
-    }
+  long long delay_ms = _concord_http_response_parse(utils, conn);
 
-    //DEBUG_PUTS(conn->response_body.str);
-    (*conn->load_cb)(conn->p_object, &conn->response_body);
-
-    conn->p_object = NULL;
-
-    safe_free(conn->response_body.str);
-    conn->response_body.size = 0;
-  }
+  uv_sleep(delay_ms);
 }

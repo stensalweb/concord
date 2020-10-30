@@ -30,7 +30,6 @@ Concord_parse_ratelimit_header(dictionary_st *header, bool use_clock)
     long long utc = te.tv_sec*1000 + te.tv_usec/1000; //calculate milliseconds
     long long reset = dictionary_get_strtoll(header, "x-ratelimit-reset") * 1000;
     long long delay_ms = reset - utc;
-
     if (delay_ms < 0){
       delay_ms = 0;
     }
@@ -38,7 +37,27 @@ Concord_parse_ratelimit_header(dictionary_st *header, bool use_clock)
     return delay_ms;
   }
 
-  return reset_after;
+  return reset_after*1000;
+}
+
+long long
+Concord_bucket_get_delay(struct concord_bucket_s *bucket, dictionary_st *header, bool use_clock)
+{
+  int remaining = dictionary_get_strtoll(header, "x-ratelimit-remaining");
+  DEBUG_PRINT("Ratelimit remaining: %d", remaining);
+
+  long long delay_ms;
+  if (!remaining){
+    delay_ms = Concord_parse_ratelimit_header(header, use_clock);
+  } else {
+    delay_ms = 0;
+  }
+  
+  if (NULL != bucket){
+    bucket->remaining = remaining;
+  }
+
+  return delay_ms;
 }
 
 static struct concord_conn_s*
