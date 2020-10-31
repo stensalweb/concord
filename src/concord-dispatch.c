@@ -38,15 +38,29 @@ _concord_context_destroy(struct concord_context_s *context)
   uv_close((uv_handle_t*)&context->poll_handle, &_uv_context_destroy_cb);
 }
 
+/* @todo move to concord-ratelimit.c */
 static void
 _uv_add_remaining_cb(uv_timer_t *req)
 {
-  DEBUG_PUTS("Updating bucket queue");
+  DEBUG_PUTS("Adding remainining conns");
   struct concord_bucket_s *bucket = req->data;
+
+  bucket->queue.bottom_running = bucket->queue.separator;
 
   do {
     Concord_queue_pop(bucket->p_utils, &bucket->queue);
   } while (bucket->remaining--);
+
+  DEBUG_PRINT("Bucket Hash:\t%s\n\t" \
+              "Queue Size:\t%ld\n\t" \
+              "Queue Bottom:\t%ld\n\t" \
+              "Queue Separator:%ld\n\t" \
+              "Queue Top:\t%ld",
+              bucket->hash_key,
+              bucket->queue.size,
+              bucket->queue.bottom_running,
+              bucket->queue.separator,
+              bucket->queue.top_onhold);
 }
 
 static void
@@ -65,19 +79,54 @@ _concord_200_action(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   _concord_load_obj_perform(conn);
 
+  curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
+  conn->status = INNACTIVE;
+
   return Concord_parse_ratelimit_header(conn->p_bucket, utils->header, true);
+}
+
+static void
+_concord_queue_pause(struct concord_queue_s *queue)
+{
+  /* @todo this is not an optimal solution, doing transfer status
+      per bucket instead of per connection would be quicker */
+  for (size_t i = queue->bottom_running; i < queue->separator; ++i){
+    if (RUNNING != queue->conns[i]->status)
+      continue;
+
+    concord_utils_st *utils = ((struct concord_bucket_s*)queue)->p_utils;
+    curl_multi_remove_handle(utils->multi_handle, queue->conns[i]->easy_handle);
+    queue->conns[i]->status = PAUSE; 
+  }
+}
+
+static void
+_uv_queue_resume_cb(uv_timer_t *req)
+{
+  struct concord_queue_s *queue = req->data;
+
+  /* @todo this is not an optimal solution, doing transfer status
+      per bucket instead of per connection would be quicker */
+  for (size_t i = queue->bottom_running; i < queue->separator; ++i){
+    if (PAUSE != queue->conns[i]->status)
+      continue;
+
+    concord_utils_st *utils = ((struct concord_bucket_s*)queue)->p_utils;
+    curl_multi_add_handle(utils->multi_handle, queue->conns[i]->easy_handle);
+    queue->conns[i]->status = RUNNING; 
+  }
 }
 
 /* if is global, then sleep for x amount inside the function and
     return 0, otherwise return the retry_after amount in ms */
 static long long
-_concord_429_action(struct concord_response_s *response_body)
+_concord_429_action(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   char message[256] = {0};
   long long retry_after;
   bool global;
 
-  jscon_scanf(response_body->str,
+  jscon_scanf(conn->response_body.str,
     "#message%ls " \
     "#retry_after%jd " \
     "#global%jb",
@@ -87,16 +136,24 @@ _concord_429_action(struct concord_response_s *response_body)
 
   DEBUG_PRINT("Being ratelimited:\t%s", message);
 
-  if (global == true){
+  if (true == global){
     DEBUG_PRINT("Global ratelimit, retrying after %lld seconds", retry_after);
     uv_sleep(retry_after*1000);
     retry_after = 0;
+
+    curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
+    conn->status = PAUSE;
+  }
+  else {
+    /* @todo this will break when performing synchronous transfers */
+    _concord_queue_pause(&conn->p_bucket->queue);
+    uv_timer_start(&conn->p_bucket->timer, &_uv_queue_resume_cb, retry_after*1000, 0);
   }
 
-  safe_free(response_body->str);
-  response_body->size = 0;
+  safe_free(conn->response_body.str);
+  conn->response_body.size = 0;
 
-  return retry_after*1000;
+  return -1;
 }
 
 static long long
@@ -114,18 +171,24 @@ _concord_http_response_action(concord_utils_st *utils, struct concord_conn_s *co
 
   DEBUG_PRINT("Conn URL: %s", url);
 
+  long long delay_ms; /* delay_ms retrieved from http action */
   switch (http_code){
   case DISCORD_OK:
-      return _concord_200_action(utils, conn);
+      delay_ms = _concord_200_action(utils, conn);
+      break;
   case DISCORD_TOO_MANY_REQUESTS:
-      return _concord_429_action(&conn->response_body);
+      delay_ms = _concord_429_action(utils, conn);
+      break;
   case CURL_NO_RESPONSE: 
       DEBUG_ASSERT(!url || !*url, "No server response has been received");
-      return 0; 
+      delay_ms = -1; /* @todo is this ok? */
+      break;
   default:
       DEBUG_PRINT("Found not yet implemented HTTP Code: %d", http_code);
       abort();
   }
+
+  return delay_ms;
 }
 
 
@@ -138,7 +201,9 @@ _concord_asynchronous_perform(concord_utils_st *utils, CURL *easy_handle)
 
   long long delay_ms = _concord_http_response_action(utils, conn);
   /* after delay_ms time has elapsed, the event loop will add the remaining connections to the multi stack (if there are any) */
-  uv_timer_start(&conn->p_bucket->timer, &_uv_add_remaining_cb, delay_ms, 0);
+  if (delay_ms != -1){
+    uv_timer_start(&conn->p_bucket->timer, &_uv_add_remaining_cb, delay_ms, 0);
+  }
 }
 
 static void
@@ -157,8 +222,6 @@ _concord_tryperform_asynchronous(concord_utils_st *utils)
     
     DEBUG_PRINT("Transfers Running: %d\n\tTransfers On Hold: %d", utils->transfers_running, utils->transfers_onhold);
     
-    curl_multi_remove_handle(utils->multi_handle, msg->easy_handle);
-
     _concord_asynchronous_perform(utils, msg->easy_handle);
   }
 }

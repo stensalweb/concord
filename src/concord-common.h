@@ -76,22 +76,21 @@ struct concord_context_s {
 };
 
 struct concord_response_s {
-  char *str; /* content of response str */
-  size_t size; /* length of response str */
+  char *str;    /* content of response str */
+  size_t size;  /* length of response str */
 };
 
-/* transfer status associated with the bucket transfers  */
 enum transfer_status {
-  RUNNING,      /* transfer is awaiting server response */
-  PAUSED,       /* running transfer has been temporarily paused */
-  ON_HOLD,      /* transfer is waiting on queue, not running */
-  INNACTIVE,    /* transfer is completed or unused */
+  INNACTIVE = 0,  /* transfer is completed or unused */
+  RUNNING,        /* transfer is awaiting server response */
+  PAUSE,          /* running transfer has been temporarily paused */
+  ON_HOLD,        /* transfer is waiting on queue, not running */
 };
 
 typedef void (concord_load_obj_ft)(void **p_object, struct concord_response_s *response_body);
 
 struct concord_conn_s {
-  enum transfer_status status; /* bucket transfers status */
+  enum transfer_status status; /* conn transfer status */
 
   struct concord_context_s *context;
   CURL *easy_handle; /* easy handle that performs the request */
