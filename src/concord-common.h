@@ -2,12 +2,22 @@
 #define LIBCONCORD_COMMON_H_
 //#include <libconcord.h> (implicit) 
 
+
 #define BASE_URL "https://discord.com/api"
 
 #define MAX_CONCURRENT_CONNS  15
 
 #define BUCKET_DICTIONARY_SIZE  30
 #define HEADER_DICTIONARY_SIZE  15
+
+enum http_method {
+  NONE,
+  DELETE,
+  GET,
+  POST,
+  PATCH,
+  PUT,
+};
 
 enum discord_limits {
   MAX_NAME_LEN           = 100,
@@ -62,66 +72,79 @@ enum discord_snowflake {
 
 struct concord_context_s {
   uv_poll_t poll_handle;
-  curl_socket_t sockfd;
+  curl_socket_t sockfd; /* curl internal socket file descriptor */
 };
 
 struct concord_response_s {
-  char *str;
-  size_t size;
+  char *str; /* content of response str */
+  size_t size; /* length of response str */
+};
+
+/* transfer status associated with the bucket transfers  */
+enum transfer_status {
+  RUNNING,      /* transfer is awaiting server response */
+  PAUSED,       /* running transfer has been temporarily paused */
+  ON_HOLD,      /* transfer is waiting on queue, not running */
+  INNACTIVE,    /* transfer is completed or unused */
 };
 
 typedef void (concord_load_obj_ft)(void **p_object, struct concord_response_s *response_body);
 
 struct concord_conn_s {
+  enum transfer_status status; /* bucket transfers status */
+
   struct concord_context_s *context;
-  CURL *easy_handle; //easy handle used to perform the request
+  CURL *easy_handle; /* easy handle that performs the request */
 
-  struct concord_response_s response_body; //stores response body associated with the easy_handle
+  struct concord_response_s response_body; /* response body associated with the transfer */
 
-  void **p_object; //hold onto object to be passed as a load_cb parameter
-  concord_load_obj_ft *load_cb; //object load callback
+  concord_load_obj_ft *load_cb; /* load object callback */
+  void **p_object; /* object to be performed action at load_cb */
 
-  struct concord_bucket_s *p_bucket; //bucket this connection node is a part of
+  struct concord_bucket_s *p_bucket; /* bucket this conn is a part of */
 };
-/*
-struct concord_list_s {
-  struct concord_conn_s *conn;
-  struct concord_list_s *next;
+
+struct concord_queue_s {
+  struct concord_conn_s **conns; /* the conn queue itself */
+  size_t size; /* how many conns the queue supports (not how many conns it currently holds) */
+
+  /* bottom index of running conns queue partition */
+  size_t bottom_running;
+  /* top index of running conns partition
+      and bottom index of on hold partition */
+  size_t separator;
+  /* top index of on hold conns queue partition */
+  size_t top_onhold;
 };
-*/
+
 struct concord_bucket_s {
-  char *hash_key;
+  struct concord_queue_s queue; /* queue containing the bucket connections */
+
+  char *hash_key; /* per-route key given by the discord API */
 
   uv_timer_t timer;
-  int remaining;
-/*
-  struct concord_list_s *active_conns;
-  size_t num_active;
-*/
-  struct concord_conn_s **queue_conns;
-  size_t num_queue;
-  size_t bottom;
-  size_t top;
+  int remaining; /* conns available for simultaneous transfers */
 
   struct concord_utils_s *p_utils;
 };
 
+/* @todo hash/unhash token */
 typedef struct concord_utils_s {
-  char *token; /* @todo hash/unhash token */
+  char *token; /* bot/user token used as identification to the API */
 
   struct curl_slist *request_header; /* the default request header sent to discord servers */
 
   CURLM *multi_handle;
-  int transfers_onhold;
-  int transfers_running;
+  int transfers_onhold; /* current transfers on hold (waiting in queue)*/
+  int transfers_running; /* current running transfers */
 
-  uv_loop_t *loop;
+  uv_loop_t *loop; /* the event loop */
   uv_timer_t timeout;
 
-  struct concord_bucket_s **client_buckets;
-  size_t num_buckets;
+  struct concord_bucket_s **client_buckets; /* array of known buckets */
+  size_t num_buckets; /* known buckets amount */
 
-  struct dictionary_s *bucket_dict; //get buckets by their endpoints/major parameters
+  struct dictionary_s *bucket_dict; /* store buckets by endpoints/major parameters */
   struct dictionary_s *header; /* holds the http response header */
 } concord_utils_st;
 
@@ -171,13 +194,10 @@ void Concord_synchronous_perform(concord_utils_st *utils, struct concord_conn_s 
 char* Concord_tryget_major(char endpoint[]);
 long long Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, struct dictionary_s *header, bool use_clock);
 
-void Concord_queue_recycle(concord_utils_st *utils, struct concord_bucket_s *bucket);
-void Concord_queue_push(concord_utils_st *utils, struct concord_bucket_s *bucket, struct concord_conn_s *conn);
-void Concord_queue_pop(concord_utils_st *utils, struct concord_bucket_s *bucket);
+void Concord_queue_pop(concord_utils_st *utils, struct concord_queue_s *queue);
 
 void Concord_start_client_buckets(concord_utils_st *utils);
 void Concord_stop_client_buckets(concord_utils_st *utils);
-struct concord_bucket_s *Concord_get_hashbucket(concord_utils_st *utils, char bucket_hash[]);
 
 void Concord_bucket_build(concord_utils_st *utils, void **p_object, concord_load_obj_ft *load_cb, enum http_method http_method, char bucket_key[], char url_route[]);
 

@@ -17,7 +17,9 @@ Curl_request_header_init(concord_utils_st *utils)
   char auth[MAX_HEADER_LEN] = "Authorization: Bot "; 
 
   struct curl_slist *new_header = NULL;
-  void *tmp;
+  void *tmp; /* for checking potential errors */
+
+
   new_header = curl_slist_append(new_header,"X-RateLimit-Precision: millisecond");
   DEBUG_ASSERT(NULL != new_header, "Couldn't create request header");
 
@@ -42,19 +44,19 @@ Curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 
   char *ptr;
   if ( NULL == (ptr = strchr(content, ':')) )
-    return realsize; //couldn't find key/value pair, return
+    return realsize; /* couldn't find key/value pair */
 
   *ptr = '\0'; /* isolate key from value at ':' */
   
   char *key = content;
 
   if ( NULL == (ptr = strstr(ptr+1, "\r\n")) )
-    return realsize; //couldn't find CRLF
+    return realsize; /* couldn't find CRLF */
 
   *ptr = '\0'; /* remove CRLF from value */
 
   /* trim space from start of value string if necessary */
-  int i=1; //start from one position after ':' char
+  int i=1; /* start from one position after ':' char */
   for ( ; isspace(content[strlen(content)+i]) ; ++i)
     continue;
 
@@ -62,8 +64,8 @@ Curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
   DEBUG_ASSERT(NULL != field, "Out of memory");
 
   /* store key/value pair in a dictionary */
-  void *tmp = dictionary_set(header, key, field, &free);
-  DEBUG_ASSERT(tmp == field, "Couldn't fetch header content");
+  void *res = dictionary_set(header, key, field, &free);
+  DEBUG_ASSERT(res == field, "Couldn't fetch header content");
 
   return realsize; /* return value for curl internals */
 }
@@ -74,6 +76,7 @@ Curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   size_t realsize = size * nmemb;
   struct concord_response_s *response_body = p_userdata;
+
 
   char *tmp = realloc(response_body->str, response_body->size + realsize + 1);
   DEBUG_ASSERT(NULL != tmp, "Out of memory");
@@ -108,7 +111,7 @@ Curl_easy_default_init(concord_utils_st *utils, struct concord_conn_s *conn)
   ecode = curl_easy_setopt(new_easy_handle, CURLOPT_PRIVATE, conn);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
-  // SET CURL_EASY CALLBACKS //
+  /* SET CURL_EASY CALLBACKS */
   ecode = curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &Curl_body_cb);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
@@ -154,34 +157,33 @@ Curl_set_method(struct concord_conn_s *conn, enum http_method method)
   switch (method){
   case DELETE:
       ecode = curl_easy_setopt(conn->easy_handle, CURLOPT_CUSTOMREQUEST, "DELETE");
-      DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
-      return;
+      break;
   case GET:
       ecode = curl_easy_setopt(conn->easy_handle, CURLOPT_HTTPGET, 1L);
-      DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
-      return;
+      break;
   case POST:
       ecode = curl_easy_setopt(conn->easy_handle, CURLOPT_POST, 1L);
-      DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
-      return;
+      break;
   case PATCH:
       ecode = curl_easy_setopt(conn->easy_handle, CURLOPT_CUSTOMREQUEST, "PATCH");
-      DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
-      return;
+      break;
   case PUT:
       ecode = curl_easy_setopt(conn->easy_handle, CURLOPT_UPLOAD, 1L);
-      DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
-      return;
+      break;
   default:
       DEBUG_PRINT("Unknown http_method\n\tCode: %d", method);
       abort();
   }
+
+  DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 }
 
 void
 Curl_set_url(struct concord_conn_s *conn, char endpoint[])
 {
   char base_url[MAX_URL_LEN] = BASE_URL;
+
+
   CURLcode ecode = curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 }

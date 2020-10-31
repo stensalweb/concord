@@ -13,7 +13,7 @@ Concord_tryget_major(char endpoint[])
 {
   if (strstr(endpoint, CHANNELS)) return "channel_major";
   if (strstr(endpoint, GUILDS)) return "guild_major";
-  //if (0 == strstr(endpoint, WEBHOOK)) return "webhook_major";
+  /* if (strstr(endpoint, WEBHOOK)) return "webhook_major"; */
   return endpoint;
 }
 
@@ -27,7 +27,7 @@ Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, dictionary_st *h
     bucket->remaining = remaining;
   }
 
-  if (remaining) return 0; //no delay if remaining > 0
+  if (remaining) return 0; /* no delay if remaining > 0 */
 
 
   long long reset_after = dictionary_get_strtoll(header, "x-ratelimit-reset-after");
@@ -36,9 +36,9 @@ Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, dictionary_st *h
   if (true == use_clock || !reset_after){
     uv_timeval64_t te;
 
-    uv_gettimeofday(&te); //get current time
+    uv_gettimeofday(&te); /* get current time */
     
-    long long utc = te.tv_sec*1000 + te.tv_usec/1000; //calculate milliseconds
+    long long utc = te.tv_sec*1000 + te.tv_usec/1000; /* calculate milliseconds */
     long long reset = dictionary_get_strtoll(header, "x-ratelimit-reset") * 1000;
     delay_ms = reset - utc;
     if (delay_ms < 0){
@@ -89,11 +89,11 @@ _concord_bucket_destroy(void *ptr)
 {
   struct concord_bucket_s *bucket = ptr;
 
-  for (size_t i=0; i < bucket->num_queue; ++i){
-    if (bucket->queue_conns[i])
-      _concord_conn_destroy(bucket->queue_conns[i]);
+  for (size_t i=0; i < bucket->queue.size; ++i){
+    if (bucket->queue.conns[i])
+      _concord_conn_destroy(bucket->queue.conns[i]);
   }
-  safe_free(bucket->queue_conns);
+  safe_free(bucket->queue.conns);
 
   safe_free(bucket->hash_key);
 
@@ -105,8 +105,8 @@ _concord_bucket_init(concord_utils_st *utils, char bucket_hash[])
 {
   struct concord_bucket_s *new_bucket = safe_malloc(sizeof *new_bucket);
 
-  new_bucket->num_queue = MAX_CONCURRENT_CONNS;
-  new_bucket->queue_conns = safe_malloc(sizeof *new_bucket->queue_conns * new_bucket->num_queue);
+  new_bucket->queue.size = MAX_CONCURRENT_CONNS;
+  new_bucket->queue.conns = safe_malloc(sizeof *new_bucket->queue.conns * new_bucket->queue.size);
 
   new_bucket->hash_key = strndup(bucket_hash, strlen(bucket_hash));
   DEBUG_ASSERT(NULL != new_bucket->hash_key, "Out of memory");
@@ -117,62 +117,64 @@ _concord_bucket_init(concord_utils_st *utils, char bucket_hash[])
   new_bucket->p_utils = utils;
   new_bucket->timer.data = new_bucket;
 
-  dictionary_set(utils->bucket_dict, bucket_hash, new_bucket, &_concord_bucket_destroy);
+  void *res = dictionary_set(utils->bucket_dict, bucket_hash, new_bucket, &_concord_bucket_destroy);
+  DEBUG_ASSERT(res == new_bucket, "Couldn't create new bucket");
 
   _concord_client_buckets_append(utils, new_bucket);
 
   return new_bucket;
 }
 
-void
-Concord_queue_recycle(concord_utils_st *utils, struct concord_bucket_s *bucket)
+/* recycle existing innactive connection */
+static void
+_concord_queue_recycle(concord_utils_st *utils, struct concord_queue_s *queue)
 {
-  DEBUG_ASSERT(NULL != bucket->queue_conns[bucket->top], "Can't recycle empty slot");
-  DEBUG_ASSERT(bucket->top < bucket->num_queue, "Queue top has reached threshold");
+  DEBUG_ASSERT(NULL != queue->conns[queue->top_onhold], "Can't recycle empty slot");
+  DEBUG_ASSERT(queue->top_onhold < queue->size, "Queue top has reached threshold");
 
-  ++bucket->top;
+  ++queue->top_onhold;
   ++utils->transfers_onhold;
 
-  DEBUG_PRINT("Bucket top: %ld\n\tBucket size: %ld", bucket->top, bucket->num_queue);
+  DEBUG_PRINT("Bucket top: %ld\n\tBucket size: %ld", queue->top_onhold, queue->size);
 }
 
 /* push new connection to queue */
-void
-Concord_queue_push(concord_utils_st *utils, struct concord_bucket_s *bucket, struct concord_conn_s *conn)
+static void
+_concord_queue_push(concord_utils_st *utils, struct concord_queue_s *queue, struct concord_conn_s *conn)
 {
-  DEBUG_ASSERT(bucket->top < bucket->num_queue, "Queue top has reached threshold");
+  DEBUG_ASSERT(queue->top_onhold < queue->size, "Queue top has reached threshold");
 
-  bucket->queue_conns[bucket->top] = conn; 
-  conn->p_bucket = bucket;
+  queue->conns[queue->top_onhold] = conn; 
+  conn->p_bucket = (struct concord_bucket_s*)queue;
 
-  ++bucket->top;
+  ++queue->top_onhold;
   ++utils->transfers_onhold;
 
-  DEBUG_PRINT("Bucket top: %ld\n\tBucket size: %ld", bucket->top, bucket->num_queue);
+  DEBUG_PRINT("Bucket top: %ld\n\tBucket size: %ld", queue->top_onhold, queue->size);
 }
 
 void
-Concord_queue_pop(concord_utils_st *utils, struct concord_bucket_s *bucket)
+Concord_queue_pop(concord_utils_st *utils, struct concord_queue_s *queue)
 {
-  if (bucket->bottom == bucket->top) return; //nothing to pop
+  if (queue->separator == queue->top_onhold) return; /* no conn to pop */
 
-  struct concord_conn_s *conn = bucket->queue_conns[bucket->bottom];
+  struct concord_conn_s *conn = queue->conns[queue->separator];
   DEBUG_ASSERT(NULL != conn, "Can't pop empty queue's slot");
 
   curl_multi_add_handle(utils->multi_handle, conn->easy_handle);
 
-  ++bucket->bottom;
+  ++queue->separator;
   --utils->transfers_onhold;
 
-  DEBUG_PRINT("Bucket Bottom: %ld\n\tBucket top: %ld\n\tBucket size: %ld", bucket->bottom, bucket->top, bucket->num_queue);
+  DEBUG_PRINT("Bucket Bottom: %ld\n\tBucket top: %ld\n\tBucket size: %ld", queue->separator, queue->top_onhold, queue->size);
 }
 
 void
 Concord_start_client_buckets(concord_utils_st *utils)
 {
   for (size_t i=0; i < utils->num_buckets; ++i){
-    Concord_queue_pop(utils, utils->client_buckets[i]);
-    DEBUG_PRINT("Bucket Hash: %s\n\tBucket Size: %ld", utils->client_buckets[i]->hash_key, utils->client_buckets[i]->top);
+    Concord_queue_pop(utils, &utils->client_buckets[i]->queue);
+    DEBUG_PRINT("Bucket Hash: %s\n\tBucket Size: %ld", utils->client_buckets[i]->hash_key, utils->client_buckets[i]->queue.top_onhold);
   }
 }
 
@@ -180,27 +182,25 @@ void
 Concord_stop_client_buckets(concord_utils_st *utils)
 {
   for (size_t i=0; i < utils->num_buckets; ++i){
-    utils->client_buckets[i]->top = 0;
-    utils->client_buckets[i]->bottom = 0;
+    utils->client_buckets[i]->queue.top_onhold = 0;
+    utils->client_buckets[i]->queue.separator = 0;
   }
 }
 
-struct concord_bucket_s*
-Concord_get_hashbucket(concord_utils_st *utils, char bucket_hash[])
+static struct concord_bucket_s*
+_concord_get_bucket(concord_utils_st *utils, char bucket_hash[])
 {
   DEBUG_ASSERT(NULL != bucket_hash, "Bucket hash unspecified (NULL)");
 
   /* check if hashbucket with bucket_hash already exists */
   struct concord_bucket_s *bucket = dictionary_get(utils->bucket_dict, bucket_hash);
-  if (NULL != bucket){
-    DEBUG_PUTS("Returning existing bucket");
-    return bucket; //bucket exists return it
+  if (!bucket){
+    /* hashbucket doesn't exist, create it */
+    DEBUG_PUTS("Bucket hash not found, creating new ...");
+    bucket = _concord_bucket_init(utils, bucket_hash);
   }
 
-  /* hashbucket doesn't exist, create it */
-  bucket = _concord_bucket_init(utils, bucket_hash);
-
-  DEBUG_PUTS("Returning new bucket");
+  DEBUG_PUTS("Returning bucket");
   return bucket;
 }
 
@@ -214,67 +214,72 @@ Concord_bucket_build(
   char url_route[])
 {
   struct concord_bucket_s *bucket = dictionary_get(utils->bucket_dict, bucket_key);
-  DEBUG_PUTS(bucket_key);
+  DEBUG_PRINT("Bucket Key: %s", bucket_key);
+
+  /* conn to be pushed to (or recycled from) bucket queue */
+  struct concord_conn_s *new_conn;
   
-  if (NULL == bucket){
-    /* this is the first time using this bucket_keyr. We will perform a blocking
-        connection to the Discord API, in order to link this bucket_key with a new
-        or existing bucket */
-    struct concord_conn_s *new_conn = _concord_conn_init(utils);
+  if (!bucket){ /* no bucket referencing the given bucket key */
+    /* this is the first time using this bucket_key. We will perform a blocking
+        connection to the Discord API, in order to fetch this bucket key
+        corresponding bucket */
+    new_conn = _concord_conn_init(utils);
     DEBUG_ASSERT(NULL != new_conn, "Out of memory");
     DEBUG_PUTS("New conn created");
 
-    Curl_set_method(new_conn, http_method); //set the http request method (GET, POST, ...)
-    Curl_set_url(new_conn, url_route); //set the http request url
 
-    new_conn->load_cb = load_cb; //callback that will perform changes to provided object
-    new_conn->p_object = p_object; //save object for when load_cb is executed
-    
-    Concord_synchronous_perform(utils, new_conn); //execute a blocking connection to generate this bucket hash
+    Curl_set_method(new_conn, http_method); /* set the http request method (GET, POST, ...) */
+    Curl_set_url(new_conn, url_route); /* set the http request url */
 
-    DEBUG_PUTS("Fetched conn matching hashbucket");
+    new_conn->load_cb = load_cb; /* callback that will perform actions on object */
+    new_conn->p_object = p_object; /* object to have action performed on */
+
+    /* execute a blocking connection to get bucket hash from the API */
+    Concord_synchronous_perform(utils, new_conn);
+    DEBUG_PUTS("Unknown bucket key, performing connection to get bucket hash");
 
     char *bucket_hash = dictionary_get(utils->header, "x-ratelimit-bucket");
     DEBUG_PRINT("Bucket Hash: %s", bucket_hash);
 
-    bucket = Concord_get_hashbucket(utils, bucket_hash); //return created/found bucket matching bucket hash
+    /* return created/found bucket matching bucket hash */
+    bucket = _concord_get_bucket(utils, bucket_hash);
 
     /* try to find a empty bucket queue slot */
-    size_t i = bucket->top;
-    while (NULL != bucket->queue_conns[i]){
+    size_t i = bucket->queue.top_onhold;
+    while (NULL != bucket->queue.conns[i]){
       ++i;
     }
-    DEBUG_ASSERT(i < bucket->num_queue, "Queue top has reached threshold");
+    DEBUG_ASSERT(i < bucket->queue.size, "Queue has reached its threshold");
 
-    bucket->queue_conns[i] = new_conn; //append conn created to the end of the bucket queue
+    bucket->queue.conns[i] = new_conn; /* append new conn to empty spot found */
 
-    new_conn->p_bucket = bucket; //reference bucket to the conn created
+    new_conn->p_bucket = bucket; /* reference bucket from new conn */
 
-    void *tmp = dictionary_set(utils->bucket_dict, bucket_key, bucket, NULL); //link this bucket_key with created/found hashbucket
-    DEBUG_ASSERT(tmp == bucket, "Couldn't link new bucket_key with existing bucket");
+    void *res = dictionary_set(utils->bucket_dict, bucket_key, bucket, NULL);
+    DEBUG_ASSERT(res == bucket, "Can't link bucket key with an existing bucket");
   }
-  else {
+  else { /* found bucket reference from given key */
     /* add connection to bucket or reuse innactive existing one */
     DEBUG_PRINT("Matching hashbucket found: %s", bucket->hash_key);
-    DEBUG_ASSERT(bucket->top < bucket->num_queue, "Queue top has reached threshold");
+    DEBUG_ASSERT(bucket->queue.top_onhold < bucket->queue.size, "Queue top has reached threshold");
 
-    struct concord_conn_s *new_conn = bucket->queue_conns[bucket->top];
-    if (NULL == new_conn){
+    new_conn = bucket->queue.conns[bucket->queue.top_onhold];
+    if (!new_conn){
       DEBUG_PUTS("Bucket exists but needs a new conn pushed to it (can't recycle)");
 
       new_conn = _concord_conn_init(utils);
       DEBUG_ASSERT(NULL != new_conn, "Out of memory");
 
-      Concord_queue_push(utils, bucket, new_conn);
+      _concord_queue_push(utils, &bucket->queue, new_conn);
     } else { 
       DEBUG_PUTS("Recycling existing connection");
-      Concord_queue_recycle(utils, bucket);
+      _concord_queue_recycle(utils, &bucket->queue);
     }
 
-    Curl_set_method(new_conn, http_method);
-    Curl_set_url(new_conn, url_route);
+    Curl_set_method(new_conn, http_method); /* set the http request method (GET, POST, ...) */
+    Curl_set_url(new_conn, url_route); /* set the http request url */
 
-    new_conn->load_cb = load_cb;
-    new_conn->p_object = p_object;
+    new_conn->load_cb = load_cb; /* callback that will perform actions on object */
+    new_conn->p_object = p_object; /* object to have action performed on */
   }
 }

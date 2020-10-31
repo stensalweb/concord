@@ -7,17 +7,9 @@
 #include <libjscon.h>
 #include <uv.h>
 
-#define CONCORD_DEBUG_MODE     1 //set to 1 to activate debug mode
-#define CONCORD_MEMDEBUG_MODE  0 //set to 1 to activate memdebug mode
 
-enum http_method {
-  NONE    = 0,
-  DELETE  = 1,
-  GET     = 2,
-  POST    = 3,
-  PATCH   = 4,
-  PUT     = 5,
-};
+#define CONCORD_DEBUG_MODE     1 /* set to 1 to activate debug mode */
+#define CONCORD_MEMDEBUG_MODE  0 /* set to 1 to activate memdebug mode */
 
 /* CHANNEL TYPES
 https://discord.com/developers/docs/resources/channel#channel-object-channel-types */

@@ -45,7 +45,7 @@ _uv_add_remaining_cb(uv_timer_t *req)
   struct concord_bucket_s *bucket = req->data;
 
   do {
-    Concord_queue_pop(bucket->p_utils, bucket);
+    Concord_queue_pop(bucket->p_utils, &bucket->queue);
   } while (bucket->remaining--);
 }
 
@@ -61,7 +61,7 @@ _concord_load_obj_perform(struct concord_conn_s *conn)
 }
 
 static long long
-_concord_200_handle(concord_utils_st *utils, struct concord_conn_s *conn)
+_concord_200_action(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   _concord_load_obj_perform(conn);
 
@@ -71,9 +71,9 @@ _concord_200_handle(concord_utils_st *utils, struct concord_conn_s *conn)
 /* if is global, then sleep for x amount inside the function and
     return 0, otherwise return the retry_after amount in ms */
 static long long
-_concord_429_handle(struct concord_response_s *response_body)
+_concord_429_action(struct concord_response_s *response_body)
 {
-  char message[150] = {0};
+  char message[256] = {0};
   long long retry_after;
   bool global;
 
@@ -100,7 +100,7 @@ _concord_429_handle(struct concord_response_s *response_body)
 }
 
 static long long
-_concord_http_response_parse(concord_utils_st *utils, struct concord_conn_s *conn)
+_concord_http_response_action(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   enum discord_http_code http_code; /* http response code */
   char *url = NULL; /* URL from request */
@@ -115,8 +115,10 @@ _concord_http_response_parse(concord_utils_st *utils, struct concord_conn_s *con
   DEBUG_PRINT("Conn URL: %s", url);
 
   switch (http_code){
-  case DISCORD_OK: return _concord_200_handle(utils, conn);
-  case DISCORD_TOO_MANY_REQUESTS: return _concord_429_handle(&conn->response_body);
+  case DISCORD_OK:
+      return _concord_200_action(utils, conn);
+  case DISCORD_TOO_MANY_REQUESTS:
+      return _concord_429_action(&conn->response_body);
   case CURL_NO_RESPONSE: 
       DEBUG_ASSERT(!url || !*url, "No server response has been received");
       return 0; 
@@ -130,12 +132,11 @@ _concord_http_response_parse(concord_utils_st *utils, struct concord_conn_s *con
 static void
 _concord_asynchronous_perform(concord_utils_st *utils, CURL *easy_handle)
 {
-  CURLcode ecode;
   struct concord_conn_s *conn; /* conn referenced by this easy_handle */
-  ecode = curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &conn);
+  CURLcode ecode = curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &conn);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
-  long long delay_ms = _concord_http_response_parse(utils, conn);
+  long long delay_ms = _concord_http_response_action(utils, conn);
   /* after delay_ms time has elapsed, the event loop will add the remaining connections to the multi stack (if there are any) */
   uv_timer_start(&conn->p_bucket->timer, &_uv_add_remaining_cb, delay_ms, 0);
 }
@@ -149,7 +150,7 @@ _concord_tryperform_asynchronous(concord_utils_st *utils)
 
   /* search for completed easy_handle transfers, and perform the
       instructions given by the transfer response */
-  while ((msg = curl_multi_info_read(utils->multi_handle, &pending)))
+  while ( (msg = curl_multi_info_read(utils->multi_handle, &pending)) )
   {
     if (CURLMSG_DONE != msg->msg)
       continue;
@@ -193,15 +194,17 @@ int
 Curl_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
 {
   uv_timer_t *timeout = p_userdata;
+  int uvcode;
 
   if (timeout_ms < 0){
-    int uvcode = uv_timer_stop(timeout);
+    uvcode = uv_timer_stop(timeout);
     DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
   } else {
-    if (0 == timeout_ms)
+    if (0 == timeout_ms){
       timeout_ms = 1;
+    }
 
-    int uvcode = uv_timer_start(timeout, &_uv_on_timeout_cb, timeout_ms, 0);
+    uvcode = uv_timer_start(timeout, &_uv_on_timeout_cb, timeout_ms, 0);
     DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
   }
 
@@ -221,7 +224,7 @@ Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void 
   switch (action){
   case CURL_POLL_IN:
   case CURL_POLL_OUT:
-      if (NULL != p_socket){
+      if (p_socket){
         context = (struct concord_context_s*)p_socket;
       } else {
         context = _concord_context_init(utils, sockfd);
@@ -237,7 +240,7 @@ Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void 
       DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
       break;
   case CURL_POLL_REMOVE:
-      if (NULL != p_socket){
+      if (p_socket){
         uvcode = uv_poll_stop(&((struct concord_context_s*)p_socket)->poll_handle);
         DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
@@ -277,7 +280,7 @@ Concord_synchronous_perform(concord_utils_st *utils, struct concord_conn_s *conn
   CURLcode ecode = curl_easy_perform(conn->easy_handle);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
-  long long delay_ms = _concord_http_response_parse(utils, conn);
+  long long delay_ms = _concord_http_response_action(utils, conn);
 
   uv_sleep(delay_ms);
 }
