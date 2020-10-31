@@ -65,7 +65,7 @@ _concord_200_handle(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   _concord_load_obj_perform(conn);
 
-  return Concord_bucket_get_delay(conn->p_bucket, utils->header, true);
+  return Concord_parse_ratelimit_header(conn->p_bucket, utils->header, true);
 }
 
 /* if is global, then sleep for x amount inside the function and

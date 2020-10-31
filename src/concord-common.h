@@ -169,8 +169,7 @@ void Concord_synchronous_perform(concord_utils_st *utils, struct concord_conn_s 
 
 
 char* Concord_tryget_major(char endpoint[]);
-long long Concord_parse_ratelimit_header(struct dictionary_s *header, bool use_clock);
-long long Concord_bucket_get_delay(struct concord_bucket_s *bucket, struct dictionary_s *header, bool use_clock);
+long long Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, struct dictionary_s *header, bool use_clock);
 
 void Concord_queue_recycle(concord_utils_st *utils, struct concord_bucket_s *bucket);
 void Concord_queue_push(concord_utils_st *utils, struct concord_bucket_s *bucket, struct concord_conn_s *conn);

@@ -18,10 +18,21 @@ Concord_tryget_major(char endpoint[])
 }
 
 long long
-Concord_parse_ratelimit_header(dictionary_st *header, bool use_clock)
+Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, dictionary_st *header, bool use_clock)
 {
+  int remaining = dictionary_get_strtoll(header, "x-ratelimit-remaining");
+  DEBUG_PRINT("Ratelimit remaining: %d", remaining);
+  
+  if (bucket){
+    bucket->remaining = remaining;
+  }
+
+  if (remaining) return 0; //no delay if remaining > 0
+
+
   long long reset_after = dictionary_get_strtoll(header, "x-ratelimit-reset-after");
 
+  long long delay_ms;
   if (true == use_clock || !reset_after){
     uv_timeval64_t te;
 
@@ -29,32 +40,12 @@ Concord_parse_ratelimit_header(dictionary_st *header, bool use_clock)
     
     long long utc = te.tv_sec*1000 + te.tv_usec/1000; //calculate milliseconds
     long long reset = dictionary_get_strtoll(header, "x-ratelimit-reset") * 1000;
-    long long delay_ms = reset - utc;
+    delay_ms = reset - utc;
     if (delay_ms < 0){
       delay_ms = 0;
     }
-
-    return delay_ms;
-  }
-
-  return reset_after*1000;
-}
-
-long long
-Concord_bucket_get_delay(struct concord_bucket_s *bucket, dictionary_st *header, bool use_clock)
-{
-  int remaining = dictionary_get_strtoll(header, "x-ratelimit-remaining");
-  DEBUG_PRINT("Ratelimit remaining: %d", remaining);
-
-  long long delay_ms;
-  if (!remaining){
-    delay_ms = Concord_parse_ratelimit_header(header, use_clock);
   } else {
-    delay_ms = 0;
-  }
-  
-  if (NULL != bucket){
-    bucket->remaining = remaining;
+    delay_ms = reset_after*1000;
   }
 
   return delay_ms;
