@@ -184,7 +184,7 @@ void Concord_http_request(
 
 int Curl_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
 int Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
-void Concord_synchronous_perform(concord_utils_st *utils, struct concord_conn_s *conn);
+void Concord_register_bucket_key(concord_utils_st *utils, struct concord_conn_s *conn, char bucket_key[]);
 
 /*************/
 /* concord-ratelimit.c */
@@ -199,6 +199,7 @@ void Concord_start_client_buckets(concord_utils_st *utils);
 void Concord_stop_client_buckets(concord_utils_st *utils);
 
 void Concord_bucket_build(concord_utils_st *utils, void **p_object, concord_load_obj_ft *load_cb, enum http_method http_method, char bucket_key[], char url_route[]);
+struct concord_bucket_s* Concord_trycreate_bucket(concord_utils_st *utils, char bucket_hash[]);
 
 /*************/
 /* curl-ext.c */

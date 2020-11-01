@@ -211,8 +211,8 @@ Concord_stop_client_buckets(concord_utils_st *utils)
   }
 }
 
-static struct concord_bucket_s*
-_concord_get_bucket(concord_utils_st *utils, char bucket_hash[])
+struct concord_bucket_s*
+Concord_trycreate_bucket(concord_utils_st *utils, char bucket_hash[])
 {
   DEBUG_ASSERT(NULL != bucket_hash, "Bucket hash unspecified (NULL)");
 
@@ -258,29 +258,10 @@ Concord_bucket_build(
     new_conn->load_cb = load_cb; /* callback that will perform actions on object */
     new_conn->p_object = p_object; /* object to have action performed on */
 
-    /* execute a blocking connection to get bucket hash from the API */
-    Concord_synchronous_perform(utils, new_conn);
-    DEBUG_PUTS("Unknown bucket key, performing connection to get bucket hash");
-
-    char *bucket_hash = dictionary_get(utils->header, "x-ratelimit-bucket");
-    DEBUG_PRINT("Bucket Hash: %s", bucket_hash);
-
-    /* return created/found bucket matching bucket hash */
-    bucket = _concord_get_bucket(utils, bucket_hash);
-
-    /* try to find a empty bucket queue slot */
-    size_t i = bucket->queue.top_onhold;
-    while (NULL != bucket->queue.conns[i]){
-      ++i;
-    }
-    DEBUG_ASSERT(i < bucket->queue.size, "Queue has reached its threshold");
-
-    bucket->queue.conns[i] = new_conn; /* append new conn to empty spot found */
-
-    new_conn->p_bucket = bucket; /* reference bucket from new conn */
-
-    void *res = dictionary_set(utils->bucket_dict, bucket_key, bucket, NULL);
-    DEBUG_ASSERT(res == bucket, "Can't link bucket key with an existing bucket");
+    /* execute a synchronous connection to the API to fetch
+        the bucket hash matching this bucket_key with a new
+        or existing bucket */
+    Concord_register_bucket_key(utils, new_conn, bucket_key);
   }
   else { /* found bucket reference from given key */
     /* add connection to bucket or reuse innactive existing one */

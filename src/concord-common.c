@@ -31,7 +31,6 @@ Concord_http_request(
   /* try to get major parameter for bucket key, if doesn't
       exists then will return the endpoint instead */
   char *bucket_key = Concord_tryget_major(endpoint);
-  DEBUG_PRINT("Bucket key encountered: %s", bucket_key);
 
   Concord_bucket_build(
              concord->utils,
