@@ -73,6 +73,7 @@ static void
 _concord_client_buckets_append(concord_utils_st *utils, struct concord_bucket_s *bucket)
 {
   ++utils->num_buckets;
+
   void *tmp = realloc(utils->client_buckets, sizeof *utils->client_buckets * utils->num_buckets);
   DEBUG_ASSERT(NULL != tmp, "Out of memory");
 
@@ -129,7 +130,7 @@ _concord_bucket_init(concord_utils_st *utils, char bucket_hash[])
 static void
 _concord_queue_recycle(concord_utils_st *utils, struct concord_queue_s *queue)
 {
-  DEBUG_ASSERT(NULL != queue->conns[queue->top_onhold], "Can't recycle empty slot");
+  DEBUG_ASSERT(NULL != queue->conns[queue->top_onhold], "Can't recycle conn from a NULL queue slot");
   DEBUG_ASSERT(queue->top_onhold < queue->size, "Queue top has reached threshold");
 
   ++queue->top_onhold;
@@ -140,14 +141,15 @@ _concord_queue_recycle(concord_utils_st *utils, struct concord_queue_s *queue)
 static void
 _concord_queue_push(concord_utils_st *utils, struct concord_queue_s *queue, struct concord_conn_s *conn)
 {
+  DEBUG_ASSERT(NULL == queue->conns[queue->top_onhold], "Can't push conn to a non-NULL queue slot");
   DEBUG_ASSERT(queue->top_onhold < queue->size, "Queue top has reached threshold");
 
   conn->status = ON_HOLD;
   conn->p_bucket = (struct concord_bucket_s*)queue;
 
   queue->conns[queue->top_onhold] = conn; 
-  ++queue->top_onhold;
 
+  ++queue->top_onhold;
   ++utils->transfers_onhold;
 }
 
@@ -260,11 +262,16 @@ Concord_bucket_build(
 
     /* execute a synchronous connection to the API to fetch
         the bucket hash matching this bucket_key with a new
-        or existing bucket */
+        or existing bucket
+
+       the new_conn status is set to INNACTIVE, which means 
+        it will be ready for recycling after it has performed
+        its transfer */
     Concord_register_bucket_key(utils, new_conn, bucket_key);
   }
-  else { /* found bucket reference from given key */
-    /* add connection to bucket or reuse innactive existing one */
+  else {
+    /* found bucket reference from given key add connection
+        to bucket or reuse innactive existing one */
     DEBUG_PRINT("Matching hashbucket found: %s", bucket->hash_key);
     DEBUG_ASSERT(bucket->queue.top_onhold < bucket->queue.size, "Queue top has reached threshold");
 

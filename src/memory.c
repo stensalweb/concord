@@ -21,6 +21,10 @@ __safe_malloc(size_t size, const char file[], const int line, const char func[])
   }
 #if CONCORD_MEMDEBUG_MODE == 1
   fprintf(stderr, "[%s:%d] %s()\n\tAlloc:\t%p(%ld bytes)\n", file, line, func, ptr, size);
+#else
+    (void)file;
+    (void)line;
+    (void)func;
 #endif
 
   return ptr;
@@ -34,6 +38,10 @@ __safe_free(void **p_ptr, const char file[], const int line, const char func[])
     free(*p_ptr);
 #if CONCORD_MEMDEBUG_MODE == 1
     fprintf(stderr, "[%s:%d] %s()\n\tFree:\t%p\n", file, line, func, *p_ptr);
+#else
+    (void)file;
+    (void)line;
+    (void)func;
 #endif
 
     *p_ptr = NULL;

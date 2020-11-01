@@ -9,7 +9,7 @@
 #include "concord-common.h"
 
 concord_user_st*
-concord_user_init(concord_utils_st *utils)
+concord_user_init()
 {
   concord_user_st *new_user = safe_malloc(sizeof *new_user);
   new_user->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);

@@ -9,7 +9,7 @@
 #include "concord-common.h"
 
 concord_guild_st*
-concord_guild_init(concord_utils_st* utils)
+concord_guild_init()
 {
   concord_guild_st *new_guild = safe_malloc(sizeof *new_guild);
   new_guild->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);

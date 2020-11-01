@@ -76,6 +76,8 @@ static void
 _uv_on_walk_cb(uv_handle_t *handle, void *arg)
 {
   uv_close(handle, NULL);
+
+  (void)arg;
 }
 
 static void

@@ -167,13 +167,13 @@ _concord_asynchronous_perform(concord_utils_st *utils, CURL *easy_handle)
   CURLcode ecode;
 
 
+  ecode = curl_easy_getinfo(easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
+  DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
+
   ecode = curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &conn);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
-  ecode = curl_easy_getinfo(conn->easy_handle, CURLINFO_RESPONSE_CODE, &http_code);
-  DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
-
-  ecode = curl_easy_getinfo(conn->easy_handle, CURLINFO_EFFECTIVE_URL, &url);
+  ecode = curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
   DEBUG_PRINT("Conn URL: %s", url);
@@ -187,7 +187,7 @@ _concord_asynchronous_perform(concord_utils_st *utils, CURL *easy_handle)
       return;
   case CURL_NO_RESPONSE: 
       DEBUG_ASSERT(!url || !*url, "No server response has been received");
-      curl_multi_remove_handle(utils->multi_handle, conn->easy_handle);
+      curl_multi_remove_handle(utils->multi_handle, easy_handle);
       return;
   default:
       DEBUG_PRINT("Found not yet implemented HTTP Code: %d", http_code);
@@ -229,6 +229,8 @@ _uv_perform_cb(uv_poll_t *req, int status, int events)
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
   _concord_tryperform_asynchronous(utils);
+
+  (void)status;
 }
 
 static void
@@ -259,6 +261,8 @@ Curl_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
     uvcode = uv_timer_start(timeout, &_uv_on_timeout_cb, timeout_ms, 0);
     DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
   }
+
+  (void)multi_handle;
 
   return 0;
 }
@@ -307,6 +311,8 @@ Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void 
       abort();
   }
 
+  (void)easy_handle;
+
   return 0;
 }
 
@@ -314,6 +320,11 @@ void
 concord_dispatch(concord_st *concord)
 {
   concord_utils_st *utils = concord->utils;
+
+  if (!utils->transfers_onhold){
+    DEBUG_PUTS("No transfers on hold, returning ..."); 
+    return;
+  }
 
   Concord_start_client_buckets(utils);
 
@@ -341,7 +352,7 @@ _concord_200_sync_action(concord_utils_st *utils, struct concord_conn_s *conn)
     performance much, as synchronous transfers are only performed when trying to
     match a first time seen bucket_key with a bucket */
 static void
-_concord_429_sync_action(concord_utils_st *utils, struct concord_conn_s *conn)
+_concord_429_sync_action(struct concord_conn_s *conn)
 {
   char message[256] = {0};
   long long retry_after;
@@ -383,7 +394,7 @@ Concord_register_bucket_key(concord_utils_st *utils, struct concord_conn_s *conn
 
   switch (http_code){
   case DISCORD_TOO_MANY_REQUESTS:
-      _concord_429_sync_action(utils, conn);
+      _concord_429_sync_action(conn);
 
       /* Try to recover from being ratelimited */
 
