@@ -11,7 +11,8 @@ OBJS  = $(addprefix $(OBJDIR)/, $(_OBJS))
 CONCORD_DLIB = $(LIBDIR)/libconcord.so
 # path to JSCON lib folder here
 
-CFLAGS = -Wall -Werror -pedantic -g \
+#@todo create specific CFLAGS for debugging
+CFLAGS = -Wall -Werror -Wextra -pedantic -O2 -g \
 	 -I$(INCLDIR)
 
 LDLIBS  = -L$(LIBDIR) -ljscon -lcurl -luv
