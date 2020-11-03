@@ -1,6 +1,7 @@
 CC	:= gcc
 SRCDIR	:= src
 OBJDIR	:= obj
+INCLDIR := include
 LIBDIR	:= lib
 
 SRC	:= $(wildcard src/*.c)
@@ -19,7 +20,7 @@ LIBUV_LDFLAGS 	:= $(shell pkg-config --libs libuv)
 LIBJSCON_CFLAGS		:=
 LIBJSCON_LDFLAGS	:= -ljscon
 
-LIBCONCORD_CFLAGS	:= -Iinclude
+LIBCONCORD_CFLAGS	:= -I$(INCLDIR)
 LIBCONCORD_LDFLAGS	:=
 
 LIBS_CFLAGS	:= $(LIBCURL_CFLAGS) $(LIBUV_CFLAGS) \
@@ -50,7 +51,7 @@ $(CONCORD_DLIB) :
 	      $(OBJS) -shared -o $(CONCORD_DLIB) $(LIBS_LDFLAGS)
 
 install : all
-	cp $(INCL_DIR)/* /usr/local/include
+	cp $(INCLDIR)/* /usr/local/include
 	cp $(CONCORD_DLIB) /usr/local/lib && \
 	ldconfig
 

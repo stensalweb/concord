@@ -21,7 +21,7 @@ LIBS_CFLAGS	:= $(LIBCURL_CFLAGS) $(LIBUV_CFLAGS) \
 LIBS_LDFLAGS	:= $(LIBCURL_LDFLAGS) $(LIBUV_LDFLAGS) \
 		      $(LIBJSCON_LDFLAGS) $(LIBCONCORD_LDFLAGS)
 
-CFLAGS	= -Wall -Werror -pedantic -g
+CFLAGS	= -Wall -Werror -Wextra -pedantic -g
 
 .PHONY : clean purge
 
