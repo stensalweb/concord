@@ -9,11 +9,11 @@ LIBCURL_LDFLAGS	:= $(shell pkg-config --libs libcurl)
 LIBUV_CFLAGS	:= $(shell pkg-config --cflags libuv)
 LIBUV_LDFLAGS	:= $(shell pkg-config --libs libuv)
 
-LIBCONCORD_CFLAGS	:= -I$(TOP)/include
-LIBCONCORD_LDFLAGS	:= "-Wl,-rpath,$(LIBDIR)" -L$(LIBDIR) -lconcord
-
 LIBJSCON_CFLAGS		:=
 LIBJSCON_LDFLAGS	:= -ljscon
+
+LIBCONCORD_CFLAGS	:= -I$(TOP)/include
+LIBCONCORD_LDFLAGS	:= "-Wl,-rpath,$(LIBDIR)" -L$(LIBDIR) -lconcord
 
 LIBS_CFLAGS	:= $(LIBCURL_CFLAGS) $(LIBUV_CFLAGS) \
 		      $(LIBJSCON_CFLAGS) $(LIBCONCORD_CFLAGS)
@@ -39,4 +39,4 @@ $(LIBDIR) :
 	$(MAKE) -C $(TOP)
 
 clean :
-	-rm -rf test-api test-gateway *.out
+	rm -rf test-api test-gateway *.out

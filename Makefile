@@ -16,8 +16,17 @@ LIBCURL_LDFLAGS	:= $(shell pkg-config --libs libcurl)
 LIBUV_CFLAGS	:= $(shell pkg-config --cflags libuv)
 LIBUV_LDFLAGS 	:= $(shell pkg-config --libs libuv)
 
-LIBS_CFLAGS	:= $(LIBCURL_CFLAGS) $(LIBUV_CFLAGS) -Iinclude
-LIBS_LDFLAGS 	:= $(LIBCURL_LDFLAGS) $(LIBUV_LDFLAGS) -ljscon
+LIBJSCON_CFLAGS		:=
+LIBJSCON_LDFLAGS	:= -ljscon
+
+LIBCONCORD_CFLAGS	:= -Iinclude
+LIBCONCORD_LDFLAGS	:=
+
+LIBS_CFLAGS	:= $(LIBCURL_CFLAGS) $(LIBUV_CFLAGS) \
+		      $(LIBJSCON_CFLAGS) $(LIBCONCORD_CFLAGS)
+
+LIBS_LDFLAGS	:= $(LIBCURL_LDFLAGS) $(LIBUV_LDFLAGS) \
+		      $(LIBJSCON_LDFLAGS)
 
 # @todo create specific CFLAGS for debugging
 CFLAGS := -Wall -Werror -Wextra -pedantic -fPIC -O2 -g
