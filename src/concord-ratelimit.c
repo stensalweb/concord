@@ -90,6 +90,8 @@ _concord_bucket_destroy(void *ptr)
 {
   struct concord_bucket_s *bucket = ptr;
 
+  uv_close((uv_handle_t*)&bucket->timer, NULL);
+
   for (size_t i=0; i < bucket->queue.size; ++i){
     if (bucket->queue.conns[i])
       _concord_conn_destroy(bucket->queue.conns[i]);
@@ -135,6 +137,11 @@ _concord_queue_recycle(concord_utils_st *utils, struct concord_queue_s *queue)
 
   ++queue->top_onhold;
   ++utils->transfers_onhold;
+
+  if (queue->top_onhold == queue->size){
+    DEBUG_PUTS("Reach queue threshold, auto performing ALL transfers on hold ...");
+    Concord_transfer_loop(utils);
+  }
 }
 
 /* push new connection to queue */
@@ -151,6 +158,11 @@ _concord_queue_push(concord_utils_st *utils, struct concord_queue_s *queue, stru
 
   ++queue->top_onhold;
   ++utils->transfers_onhold;
+
+  if (queue->top_onhold == queue->size){
+    DEBUG_PUTS("Reach queue threshold, auto performing ALL transfers on hold ...");
+    Concord_transfer_loop(utils);
+  }
 }
 
 void
@@ -226,7 +238,6 @@ Concord_trycreate_bucket(concord_utils_st *utils, char bucket_hash[])
     bucket = _concord_bucket_init(utils, bucket_hash);
   }
 
-  DEBUG_PUTS("Returning bucket");
   return bucket;
 }
 
@@ -266,7 +277,7 @@ Concord_bucket_build(
 
        the new_conn status is set to INNACTIVE, which means 
         it will be ready for recycling after it has performed
-        its transfer */
+        this connection */
     Concord_register_bucket_key(utils, new_conn, bucket_key);
   }
   else {

@@ -12,7 +12,7 @@
 
 void
 Concord_http_request(
-  concord_st *concord, 
+  concord_utils_st *utils, 
   void **p_object, 
   concord_load_obj_ft *load_cb,
   enum http_method http_method,
@@ -33,17 +33,30 @@ Concord_http_request(
   char *bucket_key = Concord_tryget_major(endpoint);
 
   Concord_bucket_build(
-             concord->utils,
+             utils,
              p_object,
              load_cb,
              http_method,
              bucket_key,
              url_route);
+}
 
-  if (MAX_CONCURRENT_CONNS == concord->utils->transfers_onhold){
-    DEBUG_PUTS("Reach max concurrent connections threshold, auto performing connections on hold ...");
-    concord_dispatch(concord);
-  }
+static struct concord_gateway_s*
+_concord_gateway_init()
+{
+  struct concord_gateway_s *new_gateway = safe_malloc(sizeof *new_gateway);
+  new_gateway->easy_handle = cws_new(GATEWAY_URL, NULL, NULL);
+  DEBUG_ASSERT(NULL != new_gateway->easy_handle, "Out of memory");
+
+  return new_gateway;
+}
+
+static void
+_concord_gateway_destroy(struct concord_gateway_s *gateway)
+{
+  cws_free(gateway->easy_handle);
+
+  safe_free(gateway); 
 }
 
 static concord_utils_st*
@@ -69,6 +82,8 @@ _concord_utils_init(char token[])
   new_utils->header = dictionary_init();
   dictionary_build(new_utils->header, HEADER_DICTIONARY_SIZE);
 
+  new_utils->gateway = _concord_gateway_init();
+
   return new_utils;
 }
 
@@ -83,6 +98,16 @@ _uv_on_walk_cb(uv_handle_t *handle, void *arg)
 static void
 _concord_utils_destroy(concord_utils_st *utils)
 {
+  curl_slist_free_all(utils->request_header);
+  curl_multi_cleanup(utils->multi_handle);
+
+  dictionary_destroy(utils->bucket_dict);
+  dictionary_destroy(utils->header);
+
+  _concord_gateway_destroy(utils->gateway);
+
+  uv_close((uv_handle_t*)&utils->timeout, NULL);
+
   int uvcode = uv_loop_close(utils->loop);
   if (UV_EBUSY == uvcode){ //there are still handles that need to be closed
     uv_walk(utils->loop, &_uv_on_walk_cb, NULL); //close each handle encountered
@@ -93,12 +118,6 @@ _concord_utils_destroy(concord_utils_st *utils)
     uvcode = uv_loop_close(utils->loop); //finally, close the loop
     DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
   }
-  
-  curl_slist_free_all(utils->request_header);
-  curl_multi_cleanup(utils->multi_handle);
-
-  dictionary_destroy(utils->bucket_dict);
-  dictionary_destroy(utils->header);
 
   safe_free(utils->client_buckets);
 

@@ -1,9 +1,12 @@
 #ifndef LIBCONCORD_COMMON_H_
 #define LIBCONCORD_COMMON_H_
+
 //#include <libconcord.h> (implicit) 
+#include "curl-websocket/curl-websocket.h"
 
 
 #define BASE_URL "https://discord.com/api"
+#define GATEWAY_URL "wss://gateway.discord.gg/?v=6&encoding=json"
 
 #define MAX_CONCURRENT_CONNS  15
 
@@ -36,7 +39,6 @@ enum discord_limits {
 /* HTTP RESPONSE CODES
 https://discord.com/developers/docs/topics/opcodes-and-status-codes#http-http-response-codes */
 enum discord_http_code {
-  CURL_NO_RESPONSE              = 0,
   DISCORD_OK                    = 200,
   DISCORD_CREATED               = 201,
   DISCORD_NO_CONTENT            = 204,
@@ -48,6 +50,8 @@ enum discord_http_code {
   DISCORD_METHOD_NOT_ALLOWED    = 405,
   DISCORD_TOO_MANY_REQUESTS     = 429,
   DISCORD_GATEWAY_UNAVAILABLE   = 502,
+
+  CURL_NO_RESPONSE              = 0,
 };
 
 /* SNOWFLAKES
@@ -127,6 +131,10 @@ struct concord_bucket_s {
   struct concord_utils_s *p_utils;
 };
 
+struct concord_gateway_s {
+  CURL *easy_handle;
+};
+
 /* @todo hash/unhash token */
 typedef struct concord_utils_s {
   char *token; /* bot/user token used as identification to the API */
@@ -145,6 +153,8 @@ typedef struct concord_utils_s {
 
   struct dictionary_s *bucket_dict; /* store buckets by endpoints/major parameters */
   struct dictionary_s *header; /* holds the http response header */
+
+  struct concord_gateway_s *gateway;
 } concord_utils_st;
 
 
@@ -171,7 +181,7 @@ void* __safe_malloc(size_t size, const char file[], const int line, const char f
     endpoint
 */
 void Concord_http_request(
-    concord_st *concord,
+    concord_utils_st *utils,
     void **p_object,
     concord_load_obj_ft *load_cb,
     enum http_method http_method,
@@ -185,6 +195,7 @@ void Concord_http_request(
 int Curl_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
 int Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
 void Concord_register_bucket_key(concord_utils_st *utils, struct concord_conn_s *conn, char bucket_key[]);
+void Concord_transfer_loop(concord_utils_st *utils);
 
 /*************/
 /* concord-ratelimit.c */
