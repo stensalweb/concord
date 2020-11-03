@@ -1,7 +1,7 @@
 CC	:= gcc
 SRCDIR	:= src
 OBJDIR	:= obj
-INCLDIR := include
+INCLDIR	:= include
 LIBDIR	:= lib
 
 SRC	:= $(wildcard src/*.c)

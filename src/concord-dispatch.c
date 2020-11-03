@@ -358,12 +358,31 @@ concord_dispatch(concord_st *concord)
 }
 
 static void
-_concord_200_sync_action(concord_utils_st *utils, struct concord_conn_s *conn)
+_concord_200_sync_action(concord_utils_st *utils, struct concord_conn_s *conn, char bucket_key[])
 {
   long long delay_ms = Concord_parse_ratelimit_header(conn->p_bucket, utils->header, true);
   uv_sleep(delay_ms);
 
   _concord_load_obj_perform(conn);
+
+  char *bucket_hash = dictionary_get(utils->header, "x-ratelimit-bucket");
+  DEBUG_PRINT("Bucket Hash: %s", bucket_hash);
+
+  /* create bucket if it doesn't exist, otherwise, get existing one */
+  struct concord_bucket_s *bucket = Concord_trycreate_bucket(utils, bucket_hash);
+
+  /* try to find a empty bucket queue slot */
+  size_t empty_slot = bucket->queue.top_onhold;
+  while (NULL != bucket->queue.conns[empty_slot]){
+    ++empty_slot;
+  }
+  DEBUG_ASSERT(empty_slot < bucket->queue.size, "Queue has reached its threshold");
+
+  bucket->queue.conns[empty_slot] = conn; /* insert conn in empty slot */
+  conn->p_bucket = bucket; /* save reference bucket from conn */
+
+  void *res = dictionary_set(utils->bucket_dict, bucket_key, bucket, NULL);
+  DEBUG_ASSERT(res == bucket, "Can't link bucket key with an existing bucket");
 }
 
 /* for synchronous 429, we won't be dealing with global and non-global ratelimits
@@ -412,11 +431,10 @@ Concord_register_bucket_key(concord_utils_st *utils, struct concord_conn_s *conn
 
       DEBUG_PRINT("Conn URL: %s", url);
 
-
       switch (http_code){
       case DISCORD_OK:
-          _concord_200_sync_action(utils, conn);
-          break;
+          _concord_200_sync_action(utils, conn, bucket_key);
+          return; /* DONE */
       case DISCORD_TOO_MANY_REQUESTS:
           _concord_429_sync_action(conn);
           break;
@@ -428,26 +446,4 @@ Concord_register_bucket_key(concord_utils_st *utils, struct concord_conn_s *conn
           abort();
       }
   } while (DISCORD_OK != http_code);
-
-  /* from this point forward its assumed that the transfer
-      was succesful (200 OK) */
-
-  char *bucket_hash = dictionary_get(utils->header, "x-ratelimit-bucket");
-  DEBUG_PRINT("Bucket Hash: %s", bucket_hash);
-
-  /* create bucket if it doesn't exist, otherwise, get existing one */
-  struct concord_bucket_s *bucket = Concord_trycreate_bucket(utils, bucket_hash);
-
-  /* try to find a empty bucket queue slot */
-  size_t empty_slot = bucket->queue.top_onhold;
-  while (NULL != bucket->queue.conns[empty_slot]){
-    ++empty_slot;
-  }
-  DEBUG_ASSERT(empty_slot < bucket->queue.size, "Queue has reached its threshold");
-
-  bucket->queue.conns[empty_slot] = conn; /* insert conn in empty slot */
-  conn->p_bucket = bucket; /* save reference bucket from conn */
-
-  void *res = dictionary_set(utils->bucket_dict, bucket_key, bucket, NULL);
-  DEBUG_ASSERT(res == bucket, "Can't link bucket key with an existing bucket");
 }

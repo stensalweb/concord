@@ -25,7 +25,7 @@ int main(void)
   concord_guild_st **guilds = malloc(jscon_size(client->guilds) * sizeof *guilds);
   assert(NULL != guilds);
 
-  for (long i=0; i < jscon_size(client->guilds); ++i){
+  for (size_t i=0; i < jscon_size(client->guilds); ++i){
     jscon_item_st *item_guild = jscon_get_byindex(client->guilds, i);
     char *guild_id = jscon_get_string(jscon_get_branch(item_guild, "id"));
     assert(NULL != guild_id);
@@ -41,7 +41,7 @@ int main(void)
   concord_channel_st **channels = malloc(jscon_size(guilds[0]->channels) * sizeof *channels);
   assert(NULL != channels);
 
-  for (long i=0; i < jscon_size(guilds[0]->channels); ++i){
+  for (size_t i=0; i < jscon_size(guilds[0]->channels); ++i){
     jscon_item_st *item_channel = jscon_get_byindex(guilds[0]->channels, i);
     char *channel_id = jscon_get_string(jscon_get_branch(item_channel, "id"));
     assert(NULL != channel_id);
@@ -55,7 +55,7 @@ int main(void)
   assert(NULL != f_out);
 
   char *buffer;
-  for (long i=0; i < jscon_size(guilds[0]->channels); ++i){
+  for (size_t i=0; i < jscon_size(guilds[0]->channels); ++i){
     if (NULL == channels[i]->messages)
       continue;
 
@@ -66,12 +66,12 @@ int main(void)
   fclose(f_out);
 
   // DELETE ALLOCATED OBJECTS
-  for (long i=0; i < jscon_size(guilds[0]->channels); ++i){
+  for (size_t i=0; i < jscon_size(guilds[0]->channels); ++i){
     concord_channel_destroy(channels[i]);
   }
   free(channels);
 
-  for (long i=0; i < jscon_size(client->guilds); ++i){
+  for (size_t i=0; i < jscon_size(client->guilds); ++i){
     concord_guild_destroy(guilds[i]);
   }
   free(guilds);
