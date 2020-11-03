@@ -90,8 +90,6 @@ _concord_bucket_destroy(void *ptr)
 {
   struct concord_bucket_s *bucket = ptr;
 
-  uv_close((uv_handle_t*)&bucket->timer, NULL);
-
   for (size_t i=0; i < bucket->queue.size; ++i){
     if (bucket->queue.conns[i])
       _concord_conn_destroy(bucket->queue.conns[i]);

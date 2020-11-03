@@ -106,8 +106,6 @@ _concord_utils_destroy(concord_utils_st *utils)
 
   _concord_gateway_destroy(utils->gateway);
 
-  uv_close((uv_handle_t*)&utils->timeout, NULL);
-
   int uvcode = uv_loop_close(utils->loop);
   if (UV_EBUSY == uvcode){ //there are still handles that need to be closed
     uv_walk(utils->loop, &_uv_on_walk_cb, NULL); //close each handle encountered
