@@ -5,8 +5,8 @@
 #include "curl-websocket/curl-websocket.h"
 
 
-#define BASE_URL "https://discord.com/api"
-#define GATEWAY_URL "wss://gateway.discord.gg/?v=6&encoding=json"
+#define BASE_API_URL "https://discord.com/api"
+#define BASE_GATEWAY_URL "wss://gateway.discord.gg/?v=6&encoding=json"
 
 #define MAX_CONCURRENT_CONNS  15
 
@@ -131,9 +131,10 @@ struct concord_bucket_s {
   struct concord_utils_s *p_utils;
 };
 
-struct concord_gateway_s {
+typedef struct concord_gateway_s {
+  CURLM *multi_handle;
   CURL *easy_handle;
-};
+} concord_gateway_st;
 
 /* @todo hash/unhash token */
 typedef struct concord_utils_s {
@@ -154,7 +155,7 @@ typedef struct concord_utils_s {
   struct dictionary_s *bucket_dict; /* store buckets by endpoints/major parameters */
   struct dictionary_s *header; /* holds the http response header */
 
-  struct concord_gateway_s *gateway;
+  concord_gateway_st *gateway;
 } concord_utils_st;
 
 
@@ -219,11 +220,17 @@ size_t Curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata
 size_t Curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata);
 
 struct curl_slist* Curl_request_header_init(concord_utils_st *utils);
-CURL* Curl_easy_default_init(concord_utils_st *utils, struct concord_conn_s *conn);
-CURLM* Curl_multi_default_init(concord_utils_st *utils);
+CURL* Concord_conn_easy_init(concord_utils_st *utils, struct concord_conn_s *conn);
+CURLM* Concord_utils_multi_init(concord_utils_st *utils);
 
 void Curl_set_method(struct concord_conn_s *conn, enum http_method method);
 void Curl_set_url(struct concord_conn_s *conn, char endpoint[]);
+
+/*************/
+/* concord-gateway.c */
+
+concord_gateway_st* Concord_gateway_init();
+void Concord_gateway_destroy(concord_gateway_st *gateway);
 
 
 #endif

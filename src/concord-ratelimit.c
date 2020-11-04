@@ -56,7 +56,7 @@ _concord_conn_init(concord_utils_st *utils)
 {
   struct concord_conn_s *new_conn = safe_malloc(sizeof *new_conn);
 
-  new_conn->easy_handle = Curl_easy_default_init(utils, new_conn);
+  new_conn->easy_handle = Concord_conn_easy_init(utils, new_conn);
 
   return new_conn;
 }

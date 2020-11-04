@@ -92,7 +92,7 @@ Curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 
 /* init easy handle with some default opt */
 CURL*
-Curl_easy_default_init(concord_utils_st *utils, struct concord_conn_s *conn)
+Concord_conn_easy_init(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   CURL *new_easy_handle = curl_easy_init();
   DEBUG_ASSERT(NULL != new_easy_handle, "Out of memory");
@@ -129,7 +129,7 @@ Curl_easy_default_init(concord_utils_st *utils, struct concord_conn_s *conn)
 
 /* init multi handle with some default opt */
 CURLM*
-Curl_multi_default_init(concord_utils_st *utils)
+Concord_utils_multi_init(concord_utils_st *utils)
 {
   CURLM *new_multi_handle = curl_multi_init();
   DEBUG_ASSERT(NULL != new_multi_handle, "Out of memory");
@@ -181,7 +181,7 @@ Curl_set_method(struct concord_conn_s *conn, enum http_method method)
 void
 Curl_set_url(struct concord_conn_s *conn, char endpoint[])
 {
-  char base_url[MAX_URL_LEN] = BASE_URL;
+  char base_url[MAX_URL_LEN] = BASE_API_URL;
 
 
   CURLcode ecode = curl_easy_setopt(conn->easy_handle, CURLOPT_URL, strcat(base_url, endpoint));

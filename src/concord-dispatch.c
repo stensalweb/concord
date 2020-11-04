@@ -85,7 +85,7 @@ _concord_load_obj_perform(struct concord_conn_s *conn)
 }
 
 static void
-_concord_200_async_action(concord_utils_st *utils, struct concord_conn_s *conn)
+_concord_200async_tryremaining(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   long long delay_ms = Concord_parse_ratelimit_header(conn->p_bucket, utils->header, true);
   /* after delay_ms time has elapsed, the event loop will add the remaining connections to the multi stack (if there are any) */
@@ -136,7 +136,7 @@ _uv_queue_resume_cb(uv_timer_t *req)
 /* if is global, then sleep for x amount inside the function and
     return 0, otherwise return the retry_after amount in ms */
 static void
-_concord_429_async_action(concord_utils_st *utils, struct concord_conn_s *conn)
+_concord_429async_tryrecover(concord_utils_st *utils, struct concord_conn_s *conn)
 {
   char message[256] = {0};
   long long retry_after;
@@ -192,10 +192,10 @@ _concord_asynchronous_perform(concord_utils_st *utils, CURL *easy_handle)
 
   switch (http_code){
   case DISCORD_OK:
-      _concord_200_async_action(utils, conn);
+      _concord_200async_tryremaining(utils, conn);
       return;
   case DISCORD_TOO_MANY_REQUESTS:
-      _concord_429_async_action(utils, conn);
+      _concord_429async_tryrecover(utils, conn);
       return;
   case CURL_NO_RESPONSE: 
       DEBUG_ASSERT(!url || !*url, "No server response has been received");
@@ -358,7 +358,7 @@ concord_dispatch(concord_st *concord)
 }
 
 static void
-_concord_200_sync_action(concord_utils_st *utils, struct concord_conn_s *conn, char bucket_key[])
+_concord_200sync_getbucket(concord_utils_st *utils, struct concord_conn_s *conn, char bucket_key[])
 {
   long long delay_ms = Concord_parse_ratelimit_header(conn->p_bucket, utils->header, true);
   uv_sleep(delay_ms);
@@ -390,7 +390,7 @@ _concord_200_sync_action(concord_utils_st *utils, struct concord_conn_s *conn, c
     performance, as synchronous transfers are only performed when trying to
     match a first time seen bucket_key with a bucket, so getting ratelimited in a synchronous transfer would be a rare occurrence */
 static void
-_concord_429_sync_action(struct concord_conn_s *conn)
+_concord_429sync_tryrecover(struct concord_conn_s *conn)
 {
   char message[256] = {0};
   long long retry_after;
@@ -433,10 +433,10 @@ Concord_register_bucket_key(concord_utils_st *utils, struct concord_conn_s *conn
 
       switch (http_code){
       case DISCORD_OK:
-          _concord_200_sync_action(utils, conn, bucket_key);
+          _concord_200sync_getbucket(utils, conn, bucket_key);
           return; /* DONE */
       case DISCORD_TOO_MANY_REQUESTS:
-          _concord_429_sync_action(conn);
+          _concord_429sync_tryrecover(conn);
           break;
       case CURL_NO_RESPONSE: 
           DEBUG_ASSERT(!url || !*url, "No server response has been received");

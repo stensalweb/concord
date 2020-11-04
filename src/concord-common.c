@@ -41,24 +41,6 @@ Concord_http_request(
              url_route);
 }
 
-static struct concord_gateway_s*
-_concord_gateway_init()
-{
-  struct concord_gateway_s *new_gateway = safe_malloc(sizeof *new_gateway);
-  new_gateway->easy_handle = cws_new(GATEWAY_URL, NULL, NULL);
-  DEBUG_ASSERT(NULL != new_gateway->easy_handle, "Out of memory");
-
-  return new_gateway;
-}
-
-static void
-_concord_gateway_destroy(struct concord_gateway_s *gateway)
-{
-  cws_free(gateway->easy_handle);
-
-  safe_free(gateway); 
-}
-
 static concord_utils_st*
 _concord_utils_init(char token[])
 {
@@ -74,7 +56,7 @@ _concord_utils_init(char token[])
   uv_timer_init(new_utils->loop, &new_utils->timeout);
   new_utils->timeout.data = new_utils;
 
-  new_utils->multi_handle = Curl_multi_default_init(new_utils);
+  new_utils->multi_handle = Concord_utils_multi_init(new_utils);
 
   new_utils->bucket_dict = dictionary_init();
   dictionary_build(new_utils->bucket_dict, BUCKET_DICTIONARY_SIZE);
@@ -82,7 +64,7 @@ _concord_utils_init(char token[])
   new_utils->header = dictionary_init();
   dictionary_build(new_utils->header, HEADER_DICTIONARY_SIZE);
 
-  new_utils->gateway = _concord_gateway_init();
+  new_utils->gateway = Concord_gateway_init();
 
   return new_utils;
 }
@@ -104,7 +86,7 @@ _concord_utils_destroy(concord_utils_st *utils)
   dictionary_destroy(utils->bucket_dict);
   dictionary_destroy(utils->header);
 
-  _concord_gateway_destroy(utils->gateway);
+  Concord_gateway_destroy(utils->gateway);
 
   int uvcode = uv_loop_close(utils->loop);
   if (UV_EBUSY == uvcode){ //there are still handles that need to be closed
