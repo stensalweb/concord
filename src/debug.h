@@ -23,6 +23,7 @@
               abort(); \
             } \
         } while(0)
+#       define DEBUG_ONLY_ASSERT(expr, msg) DEBUG_ASSERT(expr, msg)
 /* @param snippet to be executed if debug mode is active */
 #       define DEBUG_ONLY(arg) (arg)
 #else /* DEBUG MODE INNACTIVE */
@@ -31,6 +32,7 @@
 /* DEBUG_ASSERT becomes a proxy for assert */
 #       include <assert.h>
 #       define DEBUG_ASSERT(expr, msg) assert(expr)
+#       define DEBUG_ONLY_ASSERT(expr, msg)
 #       define DEBUG_ONLY(arg)
 #endif
 

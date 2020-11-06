@@ -54,6 +54,24 @@ enum discord_http_code {
   CURL_NO_RESPONSE              = 0,
 };
 
+/* GATEWAY OPCODES
+https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-opcodes */
+enum gateway_opcode {
+  GATEWAY_DISPATCH              = 0,
+  GATEWAY_HEARTBEAT             = 1,
+  GATEWAY_IDENTIFY              = 2,
+  GATEWAY_PRESENCE_UPDATE       = 3,
+  GATEWAY_VOICE_STATE_UPDATE    = 4,
+  GATEWAY_RESUME                = 6,
+  GATEWAY_RECONNECT             = 7,
+  GATEWAY_REQUEST_GUILD_MEMBERS = 8,
+  GATEWAY_INVALID_SESSION       = 9,
+  GATEWAY_HELLO                 = 10,
+  GATEWAY_HEARTBEAT_ACK         = 11,
+
+  GATEWAY_ERROR                 = -1,
+};
+
 /* SNOWFLAKES
 https://discord.com/developers/docs/reference#snowflakes */
 enum discord_snowflake {
@@ -96,7 +114,6 @@ typedef void (concord_load_obj_ft)(void **p_object, struct concord_response_s *r
 struct concord_conn_s {
   enum transfer_status status; /* conn transfer status */
 
-  struct concord_context_s *context;
   CURL *easy_handle; /* easy handle that performs the request */
 
   struct concord_response_s response_body; /* response body associated with the transfer */
@@ -132,8 +149,24 @@ struct concord_bucket_s {
 };
 
 typedef struct concord_gateway_s {
+  enum transfer_status status; /* gateway status */
+
   CURLM *multi_handle;
   CURL *easy_handle;
+
+  int transfers_running; /* current running transfers */
+
+  uv_loop_t *loop; /* the event loop */
+  uv_timer_t timeout;
+
+  long utf_when_heartbeat;
+  int heartbeat_ms;
+
+  enum gateway_opcode opcode;   /* field 'opcode' */
+  int seq_number;               /* field 's' */
+  char event_name[25];          /* field 't' */
+  jscon_item_st *event_data;    /* field 'd' */
+
 } concord_gateway_st;
 
 /* @todo hash/unhash token */
@@ -154,8 +187,6 @@ typedef struct concord_utils_s {
 
   struct dictionary_s *bucket_dict; /* store buckets by endpoints/major parameters */
   struct dictionary_s *header; /* holds the http response header */
-
-  concord_gateway_st *gateway;
 } concord_utils_st;
 
 
@@ -193,8 +224,10 @@ void Concord_http_request(
 /* concord-dispatch.c */
 
 
-int Curl_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
-int Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
+struct concord_context_s* Concord_context_init(uv_loop_t *loop, curl_socket_t sockfd);
+void Concord_context_destroy(struct concord_context_s *context);
+int Concord_utils_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
+int Concord_utils_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
 void Concord_register_bucket_key(concord_utils_st *utils, struct concord_conn_s *conn, char bucket_key[]);
 void Concord_transfer_loop(concord_utils_st *utils);
 
@@ -222,6 +255,8 @@ size_t Curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata);
 struct curl_slist* Curl_request_header_init(concord_utils_st *utils);
 CURL* Concord_conn_easy_init(concord_utils_st *utils, struct concord_conn_s *conn);
 CURLM* Concord_utils_multi_init(concord_utils_st *utils);
+CURL* Concord_gateway_easy_init(concord_gateway_st *gateway);
+CURLM* Concord_gateway_multi_init(concord_gateway_st *gateway);
 
 void Curl_set_method(struct concord_conn_s *conn, enum http_method method);
 void Curl_set_url(struct concord_conn_s *conn, char endpoint[]);
@@ -231,6 +266,14 @@ void Curl_set_url(struct concord_conn_s *conn, char endpoint[]);
 
 concord_gateway_st* Concord_gateway_init();
 void Concord_gateway_destroy(concord_gateway_st *gateway);
+int Concord_gateway_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
+int Concord_gateway_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
+void Concord_gateway_run(concord_gateway_st *gateway);
+void Concord_on_connect_cb(void *data, CURL *easy_handle, const char *ws_protocols);
+void Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len);
+void Concord_on_ping_cb(void *data, CURL *easy_handle, const char *reason, size_t len);
+void Concord_on_pong_cb(void *data, CURL *easy_handle, const char *reason, size_t len);
+void Concord_on_close_cb(void *data, CURL *easy_handle, enum cws_close_reason cwscode, const char *reason, size_t len);
 
 
 #endif

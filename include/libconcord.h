@@ -122,6 +122,7 @@ typedef struct {
 
 typedef struct concord_s {
   struct concord_utils_s *utils;
+  struct concord_gateway_s *gateway;
 
   concord_channel_st *channel;
   concord_user_st *user;

@@ -47,6 +47,7 @@ _concord_utils_init(char token[])
   concord_utils_st *new_utils = safe_malloc(sizeof *new_utils);
 
   new_utils->loop = uv_default_loop();
+  uv_loop_set_data(new_utils->loop, new_utils);
 
   new_utils->token = strndup(token, strlen(token)-1);
   DEBUG_ASSERT(NULL != new_utils->token, "Out of memory");
@@ -54,7 +55,7 @@ _concord_utils_init(char token[])
   new_utils->request_header = Curl_request_header_init(new_utils);
 
   uv_timer_init(new_utils->loop, &new_utils->timeout);
-  new_utils->timeout.data = new_utils;
+  uv_handle_set_data((uv_handle_t*)&new_utils->timeout, new_utils);
 
   new_utils->multi_handle = Concord_utils_multi_init(new_utils);
 
@@ -63,8 +64,6 @@ _concord_utils_init(char token[])
 
   new_utils->header = dictionary_init();
   dictionary_build(new_utils->header, HEADER_DICTIONARY_SIZE);
-
-  new_utils->gateway = Concord_gateway_init();
 
   return new_utils;
 }
@@ -83,11 +82,6 @@ _concord_utils_destroy(concord_utils_st *utils)
   curl_slist_free_all(utils->request_header);
   curl_multi_cleanup(utils->multi_handle);
 
-  dictionary_destroy(utils->bucket_dict);
-  dictionary_destroy(utils->header);
-
-  Concord_gateway_destroy(utils->gateway);
-
   int uvcode = uv_loop_close(utils->loop);
   if (UV_EBUSY == uvcode){ //there are still handles that need to be closed
     uv_walk(utils->loop, &_uv_on_walk_cb, NULL); //close each handle encountered
@@ -98,6 +92,9 @@ _concord_utils_destroy(concord_utils_st *utils)
     uvcode = uv_loop_close(utils->loop); //finally, close the loop
     DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
   }
+
+  dictionary_destroy(utils->bucket_dict);
+  dictionary_destroy(utils->header);
 
   safe_free(utils->client_buckets);
 
@@ -112,11 +109,15 @@ concord_init(char token[])
   concord_st *new_concord = safe_malloc(sizeof *new_concord);
 
   new_concord->utils = _concord_utils_init(token);
+  new_concord->gateway = Concord_gateway_init();
 
   new_concord->channel = concord_channel_init(&new_concord->utils);
   new_concord->guild = concord_guild_init(&new_concord->utils);
   new_concord->user = concord_user_init(&new_concord->utils);
   new_concord->client = concord_user_init(&new_concord->utils);
+
+  /* @todo this is temporary */
+  Concord_gateway_run(new_concord->gateway);
 
   return new_concord;
 }
@@ -125,6 +126,7 @@ void
 concord_cleanup(concord_st *concord)
 {
   _concord_utils_destroy(concord->utils);
+  Concord_gateway_destroy(concord->gateway);
 
   concord_channel_destroy(concord->channel);
   concord_guild_destroy(concord->guild);

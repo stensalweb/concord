@@ -135,16 +135,71 @@ Concord_utils_multi_init(concord_utils_st *utils)
   DEBUG_ASSERT(NULL != new_multi_handle, "Out of memory");
 
   CURLMcode mcode;
-  mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_SOCKETFUNCTION, &Curl_handle_socket_cb);
+  mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_SOCKETFUNCTION, &Concord_utils_socket_cb);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
   mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_SOCKETDATA, utils);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
-  mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_TIMERFUNCTION, &Curl_start_timeout_cb);
+  mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_TIMERFUNCTION, &Concord_utils_timeout_cb);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
   mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_TIMERDATA, &utils->timeout);
+  DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
+
+  return new_multi_handle;
+}
+
+/* init easy handle with some default opt */
+CURL*
+Concord_gateway_easy_init(concord_gateway_st *gateway)
+{
+  /* @todo this could definetely become global */
+  struct cws_callbacks *cws_cbs = safe_malloc(sizeof *cws_cbs);
+
+  cws_cbs->on_connect = &Concord_on_connect_cb;
+  cws_cbs->on_text = &Concord_on_text_cb;
+  //cws_cbs->on_binary = &Concord_on_binary_cb;
+  cws_cbs->on_ping = &Concord_on_ping_cb;
+  cws_cbs->on_pong = &Concord_on_pong_cb;
+  cws_cbs->on_close = &Concord_on_close_cb;
+  cws_cbs->data = gateway;
+
+  /* @todo add protocols */ 
+  CURL *new_easy_handle = cws_new(BASE_GATEWAY_URL, NULL, cws_cbs);
+  DEBUG_ASSERT(NULL != new_easy_handle, "Out of memory");
+
+  CURLcode ecode;
+  DEBUG_ONLY(ecode = curl_easy_setopt(new_easy_handle, CURLOPT_VERBOSE, 2L));
+  DEBUG_ONLY_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
+
+  ecode = curl_easy_setopt(new_easy_handle, CURLOPT_FOLLOWLOCATION, 2L);
+  DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
+/*
+  ecode = curl_easy_setopt(new_easy_handle, CURLOPT_TIMEOUT, 5L);
+  DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
+*/
+  return new_easy_handle;
+}
+
+/* init multi handle with some default opt */
+CURLM*
+Concord_gateway_multi_init(concord_gateway_st *gateway)
+{
+  CURLM *new_multi_handle = curl_multi_init();
+  DEBUG_ASSERT(NULL != new_multi_handle, "Out of memory");
+
+  CURLMcode mcode;
+  mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_SOCKETFUNCTION, &Concord_gateway_socket_cb);
+  DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
+
+  mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_SOCKETDATA, gateway);
+  DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
+
+  mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_TIMERFUNCTION, &Concord_gateway_timeout_cb);
+  DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
+
+  mcode = curl_multi_setopt(new_multi_handle, CURLMOPT_TIMERDATA, &gateway->timeout);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
   return new_multi_handle;

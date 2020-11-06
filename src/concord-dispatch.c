@@ -8,18 +8,18 @@
 #include "debug.h"
 
 
-static struct concord_context_s*
-_concord_context_init(concord_utils_st *utils, curl_socket_t sockfd)
+struct concord_context_s*
+Concord_context_init(uv_loop_t *loop, curl_socket_t sockfd)
 {
   DEBUG_PUTS("Creating new context");
   struct concord_context_s *new_context = safe_malloc(sizeof *new_context);
 
   new_context->sockfd = sockfd;
 
-  int uvcode = uv_poll_init_socket(utils->loop, &new_context->poll_handle, sockfd);
+  int uvcode = uv_poll_init_socket(loop, &new_context->poll_handle, sockfd);
   DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
-  new_context->poll_handle.data = utils;
+  new_context->poll_handle.data = uv_loop_get_data(loop);
 
   return new_context;
 }
@@ -32,8 +32,8 @@ _uv_context_destroy_cb(uv_handle_t *handle)
   safe_free(context);
 }
 
-static void
-_concord_context_destroy(struct concord_context_s *context)
+void
+Concord_context_destroy(struct concord_context_s *context)
 {
   uv_close((uv_handle_t*)&context->poll_handle, &_uv_context_destroy_cb);
 }
@@ -42,7 +42,7 @@ _concord_context_destroy(struct concord_context_s *context)
 static void
 _uv_add_remaining_cb(uv_timer_t *req)
 {
-  struct concord_bucket_s *bucket = req->data;
+  struct concord_bucket_s *bucket = uv_handle_get_data((uv_handle_t*)req);
 
   bucket->queue.bottom_running = bucket->queue.separator;
 
@@ -115,7 +115,7 @@ _concord_queue_pause(struct concord_queue_s *queue)
 static void
 _uv_queue_resume_cb(uv_timer_t *req)
 {
-  struct concord_queue_s *queue = req->data;
+  struct concord_queue_s *queue = uv_handle_get_data((uv_handle_t*)req);
   concord_utils_st *utils = ((struct concord_bucket_s*)queue)->p_utils;
 
 
@@ -232,7 +232,7 @@ _uv_perform_cb(uv_poll_t *req, int uvstatus, int events)
 {
   DEBUG_ASSERT(!uvstatus, uv_strerror(uvstatus));
 
-  concord_utils_st *utils = req->data;
+  concord_utils_st *utils = uv_handle_get_data((uv_handle_t*)req);
   struct concord_context_s *context = (struct concord_context_s*)req;
 
   int flags = 0;
@@ -243,23 +243,19 @@ _uv_perform_cb(uv_poll_t *req, int uvstatus, int events)
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
   _concord_tryperform_asynchronous(utils);
-
-  (void)uvstatus;
 }
 
 static void
 _uv_on_timeout_cb(uv_timer_t *req)
 {
-  concord_utils_st *utils = req->data;
+  concord_utils_st *utils = uv_handle_get_data((uv_handle_t*)req);
 
   CURLMcode mcode = curl_multi_socket_action(utils->multi_handle, CURL_SOCKET_TIMEOUT, 0, &utils->transfers_running);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
-
-  _concord_tryperform_asynchronous(utils);
 }
 
 int
-Curl_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
+Concord_utils_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
 {
   uv_timer_t *timeout = p_userdata;
   int uvcode;
@@ -282,7 +278,7 @@ Curl_start_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
 }
 
 int
-Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket)
+Concord_utils_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket)
 {
   concord_utils_st *utils = p_userdata;
   CURLMcode mcode;
@@ -297,7 +293,7 @@ Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void 
       if (p_socket){
         context = (struct concord_context_s*)p_socket;
       } else {
-        context = _concord_context_init(utils, sockfd);
+        context = Concord_context_init(utils->loop, sockfd);
       }
 
       mcode = curl_multi_assign(utils->multi_handle, sockfd, context);
@@ -314,7 +310,7 @@ Curl_handle_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void 
         uvcode = uv_poll_stop(&((struct concord_context_s*)p_socket)->poll_handle);
         DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
-        _concord_context_destroy((struct concord_context_s*)p_socket);
+        Concord_context_destroy((struct concord_context_s*)p_socket);
 
         mcode = curl_multi_assign(utils->multi_handle, sockfd, NULL);
         DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
