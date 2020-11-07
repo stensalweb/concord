@@ -116,15 +116,15 @@ concord_init(char token[])
   new_concord->user = concord_user_init(&new_concord->utils);
   new_concord->client = concord_user_init(&new_concord->utils);
 
-  /* @todo this is temporary */
-  Concord_gateway_run(new_concord->gateway);
-
   return new_concord;
 }
 
 void
 concord_cleanup(concord_st *concord)
 {
+  /* @todo send a sigint to gateway loop */
+  uv_thread_join(&concord->gateway->thread_id);
+  
   _concord_utils_destroy(concord->utils);
   Concord_gateway_destroy(concord->gateway);
 

@@ -149,6 +149,8 @@ struct concord_bucket_s {
 };
 
 typedef struct concord_gateway_s {
+  uv_thread_t thread_id; /* gateway loop thread id */
+
   struct concord_context_s *context;
 
   enum transfer_status status; /* gateway status */
@@ -269,7 +271,6 @@ concord_gateway_st* Concord_gateway_init();
 void Concord_gateway_destroy(concord_gateway_st *gateway);
 int Concord_gateway_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
 int Concord_gateway_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
-void Concord_gateway_run(concord_gateway_st *gateway);
 void Concord_on_connect_cb(void *data, CURL *easy_handle, const char *ws_protocols);
 void Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len);
 void Concord_on_close_cb(void *data, CURL *easy_handle, enum cws_close_reason cwscode, const char *reason, size_t len);

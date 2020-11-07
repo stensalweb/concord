@@ -273,17 +273,28 @@ Concord_on_close_cb(void *data, CURL *easy_handle, enum cws_close_reason cwscode
   (void)easy_handle;
 }
 
-void
-Concord_gateway_run(concord_gateway_st *gateway)
+static void
+_concord_gateway_run(void *ptr)
 {
-  if (RUNNING == gateway->status){
-    DEBUG_PUTS("Gateway already running, returning"); 
-    return;
-  }
+  concord_gateway_st *gateway = ptr; 
+
   curl_multi_add_handle(gateway->multi_handle, gateway->easy_handle);
 
   int uvcode = uv_run(gateway->loop, UV_RUN_DEFAULT);
   DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
   curl_multi_remove_handle(gateway->multi_handle, gateway->easy_handle);
+}
+
+void
+concord_gateway_connect(concord_st *concord)
+{
+  concord_gateway_st *gateway = concord->gateway;
+
+  if (RUNNING == gateway->status){
+    DEBUG_PUTS("Gateway already running, returning"); 
+    return;
+  }
+
+  uv_thread_create(&gateway->thread_id, &_concord_gateway_run, gateway);
 }
