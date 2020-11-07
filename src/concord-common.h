@@ -68,8 +68,6 @@ enum gateway_opcode {
   GATEWAY_INVALID_SESSION       = 9,
   GATEWAY_HELLO                 = 10,
   GATEWAY_HEARTBEAT_ACK         = 11,
-
-  GATEWAY_ERROR                 = -1,
 };
 
 /* SNOWFLAKES
@@ -149,6 +147,7 @@ struct concord_bucket_s {
 };
 
 typedef struct concord_gateway_s {
+  uv_async_t async; /* wakeup callback from another thread */
   uv_thread_t thread_id; /* gateway loop thread id */
 
   struct concord_context_s *context;

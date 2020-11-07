@@ -133,6 +133,9 @@ typedef struct concord_s {
 
 void concord_dispatch(concord_st *concord);
 void concord_gateway_connect(concord_st *concord);
+void concord_gateway_disconnect(concord_st *concord);
+
+bool concord_gateway_isrunning(concord_st *concord);
 
 void concord_global_init();
 void concord_global_cleanup();

@@ -122,11 +122,9 @@ concord_init(char token[])
 void
 concord_cleanup(concord_st *concord)
 {
-  /* @todo send a sigint to gateway loop */
-  uv_thread_join(&concord->gateway->thread_id);
-  
-  _concord_utils_destroy(concord->utils);
   Concord_gateway_destroy(concord->gateway);
+
+  _concord_utils_destroy(concord->utils);
 
   concord_channel_destroy(concord->channel);
   concord_guild_destroy(concord->guild);

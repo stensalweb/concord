@@ -154,7 +154,7 @@ Concord_utils_multi_init(concord_utils_st *utils)
 CURL*
 Concord_gateway_easy_init(concord_gateway_st *gateway)
 {
-  /* missing on_ping, on_pong and on_binary */
+  /* missing on_binary, on_ping, on_pong */
   struct cws_callbacks cws_cbs = {
     .on_connect = &Concord_on_connect_cb,
     .on_text = &Concord_on_text_cb,

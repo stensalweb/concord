@@ -19,6 +19,9 @@ int main(void)
 
   concord_gateway_connect(concord);
 
+  uv_sleep(5000);
+  //while (true == concord_gateway_isrunning(concord));
+
   concord_cleanup(concord);
 
   concord_global_cleanup();
