@@ -7,6 +7,7 @@ This document describes features to be incorporated in the future.
 - Implement Discord Gateway (WebSockets) support
   - Intuitive event handler
   - Resume logic on error
+  - Add signal receiver that interrupts and cleans gateway resources
 - Add lib package (pkg-config) to seach path
 
 ## MEDIUM
