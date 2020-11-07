@@ -157,11 +157,9 @@ Concord_gateway_easy_init(concord_gateway_st *gateway)
   /* @todo this could definetely become global */
   struct cws_callbacks *cws_cbs = safe_malloc(sizeof *cws_cbs);
 
+  /* missing on_ping, on_pong and on_binary */
   cws_cbs->on_connect = &Concord_on_connect_cb;
   cws_cbs->on_text = &Concord_on_text_cb;
-  //cws_cbs->on_binary = &Concord_on_binary_cb;
-  cws_cbs->on_ping = &Concord_on_ping_cb;
-  cws_cbs->on_pong = &Concord_on_pong_cb;
   cws_cbs->on_close = &Concord_on_close_cb;
   cws_cbs->data = gateway;
 

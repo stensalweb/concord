@@ -149,6 +149,8 @@ struct concord_bucket_s {
 };
 
 typedef struct concord_gateway_s {
+  struct concord_context_s *context;
+
   enum transfer_status status; /* gateway status */
 
   CURLM *multi_handle;
@@ -159,8 +161,7 @@ typedef struct concord_gateway_s {
   uv_loop_t *loop; /* the event loop */
   uv_timer_t timeout;
 
-  long utf_when_heartbeat;
-  int heartbeat_ms;
+  uv_timer_t heartbeat_signal;
 
   enum gateway_opcode opcode;   /* field 'opcode' */
   int seq_number;               /* field 's' */
@@ -271,8 +272,6 @@ int Concord_gateway_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int actio
 void Concord_gateway_run(concord_gateway_st *gateway);
 void Concord_on_connect_cb(void *data, CURL *easy_handle, const char *ws_protocols);
 void Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len);
-void Concord_on_ping_cb(void *data, CURL *easy_handle, const char *reason, size_t len);
-void Concord_on_pong_cb(void *data, CURL *easy_handle, const char *reason, size_t len);
 void Concord_on_close_cb(void *data, CURL *easy_handle, enum cws_close_reason cwscode, const char *reason, size_t len);
 
 
