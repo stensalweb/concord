@@ -188,13 +188,10 @@ Concord_gateway_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, v
 void
 Concord_on_connect_cb(void *data, CURL *easy_handle, const char *ws_protocols)
 {
-  concord_gateway_st *gateway = data;
-
-  gateway->status = RUNNING;
-
   DEBUG_PRINT("Connected, WS-Protocols: '%s'", ws_protocols);
 
   (void)easy_handle;
+  (void)data;
 }
 
 static void
@@ -371,6 +368,8 @@ concord_gateway_connect(concord_st *concord)
     return;
   }
 
+  gateway->status = RUNNING; /* not really running just yet, trying to connect ... */
+
   uv_thread_create(&gateway->thread_id, &_concord_gateway_run, gateway);
 }
 
@@ -385,8 +384,8 @@ concord_gateway_disconnect(concord_st *concord)
   _concord_gateway_disconnect(concord->gateway);
 }
 
-bool
+int
 concord_gateway_isrunning(concord_st *concord)
 {
-  return (RUNNING == concord->gateway->status) ? true : false;
+  return (RUNNING == concord->gateway->status);
 }
