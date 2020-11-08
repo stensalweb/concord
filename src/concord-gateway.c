@@ -9,13 +9,16 @@
 
 
 concord_gateway_st*
-Concord_gateway_init()
+Concord_gateway_init(char token[])
 {
   concord_gateway_st *new_gateway = safe_malloc(sizeof *new_gateway);
   
   new_gateway->loop = safe_malloc(sizeof *new_gateway->loop);
   uv_loop_init(new_gateway->loop);
   uv_loop_set_data(new_gateway->loop, new_gateway);
+
+  new_gateway->token = strndup(token, strlen(token)-1);
+  DEBUG_ASSERT(NULL != new_gateway->token, "Out of memory");
 
   uv_timer_init(new_gateway->loop, &new_gateway->timeout);
   uv_handle_set_data((uv_handle_t*)&new_gateway->timeout, new_gateway);
@@ -75,6 +78,8 @@ Concord_gateway_destroy(concord_gateway_st *gateway)
   if (gateway->event_data){
     jscon_destroy(gateway->event_data);
   }
+
+  safe_free(gateway->token);
 
   safe_free(gateway); 
 }
@@ -254,6 +259,72 @@ _concord_gateway_strevent(enum gateway_opcode opcode)
   }
 }
 
+static void
+_concord_on_gateway_hello(concord_gateway_st *gateway)
+{
+  unsigned long heartbeat_ms = (unsigned long)jscon_get_integer(jscon_get_branch(gateway->event_data, "heartbeat_interval"));
+  DEBUG_ASSERT(heartbeat_ms > 0, "Invalid heartbeat_ms");
+
+  int uvcode = uv_timer_start(&gateway->heartbeat_signal, &_uv_on_heartbeat_signal_cb, 0, heartbeat_ms);
+  DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
+}
+
+static void
+_concord_gateway_start_identify(concord_gateway_st *gateway)
+{
+  if (gateway->identify){
+    jscon_destroy(gateway->identify);
+    gateway->identify = NULL;
+  }
+
+  uv_utsname_t buffer;
+  int uvcode = uv_os_uname(&buffer);
+  DEBUG_ASSERT(!uvcode, "Couldn't fetch system information");
+
+
+  jscon_list_st *main_list = jscon_list_init();  
+  jscon_list_st *helper_list = jscon_list_init();  
+
+  /* https://discord.com/developers/docs/topics/gateway#identify-identify-connection-properties */
+  jscon_list_append(helper_list, jscon_string(buffer.sysname, "$os"));
+  /* @todo library name should be from a macro */
+  jscon_list_append(helper_list, jscon_string("libconcord", "$browser"));
+  jscon_list_append(helper_list, jscon_string("libconcord", "$device"));
+  jscon_list_append(main_list, jscon_object(helper_list, "properties"));
+  /* https://discord.com/developers/docs/topics/gateway#sharding */
+  /* @todo */
+
+  /* https://discord.com/developers/docs/topics/gateway#update-status-gateway-status-update-structure */
+  jscon_list_append(helper_list, jscon_null("since"));
+  jscon_list_append(helper_list, jscon_null("activities"));
+  jscon_list_append(helper_list, jscon_string("online","status"));
+  jscon_list_append(helper_list, jscon_boolean(false,"afk"));
+  jscon_list_append(main_list, jscon_object(helper_list, "presence"));
+
+  /* https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
+  jscon_list_append(main_list, jscon_string(gateway->token, "token"));
+  jscon_list_append(main_list, jscon_boolean(false, "compress"));
+  jscon_list_append(main_list, jscon_integer(50, "large_threshold"));
+  jscon_list_append(main_list, jscon_boolean(true, "guild_subscriptions"));
+  jscon_list_append(main_list, jscon_integer(GUILD_MESSAGES, "intents"));
+  jscon_list_append(main_list, jscon_object(main_list, "d"));
+  jscon_list_append(main_list, jscon_integer(GATEWAY_IDENTIFY, "op"));
+  
+  /* @todo make this a separate function */
+  gateway->identify = jscon_object(main_list, NULL);
+
+  char *send_payload = jscon_stringify(gateway->identify, JSCON_ANY);
+  DEBUG_PRINT("IDENTIFY PAYLOAD:\n\t%s", send_payload);
+  
+  bool ret = cws_send_text(gateway->easy_handle, send_payload);
+  DEBUG_ASSERT(true == ret, "Couldn't send heartbeat payload");
+
+  safe_free(send_payload);
+
+  jscon_list_destroy(helper_list);
+  jscon_list_destroy(main_list);
+}
+
 void
 Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
 {
@@ -263,6 +334,7 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
 
   if (gateway->event_data){
     jscon_destroy(gateway->event_data);
+    gateway->event_data = NULL;
   }
 
   jscon_scanf((char*)text, 
@@ -282,17 +354,13 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
                  : gateway->event_name, 
               gateway->seq_number);
 
-  int uvcode;
   switch (gateway->opcode){
-  case GATEWAY_HELLO:
-   {
-        ulong heartbeat_ms = (ulong)jscon_get_integer(jscon_get_branch(gateway->event_data, "heartbeat_interval"));
-        DEBUG_ASSERT(heartbeat_ms > 0, "Invalid heartbeat_ms");
-
-        uvcode = uv_timer_start(&gateway->heartbeat_signal, &_uv_on_heartbeat_signal_cb, 0, heartbeat_ms);
-        DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
+  case GATEWAY_DISPATCH:
         break;
-   }
+  case GATEWAY_HELLO:
+        _concord_on_gateway_hello(gateway);
+        _concord_gateway_start_identify(gateway);
+        break;
   case GATEWAY_HEARTBEAT_ACK:
         break; 
   default:

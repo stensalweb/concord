@@ -70,6 +70,26 @@ enum gateway_opcode {
   GATEWAY_HEARTBEAT_ACK         = 11,
 };
 
+/* GATEWAY INTENTS
+https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
+enum gateway_intents {
+  GUILDS                        = 1 << 0,
+  GUILD_MEMBERS                 = 1 << 1,
+  GUILD_BANS                    = 1 << 2,
+  GUILD_EMOJIS                  = 1 << 3,
+  GUILD_INTEGRATIONS            = 1 << 4,
+  GUILD_WEBHOOKS                = 1 << 5,
+  GUILD_INVITES                 = 1 << 6,
+  GUILD_VOICE_STATES            = 1 << 7,
+  GUILD_PRESENCES               = 1 << 8,
+  GUILD_MESSAGES                = 1 << 9,
+  GUILD_MESSAGE_REACTIONS       = 1 << 10,
+  GUILD_MESSAGE_TYPING          = 1 << 11,
+  DIRECT_MESSAGES               = 1 << 12,
+  DIRECT_MESSAGE_REACTIONS      = 1 << 13,
+  DIRECT_MESSAGE_TYPING         = 1 << 14,
+};
+
 /* SNOWFLAKES
 https://discord.com/developers/docs/reference#snowflakes */
 enum discord_snowflake {
@@ -149,6 +169,10 @@ struct concord_bucket_s {
 };
 
 typedef struct concord_gateway_s {
+  char *token;
+  /* https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
+  jscon_item_st *identify;
+
   struct concord_context_s *context;
 
   CURLM *multi_handle;
@@ -264,7 +288,7 @@ void Curl_set_url(struct concord_conn_s *conn, char endpoint[]);
 /*************/
 /* concord-gateway.c */
 
-concord_gateway_st* Concord_gateway_init();
+concord_gateway_st* Concord_gateway_init(char token[]);
 void Concord_gateway_destroy(concord_gateway_st *gateway);
 int Concord_gateway_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
 int Concord_gateway_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);

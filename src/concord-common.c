@@ -109,12 +109,12 @@ concord_init(char token[])
   concord_st *new_concord = safe_malloc(sizeof *new_concord);
 
   new_concord->utils = _concord_utils_init(token);
-  new_concord->gateway = Concord_gateway_init();
+  new_concord->gateway = Concord_gateway_init(token);
 
-  new_concord->channel = concord_channel_init(&new_concord->utils);
-  new_concord->guild = concord_guild_init(&new_concord->utils);
-  new_concord->user = concord_user_init(&new_concord->utils);
-  new_concord->client = concord_user_init(&new_concord->utils);
+  new_concord->channel = concord_channel_init();
+  new_concord->guild = concord_guild_init();
+  new_concord->user = concord_user_init();
+  new_concord->client = concord_user_init();
 
   return new_concord;
 }
