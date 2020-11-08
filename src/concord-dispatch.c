@@ -19,7 +19,7 @@ Concord_context_init(uv_loop_t *loop, curl_socket_t sockfd)
   int uvcode = uv_poll_init_socket(loop, &new_context->poll_handle, sockfd);
   DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
-  new_context->poll_handle.data = uv_loop_get_data(loop);
+  uv_handle_set_data((uv_handle_t*)&new_context->poll_handle, uv_loop_get_data(loop));
 
   return new_context;
 }
@@ -284,33 +284,38 @@ Concord_utils_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, voi
   CURLMcode mcode;
   int uvcode;
   int events = 0;
-  struct concord_context_s *context;
+  struct concord_conn_s *conn;
 
+  if (!p_socket){
+    CURLcode ecode = curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &conn);
+    DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
+
+    mcode = curl_multi_assign(utils->multi_handle, sockfd, conn);
+    DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
+  } else {
+    conn = p_socket;
+  }
 
   switch (action){
   case CURL_POLL_IN:
   case CURL_POLL_OUT:
-      if (p_socket){
-        context = (struct concord_context_s*)p_socket;
-      } else {
-        context = Concord_context_init(utils->loop, sockfd);
+      if (!conn->context){
+        conn->context = Concord_context_init(utils->loop, sockfd);
       }
-
-      mcode = curl_multi_assign(utils->multi_handle, sockfd, context);
-      DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
       if (action != CURL_POLL_IN) events |= UV_WRITABLE;
       if (action != CURL_POLL_OUT) events |= UV_READABLE;
 
-      uvcode = uv_poll_start(&context->poll_handle, events, &_uv_perform_cb);
+      uvcode = uv_poll_start(&conn->context->poll_handle, events, &_uv_perform_cb);
       DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
       break;
   case CURL_POLL_REMOVE:
-      if (p_socket){
-        uvcode = uv_poll_stop(&((struct concord_context_s*)p_socket)->poll_handle);
+      if (conn){
+        uvcode = uv_poll_stop(&conn->context->poll_handle);
         DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
-        Concord_context_destroy((struct concord_context_s*)p_socket);
+        Concord_context_destroy(conn->context);
+        conn->context = NULL;
 
         mcode = curl_multi_assign(utils->multi_handle, sockfd, NULL);
         DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
@@ -320,8 +325,6 @@ Concord_utils_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, voi
       DEBUG_PRINT("Unknown CURL_POLL_XXX option encountered\n\tCode: %d", action);
       abort();
   }
-
-  (void)easy_handle;
 
   return 0;
 }

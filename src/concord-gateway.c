@@ -38,7 +38,7 @@ _uv_on_walk_cb(uv_handle_t *handle, void *arg)
 }
 
 static void
-_concord_gateway_join_thread(concord_gateway_st *gateway)
+_concord_gateway_disconnect(concord_gateway_st *gateway)
 {
   uv_async_send(&gateway->async);
   uv_thread_join(&gateway->thread_id);
@@ -48,7 +48,12 @@ void
 Concord_gateway_destroy(concord_gateway_st *gateway)
 {
   if (RUNNING == gateway->status){
-    _concord_gateway_join_thread(gateway);
+    _concord_gateway_disconnect(gateway);
+  }
+
+  if (gateway->context){
+    Concord_context_destroy(gateway->context);
+    gateway->context = NULL;
   }
 
   curl_multi_cleanup(gateway->multi_handle);
@@ -100,7 +105,6 @@ _uv_perform_cb(uv_poll_t *req, int uvstatus, int events)
     DEBUG_PRINT("HTTP completed with status %d '%s'", msg->data.result, curl_easy_strerror(msg->data.result));
 
     gateway->status = INNACTIVE;
-
     uv_stop(gateway->loop);
   }
 }
@@ -143,7 +147,6 @@ int
 Concord_gateway_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket)
 {
   concord_gateway_st *gateway = p_userdata;
-  CURLMcode mcode;
   int uvcode;
   int events = 0;
 
@@ -152,14 +155,9 @@ Concord_gateway_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, v
   case CURL_POLL_IN:
   case CURL_POLL_OUT:
   case CURL_POLL_INOUT:
-      if (p_socket){
-        gateway->context = (struct concord_context_s*)p_socket;
-      } else {
+      if (!gateway->context){
         gateway->context = Concord_context_init(gateway->loop, sockfd);
       }
-
-      mcode = curl_multi_assign(gateway->multi_handle, sockfd, gateway->context);
-      DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
 
       if (action != CURL_POLL_IN) events |= UV_WRITABLE;
       if (action != CURL_POLL_OUT) events |= UV_READABLE;
@@ -168,14 +166,12 @@ Concord_gateway_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, v
       DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
       break;
   case CURL_POLL_REMOVE:
-      if (p_socket){
-        uvcode = uv_poll_stop(&((struct concord_context_s*)p_socket)->poll_handle);
+      if (gateway->context){
+        uvcode = uv_poll_stop(&gateway->context->poll_handle);
         DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
-        Concord_context_destroy((struct concord_context_s*)p_socket);
-
-        mcode = curl_multi_assign(gateway->multi_handle, sockfd, NULL);
-        DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
+        Concord_context_destroy(gateway->context);
+        gateway->context = NULL;
       }
       break;
   default:
@@ -184,6 +180,7 @@ Concord_gateway_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, v
   }
 
   (void)easy_handle;
+  (void)p_socket;
 
   return 0;
 }
@@ -228,6 +225,38 @@ _uv_on_heartbeat_signal_cb(uv_timer_t *req)
   _concord_heartbeat_send(gateway);
 }
 
+char*
+_concord_gateway_strevent(enum gateway_opcode opcode)
+{
+  switch(opcode){
+  case GATEWAY_DISPATCH:
+        return "GATEWAY_DISPATCH";
+  case GATEWAY_HEARTBEAT:
+        return "GATEWAY_HEARTBEAT";
+  case GATEWAY_IDENTIFY:
+        return "GATEWAY_IDENTIFY";
+  case GATEWAY_PRESENCE_UPDATE:
+        return "GATEWAY_PRESENCE_UPDATE";
+  case GATEWAY_VOICE_STATE_UPDATE:
+        return "GATEWAY_VOICE_STATE_UPDATE";
+  case GATEWAY_RESUME:
+        return "GATEWAY_RESUME";
+  case GATEWAY_RECONNECT:
+        return "GATEWAY_RECONNECT";
+  case GATEWAY_REQUEST_GUILD_MEMBERS:
+        return "GATEWAY_REQUEST_GUILD_MEMBERS";
+  case GATEWAY_INVALID_SESSION:
+        return "GATEWAY_INVALID_SESSION";
+  case GATEWAY_HELLO:
+        return "GATEWAY_HELLO";
+  case GATEWAY_HEARTBEAT_ACK:
+        return "GATEWAY_HEARTBEAT_ACK";
+  default:
+        DEBUG_PRINT("Invalid gateway opcode:\t%d", opcode);
+        abort();
+  }
+}
+
 void
 Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
 {
@@ -251,7 +280,9 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
 
   DEBUG_PRINT("OP:\t\t%d\n\tEVENT_NAME:\t%s\n\tSEQ_NUMBER:\t%d", 
               gateway->opcode, 
-              gateway->event_name, 
+              !*gateway->event_name /* "if is empty string" */
+                 ?  _concord_gateway_strevent(gateway->opcode)
+                 : gateway->event_name, 
               gateway->seq_number);
 
   int uvcode;
@@ -261,7 +292,6 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
         ulong heartbeat_ms = (ulong)jscon_get_integer(jscon_get_branch(gateway->event_data, "heartbeat_interval"));
         DEBUG_ASSERT(heartbeat_ms > 0, "Invalid heartbeat_ms");
 
-        /* @todo figure out why timer is not accurate */
         uvcode = uv_timer_start(&gateway->heartbeat_signal, &_uv_on_heartbeat_signal_cb, 0, heartbeat_ms);
         DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
         break;
@@ -280,13 +310,10 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
 void
 Concord_on_close_cb(void *data, CURL *easy_handle, enum cws_close_reason cwscode, const char *reason, size_t len)
 {
-  concord_gateway_st *gateway = data;
   DEBUG_PRINT("CLOSE=%4d %zd bytes '%s'", cwscode, len, reason);
 
-  gateway->status = INNACTIVE;
-  uv_stop(gateway->loop);
-
   (void)easy_handle;
+  (void)data;
 }
 
 static void
@@ -300,6 +327,9 @@ _uv_disconnect_cb(uv_timer_t *req)
   DEBUG_ASSERT(true == ret, "Couldn't disconnect from gateway gracefully");
 
   _uv_perform_cb(&gateway->context->poll_handle, uv_is_closing((uv_handle_t*)&gateway->context->poll_handle), UV_READABLE|UV_DISCONNECT);
+
+  uv_timer_stop(&gateway->timeout);
+  uv_close((uv_handle_t*)&gateway->timeout, NULL);
 }
 
 static void
@@ -307,10 +337,13 @@ _uv_on_force_close_cb(uv_async_t *req)
 {
   concord_gateway_st *gateway = uv_handle_get_data((uv_handle_t*)req);
 
-  int uvcode = uv_timer_start(&gateway->heartbeat_signal, &_uv_disconnect_cb, 0, 0);
+  int uvcode = uv_timer_start(&gateway->timeout, &_uv_disconnect_cb, 0, 0);
   DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
   uv_close((uv_handle_t*)req, NULL);
+
+  uv_timer_stop(&gateway->heartbeat_signal);
+  uv_close((uv_handle_t*)&gateway->heartbeat_signal, NULL);
 }
 
 static void
@@ -349,7 +382,7 @@ concord_gateway_disconnect(concord_st *concord)
     return;
   }
 
-  _concord_gateway_join_thread(concord->gateway);
+  _concord_gateway_disconnect(concord->gateway);
 }
 
 bool

@@ -64,6 +64,11 @@ _concord_conn_init(concord_utils_st *utils)
 static void
 _concord_conn_destroy(struct concord_conn_s *conn)
 {
+  if (conn->context){
+    Concord_context_destroy(conn->context);
+    conn->context = NULL;
+  }
+
   curl_easy_cleanup(conn->easy_handle);
   safe_free(conn->response_body.str);
   safe_free(conn);

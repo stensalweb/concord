@@ -110,20 +110,22 @@ enum transfer_status {
 typedef void (concord_load_obj_ft)(void **p_object, struct concord_response_s *response_body);
 
 struct concord_conn_s {
-  enum transfer_status status; /* conn transfer status */
+  struct concord_context_s *context;
 
   CURL *easy_handle; /* easy handle that performs the request */
+  enum transfer_status status; /* easy_handle's transfer status */
 
   struct concord_response_s response_body; /* response body associated with the transfer */
 
   concord_load_obj_ft *load_cb; /* load object callback */
   void **p_object; /* object to be performed action at load_cb */
 
-  struct concord_bucket_s *p_bucket; /* bucket this conn is a part of */
+  struct concord_bucket_s *p_bucket; /* bucket this conn is inside */
+
 };
 
 struct concord_queue_s {
-  struct concord_conn_s **conns; /* the conn queue itself */
+  struct concord_conn_s **conns; /* the connections queue */
   size_t size; /* how many conns the queue supports (not how many conns it currently holds) */
 
   /* bottom index of running conns queue partition */
@@ -147,22 +149,18 @@ struct concord_bucket_s {
 };
 
 typedef struct concord_gateway_s {
-  uv_async_t async; /* wakeup callback from another thread */
-  uv_thread_t thread_id; /* gateway loop thread id */
-
   struct concord_context_s *context;
-
-  enum transfer_status status; /* gateway status */
 
   CURLM *multi_handle;
   CURL *easy_handle;
-
-  int transfers_running; /* current running transfers */
+  enum transfer_status status; /* gateway's easy_handle status */
+  int transfers_running; /* current running transfers ( 1 or 0 )*/
 
   uv_loop_t *loop; /* the event loop */
   uv_timer_t timeout;
-
-  uv_timer_t heartbeat_signal;
+  uv_timer_t heartbeat_signal; /* keep connection with gateway alive */
+  uv_async_t async; /* wakeup callback from another thread */
+  uv_thread_t thread_id; /* gateway loop thread id */
 
   enum gateway_opcode opcode;   /* field 'opcode' */
   int seq_number;               /* field 's' */
