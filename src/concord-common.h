@@ -186,9 +186,9 @@ typedef struct concord_gateway_s {
   uv_async_t async; /* wakeup callback from another thread */
   uv_thread_t thread_id; /* gateway loop thread id */
 
-  enum gateway_opcode opcode;   /* field 'opcode' */
-  int seq_number;               /* field 's' */
-  char event_name[25];          /* field 't' */
+  enum gateway_opcode *opcode;  /* field 'opcode' */
+  int *seq_number;              /* field 's' */
+  char *event_name;             /* field 't' */
   jscon_item_st *event_data;    /* field 'd' */
 
 } concord_gateway_st;

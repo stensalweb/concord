@@ -29,6 +29,11 @@ Concord_gateway_init(char token[])
   new_gateway->easy_handle = Concord_gateway_easy_init(new_gateway);
   new_gateway->multi_handle = Concord_gateway_multi_init(new_gateway);
 
+  new_gateway->opcode = safe_malloc(sizeof *new_gateway->opcode);
+  new_gateway->seq_number = safe_malloc(sizeof *new_gateway->seq_number);
+  new_gateway->event_name = safe_malloc(25);
+
+
   return new_gateway;
 }
 
@@ -204,10 +209,10 @@ _concord_heartbeat_send(concord_gateway_st *gateway)
 {
   char send_payload[250];
 
-  if (0 == gateway->seq_number){
+  if (!gateway->seq_number){
     snprintf(send_payload, 249, "{\"op\": 1, \"d\": null}");
   } else {
-    snprintf(send_payload, 249, "{\"op\": 1, \"d\": %d}", gateway->seq_number);
+    snprintf(send_payload, 249, "{\"op\": 1, \"d\": %d}", *gateway->seq_number);
   }
 
   DEBUG_PRINT("HEARTBEAT_PAYLOAD:\n\t\t%s", send_payload);
@@ -343,18 +348,18 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
               "#op%jd " \
               "#d%ji",
                gateway->event_name,
-               &gateway->seq_number,
-               &gateway->opcode,
+               gateway->seq_number,
+               gateway->opcode,
                &gateway->event_data);
 
   DEBUG_PRINT("OP:\t\t%d\n\tEVENT_NAME:\t%s\n\tSEQ_NUMBER:\t%d", 
-              gateway->opcode, 
+              *gateway->opcode, 
               !*gateway->event_name /* "if is empty string" */
-                 ?  _concord_gateway_strevent(gateway->opcode)
+                 ?  _concord_gateway_strevent(*gateway->opcode)
                  : gateway->event_name, 
-              gateway->seq_number);
+              *gateway->seq_number);
 
-  switch (gateway->opcode){
+  switch (*gateway->opcode){
   case GATEWAY_DISPATCH:
         break;
   case GATEWAY_HELLO:
@@ -364,7 +369,7 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
   case GATEWAY_HEARTBEAT_ACK:
         break; 
   default:
-        DEBUG_PRINT("Not yet implemented Gateway Opcode: %d", gateway->opcode);
+        DEBUG_PRINT("Not yet implemented Gateway Opcode: %d", *gateway->opcode);
         abort();
   }
 
@@ -375,10 +380,14 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
 void
 Concord_on_close_cb(void *data, CURL *easy_handle, enum cws_close_reason cwscode, const char *reason, size_t len)
 {
+  concord_gateway_st *gateway = data;
+
   DEBUG_PRINT("CLOSE=%4d %zd bytes '%s'", cwscode, len, reason);
 
+  gateway->status = INNACTIVE;
+  uv_stop(gateway->loop);
+
   (void)easy_handle;
-  (void)data;
 }
 
 static void
@@ -391,10 +400,10 @@ _uv_disconnect_cb(uv_timer_t *req)
   bool ret = cws_close(gateway->easy_handle, CWS_CLOSE_REASON_NORMAL, reason, strlen(reason));
   DEBUG_ASSERT(true == ret, "Couldn't disconnect from gateway gracefully");
 
-  _uv_perform_cb(&gateway->context->poll_handle, uv_is_closing((uv_handle_t*)&gateway->context->poll_handle), UV_READABLE|UV_DISCONNECT);
-
   uv_timer_stop(&gateway->timeout);
   uv_close((uv_handle_t*)&gateway->timeout, NULL);
+
+  _uv_perform_cb(&gateway->context->poll_handle, uv_is_closing((uv_handle_t*)&gateway->context->poll_handle), UV_READABLE|UV_DISCONNECT);
 }
 
 static void
