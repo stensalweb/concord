@@ -8,7 +8,7 @@
 #define BASE_API_URL "https://discord.com/api"
 #define BASE_GATEWAY_URL "wss://gateway.discord.gg/?v=6&encoding=json"
 
-#define MAX_CONCURRENT_CONNS  15
+#define MAX_QUEUE_SIZE  15
 
 #define BUCKET_DICTIONARY_SIZE  30
 #define HEADER_DICTIONARY_SIZE  15
@@ -168,6 +168,13 @@ struct concord_bucket_s {
   struct concord_utils_s *p_utils;
 };
 
+enum gateway_status {
+  DISCONNECTED   = 0,           /* disconnected from gateway */
+  DISCONNECTING  = 1 << 0,      /* disconnecting from gateway */
+  CONNECTING     = 1 << 1,      /* connecting to gateway */
+  CONNECTED      = 1 << 2,      /* connected to gateway */
+};
+
 typedef struct concord_gateway_s {
   char *token;
   /* https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
@@ -177,7 +184,7 @@ typedef struct concord_gateway_s {
 
   CURLM *multi_handle;
   CURL *easy_handle;
-  enum transfer_status status; /* gateway's easy_handle status */
+  enum gateway_status status; /* gateway's easy_handle status */
   int transfers_running; /* current running transfers ( 1 or 0 )*/
 
   uv_loop_t *loop; /* the event loop */
@@ -186,10 +193,12 @@ typedef struct concord_gateway_s {
   uv_async_t async; /* wakeup callback from another thread */
   uv_thread_t thread_id; /* gateway loop thread id */
 
-  enum gateway_opcode *opcode;  /* field 'opcode' */
-  int *seq_number;              /* field 's' */
-  char *event_name;             /* field 't' */
-  jscon_item_st *event_data;    /* field 'd' */
+  struct { /* PAYLOAD STRUCTURE */
+    enum gateway_opcode opcode;         /* field 'op' */
+    long long seq_number;               /* field 's' */
+    char event_name[25];                /* field 't' */
+    jscon_item_st *event_data;          /* field 'd' */
+  } payload;
 
 } concord_gateway_st;
 

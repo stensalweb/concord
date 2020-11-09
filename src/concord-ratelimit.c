@@ -111,7 +111,7 @@ _concord_bucket_init(concord_utils_st *utils, char bucket_hash[])
 {
   struct concord_bucket_s *new_bucket = safe_malloc(sizeof *new_bucket);
 
-  new_bucket->queue.size = MAX_CONCURRENT_CONNS;
+  new_bucket->queue.size = MAX_QUEUE_SIZE;
   new_bucket->queue.conns = safe_malloc(sizeof *new_bucket->queue.conns * new_bucket->queue.size);
 
   new_bucket->hash_key = strndup(bucket_hash, strlen(bucket_hash));

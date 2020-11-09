@@ -29,11 +29,6 @@ Concord_gateway_init(char token[])
   new_gateway->easy_handle = Concord_gateway_easy_init(new_gateway);
   new_gateway->multi_handle = Concord_gateway_multi_init(new_gateway);
 
-  new_gateway->opcode = safe_malloc(sizeof *new_gateway->opcode);
-  new_gateway->seq_number = safe_malloc(sizeof *new_gateway->seq_number);
-  new_gateway->event_name = safe_malloc(25);
-
-
   return new_gateway;
 }
 
@@ -55,7 +50,7 @@ _concord_gateway_disconnect(concord_gateway_st *gateway)
 void
 Concord_gateway_destroy(concord_gateway_st *gateway)
 {
-  if (RUNNING == gateway->status){
+  if (CONNECTED == gateway->status){
     _concord_gateway_disconnect(gateway);
   }
 
@@ -80,8 +75,9 @@ Concord_gateway_destroy(concord_gateway_st *gateway)
   }
   safe_free(gateway->loop);
 
-  if (gateway->event_data){
-    jscon_destroy(gateway->event_data);
+  if (gateway->payload.event_data){
+    jscon_destroy(gateway->payload.event_data);
+    gateway->payload.event_data = NULL;
   }
 
   safe_free(gateway->token);
@@ -114,7 +110,7 @@ _uv_perform_cb(uv_poll_t *req, int uvstatus, int events)
     
     DEBUG_PRINT("HTTP completed with status %d '%s'", msg->data.result, curl_easy_strerror(msg->data.result));
 
-    gateway->status = INNACTIVE;
+    gateway->status = DISCONNECTED;
     uv_stop(gateway->loop);
   }
 }
@@ -198,10 +194,13 @@ Concord_gateway_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, v
 void
 Concord_on_connect_cb(void *data, CURL *easy_handle, const char *ws_protocols)
 {
+  concord_gateway_st *gateway = data;
+
   DEBUG_PRINT("Connected, WS-Protocols: '%s'", ws_protocols);
 
+  gateway->status = CONNECTED;
+
   (void)easy_handle;
-  (void)data;
 }
 
 static void
@@ -209,10 +208,10 @@ _concord_heartbeat_send(concord_gateway_st *gateway)
 {
   char send_payload[250];
 
-  if (!gateway->seq_number){
+  if (0 == gateway->payload.seq_number){
     snprintf(send_payload, 249, "{\"op\": 1, \"d\": null}");
   } else {
-    snprintf(send_payload, 249, "{\"op\": 1, \"d\": %d}", *gateway->seq_number);
+    snprintf(send_payload, 249, "{\"op\": 1, \"d\": %lld}", gateway->payload.seq_number);
   }
 
   DEBUG_PRINT("HEARTBEAT_PAYLOAD:\n\t\t%s", send_payload);
@@ -267,7 +266,7 @@ _concord_gateway_strevent(enum gateway_opcode opcode)
 static void
 _concord_on_gateway_hello(concord_gateway_st *gateway)
 {
-  unsigned long heartbeat_ms = (unsigned long)jscon_get_integer(jscon_get_branch(gateway->event_data, "heartbeat_interval"));
+  unsigned long heartbeat_ms = (unsigned long)jscon_get_integer(jscon_get_branch(gateway->payload.event_data, "heartbeat_interval"));
   DEBUG_ASSERT(heartbeat_ms > 0, "Invalid heartbeat_ms");
 
   int uvcode = uv_timer_start(&gateway->heartbeat_signal, &_uv_on_heartbeat_signal_cb, 0, heartbeat_ms);
@@ -337,9 +336,9 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
 
   DEBUG_PRINT("ON_TEXT:\n\t\t%s", text);
 
-  if (gateway->event_data){
-    jscon_destroy(gateway->event_data);
-    gateway->event_data = NULL;
+  if (gateway->payload.event_data){
+    jscon_destroy(gateway->payload.event_data);
+    gateway->payload.event_data = NULL;
   }
 
   jscon_scanf((char*)text, 
@@ -347,19 +346,19 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
               "#s%jd " \
               "#op%jd " \
               "#d%ji",
-               gateway->event_name,
-               gateway->seq_number,
-               gateway->opcode,
-               &gateway->event_data);
+               gateway->payload.event_name,
+               &gateway->payload.seq_number,
+               &gateway->payload.opcode,
+               &gateway->payload.event_data);
 
-  DEBUG_PRINT("OP:\t\t%d\n\tEVENT_NAME:\t%s\n\tSEQ_NUMBER:\t%d", 
-              *gateway->opcode, 
-              !*gateway->event_name /* "if is empty string" */
-                 ?  _concord_gateway_strevent(*gateway->opcode)
-                 : gateway->event_name, 
-              *gateway->seq_number);
+  DEBUG_PRINT("OP:\t\t%s\n\tEVENT_NAME:\t%s\n\tSEQ_NUMBER:\t%lld", 
+              _concord_gateway_strevent(gateway->payload.opcode), 
+              !*gateway->payload.event_name /* "if is empty string" */
+                 ? "NULL" 
+                 : gateway->payload.event_name, 
+              gateway->payload.seq_number);
 
-  switch (*gateway->opcode){
+  switch (gateway->payload.opcode){
   case GATEWAY_DISPATCH:
         break;
   case GATEWAY_HELLO:
@@ -369,7 +368,7 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
   case GATEWAY_HEARTBEAT_ACK:
         break; 
   default:
-        DEBUG_PRINT("Not yet implemented Gateway Opcode: %d", *gateway->opcode);
+        DEBUG_PRINT("Not yet implemented Gateway Opcode: %d", gateway->payload.opcode);
         abort();
   }
 
@@ -384,7 +383,7 @@ Concord_on_close_cb(void *data, CURL *easy_handle, enum cws_close_reason cwscode
 
   DEBUG_PRINT("CLOSE=%4d %zd bytes '%s'", cwscode, len, reason);
 
-  gateway->status = INNACTIVE;
+  gateway->status = DISCONNECTING;
   uv_stop(gateway->loop);
 
   (void)easy_handle;
@@ -440,12 +439,12 @@ concord_gateway_connect(concord_st *concord)
 {
   concord_gateway_st *gateway = concord->gateway;
 
-  if (RUNNING == gateway->status){
+  if ((CONNECTING|CONNECTED) & gateway->status){
     DEBUG_PUTS("Gateway already running, returning"); 
     return;
   }
 
-  gateway->status = RUNNING; /* not really running just yet, trying to connect ... */
+  gateway->status = CONNECTING;
 
   uv_thread_create(&gateway->thread_id, &_concord_gateway_run, gateway);
 }
@@ -453,7 +452,7 @@ concord_gateway_connect(concord_st *concord)
 void
 concord_gateway_disconnect(concord_st *concord)
 {
-  if (INNACTIVE == concord->gateway->status){
+  if ((DISCONNECTING|DISCONNECTED) == concord->gateway->status){
     DEBUG_PUTS("Gateway already innactive, returning"); 
     return;
   }
@@ -464,5 +463,5 @@ concord_gateway_disconnect(concord_st *concord)
 int
 concord_gateway_isrunning(concord_st *concord)
 {
-  return (RUNNING == concord->gateway->status);
+  return ((CONNECTING|CONNECTED) & concord->gateway->status);
 }
