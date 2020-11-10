@@ -121,8 +121,8 @@ typedef struct {
 } concord_user_st;
 
 typedef struct concord_s {
-  struct concord_utils_s *utils;
-  struct concord_gateway_s *gateway;
+  struct concord_http_s *http;
+  struct concord_ws_s *ws;
 
   concord_channel_st *channel;
   concord_user_st *user;
@@ -132,10 +132,10 @@ typedef struct concord_s {
 
 
 void concord_dispatch(concord_st *concord);
-void concord_gateway_connect(concord_st *concord);
-void concord_gateway_disconnect(concord_st *concord);
+void concord_ws_connect(concord_st *concord);
+void concord_ws_disconnect(concord_st *concord);
 
-int concord_gateway_isrunning(concord_st *concord);
+int concord_ws_isrunning(concord_st *concord);
 
 void concord_global_init();
 void concord_global_cleanup();

@@ -39,24 +39,24 @@ enum discord_limits {
 /* HTTP RESPONSE CODES
 https://discord.com/developers/docs/topics/opcodes-and-status-codes#http-http-response-codes */
 enum discord_http_code {
-  DISCORD_OK                    = 200,
-  DISCORD_CREATED               = 201,
-  DISCORD_NO_CONTENT            = 204,
-  DISCORD_NOT_MODIFIED          = 304,
-  DISCORD_BAD_REQUEST           = 400,
-  DISCORD_UNAUTHORIZED          = 401,
-  DISCORD_FORBIDDEN             = 403,
-  DISCORD_NOT_FOUND             = 404,
-  DISCORD_METHOD_NOT_ALLOWED    = 405,
-  DISCORD_TOO_MANY_REQUESTS     = 429,
-  DISCORD_GATEWAY_UNAVAILABLE   = 502,
+  HTTP_OK                       = 200,
+  HTTP_CREATED                  = 201,
+  HTTP_NO_CONTENT               = 204,
+  HTTP_NOT_MODIFIED             = 304,
+  HTTP_BAD_REQUEST              = 400,
+  HTTP_UNAUTHORIZED             = 401,
+  HTTP_FORBIDDEN                = 403,
+  HTTP_NOT_FOUND                = 404,
+  HTTP_METHOD_NOT_ALLOWED       = 405,
+  HTTP_TOO_MANY_REQUESTS        = 429,
+  HTTP_GATEWAY_UNAVAILABLE      = 502,
 
   CURL_NO_RESPONSE              = 0,
 };
 
 /* GATEWAY OPCODES
 https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-opcodes */
-enum gateway_opcode {
+enum ws_opcode {
   GATEWAY_DISPATCH              = 0,
   GATEWAY_HEARTBEAT             = 1,
   GATEWAY_IDENTIFY              = 2,
@@ -72,7 +72,7 @@ enum gateway_opcode {
 
 /* GATEWAY INTENTS
 https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
-enum gateway_intents {
+enum ws_intents {
   GUILDS                        = 1 << 0,
   GUILD_MEMBERS                 = 1 << 1,
   GUILD_BANS                    = 1 << 2,
@@ -120,11 +120,11 @@ struct concord_response_s {
   size_t size;  /* length of response str */
 };
 
-enum transfer_status {
-  INNACTIVE = 0,  /* transfer is completed or unused */
-  RUNNING,        /* transfer is awaiting server response */
-  PAUSE,          /* running transfer has been temporarily paused */
-  ON_HOLD,        /* transfer is waiting on queue, not running */
+enum conn_status {
+  INNACTIVE = 0,  /* conn is open for reuse/recycle */
+  RUNNING,        /* conn is awaiting server response */
+  PAUSE,          /* running conn has been temporarily paused */
+  ON_HOLD,        /* conn is waiting on queue, not running */
 };
 
 typedef void (concord_load_obj_ft)(void **p_object, struct concord_response_s *response_body);
@@ -133,9 +133,9 @@ struct concord_conn_s {
   struct concord_context_s *context;
 
   CURL *easy_handle; /* easy handle that performs the request */
-  enum transfer_status status; /* easy_handle's transfer status */
+  enum conn_status status; /* easy_handle's conn status */
 
-  struct concord_response_s response_body; /* response body associated with the transfer */
+  struct concord_response_s response_body; /* response body associated with the conn */
 
   concord_load_obj_ft *load_cb; /* load object callback */
   void **p_object; /* object to be performed action at load_cb */
@@ -148,13 +148,10 @@ struct concord_queue_s {
   struct concord_conn_s **conns; /* the connections queue */
   size_t size; /* how many conns the queue supports (not how many conns it currently holds) */
 
-  /* bottom index of running conns queue partition */
-  size_t bottom_running;
-  /* top index of running conns partition
-      and bottom index of on hold partition */
-  size_t separator;
-  /* top index of on hold conns queue partition */
-  size_t top_onhold;
+  /* @todo illustrate how this works */
+  size_t bottom_running; /* bottom index of running conns */
+  size_t separator; /* top index of running conns and bottom index on hold conns */
+  size_t top_onhold; /* top index of on hold conns */
 };
 
 struct concord_bucket_s {
@@ -162,20 +159,20 @@ struct concord_bucket_s {
 
   char *hash_key; /* per-route key given by the discord API */
 
-  uv_timer_t timer;
+  uv_timer_t ratelimit_timer; /* resume transfers from ratelimited bucket */
   int remaining; /* conns available for simultaneous transfers */
 
-  struct concord_utils_s *p_utils;
+  struct concord_http_s *p_http; /* client this bucket is a part of */
 };
 
-enum gateway_status {
-  DISCONNECTED   = 0,           /* disconnected from gateway */
-  DISCONNECTING  = 1 << 0,      /* disconnecting from gateway */
-  CONNECTING     = 1 << 1,      /* connecting to gateway */
-  CONNECTED      = 1 << 2,      /* connected to gateway */
+enum ws_status {
+  DISCONNECTED   = 0,           /* disconnected from ws */
+  DISCONNECTING  = 1 << 0,      /* disconnecting from ws */
+  CONNECTING     = 1 << 1,      /* connecting to ws */
+  CONNECTED      = 1 << 2,      /* connected to ws */
 };
 
-typedef struct concord_gateway_s {
+typedef struct concord_ws_s {
   char *token;
   /* https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
   jscon_item_st *identify;
@@ -184,26 +181,26 @@ typedef struct concord_gateway_s {
 
   CURLM *multi_handle;
   CURL *easy_handle;
-  enum gateway_status status; /* gateway's easy_handle status */
+  enum ws_status status; /* ws's easy_handle status */
   int transfers_running; /* current running transfers ( 1 or 0 )*/
 
   uv_loop_t *loop; /* the event loop */
   uv_timer_t timeout;
-  uv_timer_t heartbeat_signal; /* keep connection with gateway alive */
+  uv_timer_t heartbeat_signal; /* keep connection with ws alive */
   uv_async_t async; /* wakeup callback from another thread */
-  uv_thread_t thread_id; /* gateway loop thread id */
+  uv_thread_t thread_id; /* ws loop thread id */
 
   struct { /* PAYLOAD STRUCTURE */
-    enum gateway_opcode opcode;         /* field 'op' */
+    enum ws_opcode opcode;         /* field 'op' */
     long long seq_number;               /* field 's' */
     char event_name[25];                /* field 't' */
     jscon_item_st *event_data;          /* field 'd' */
   } payload;
 
-} concord_gateway_st;
+} concord_ws_st;
 
 /* @todo hash/unhash token */
-typedef struct concord_utils_s {
+typedef struct concord_http_s {
   char *token; /* bot/user token used as identification to the API */
 
   struct curl_slist *request_header; /* the default request header sent to discord servers */
@@ -220,7 +217,7 @@ typedef struct concord_utils_s {
 
   struct dictionary_s *bucket_dict; /* store buckets by endpoints/major parameters */
   struct dictionary_s *header; /* holds the http response header */
-} concord_utils_st;
+} concord_http_st;
 
 
 /* memory.c */
@@ -234,7 +231,7 @@ void* __safe_malloc(size_t size, const char file[], const int line, const char f
 /* concord-common.c */
 
 /* 
-  @param utils contains tools common to every request
+  @param http contains tools common to every request
   @param p_object is a pointer to the object to be loaded by load_cb
   @param load_cb is the function that will load the object attributes
     once a connection is completed
@@ -246,7 +243,7 @@ void* __safe_malloc(size_t size, const char file[], const int line, const char f
     endpoint
 */
 void Concord_http_request(
-    concord_utils_st *utils,
+    concord_http_st *http,
     void **p_object,
     concord_load_obj_ft *load_cb,
     enum http_method http_method,
@@ -259,10 +256,10 @@ void Concord_http_request(
 
 struct concord_context_s* Concord_context_init(uv_loop_t *loop, curl_socket_t sockfd);
 void Concord_context_destroy(struct concord_context_s *context);
-int Concord_utils_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
-int Concord_utils_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
-void Concord_register_bucket_key(concord_utils_st *utils, struct concord_conn_s *conn, char bucket_key[]);
-void Concord_transfer_loop(concord_utils_st *utils);
+int Concord_http_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
+int Concord_http_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
+void Concord_register_bucket_key(concord_http_st *http, struct concord_conn_s *conn, char bucket_key[]);
+void Concord_transfers_run(concord_http_st *http);
 
 /*************/
 /* concord-ratelimit.c */
@@ -271,13 +268,13 @@ void Concord_transfer_loop(concord_utils_st *utils);
 char* Concord_tryget_major(char endpoint[]);
 long long Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, struct dictionary_s *header, bool use_clock);
 
-void Concord_queue_pop(concord_utils_st *utils, struct concord_queue_s *queue);
+void Concord_queue_pop(concord_http_st *http, struct concord_queue_s *queue);
 
-void Concord_start_client_buckets(concord_utils_st *utils);
-void Concord_stop_client_buckets(concord_utils_st *utils);
+void Concord_start_client_buckets(concord_http_st *http);
+void Concord_stop_client_buckets(concord_http_st *http);
 
-void Concord_bucket_build(concord_utils_st *utils, void **p_object, concord_load_obj_ft *load_cb, enum http_method http_method, char bucket_key[], char url_route[]);
-struct concord_bucket_s* Concord_trycreate_bucket(concord_utils_st *utils, char bucket_hash[]);
+void Concord_bucket_build(concord_http_st *http, void **p_object, concord_load_obj_ft *load_cb, enum http_method http_method, char bucket_key[], char url_route[]);
+struct concord_bucket_s* Concord_trycreate_bucket(concord_http_st *http, char bucket_hash[]);
 
 /*************/
 /* curl-ext.c */
@@ -285,22 +282,22 @@ struct concord_bucket_s* Concord_trycreate_bucket(concord_utils_st *utils, char 
 size_t Curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata);
 size_t Curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata);
 
-struct curl_slist* Curl_request_header_init(concord_utils_st *utils);
-CURL* Concord_conn_easy_init(concord_utils_st *utils, struct concord_conn_s *conn);
-CURLM* Concord_utils_multi_init(concord_utils_st *utils);
-CURL* Concord_gateway_easy_init(concord_gateway_st *gateway);
-CURLM* Concord_gateway_multi_init(concord_gateway_st *gateway);
+struct curl_slist* Curl_request_header_init(concord_http_st *http);
+CURL* Concord_conn_easy_init(concord_http_st *http, struct concord_conn_s *conn);
+CURLM* Concord_http_multi_init(concord_http_st *http);
+CURL* Concord_ws_easy_init(concord_ws_st *ws);
+CURLM* Concord_ws_multi_init(concord_ws_st *ws);
 
 void Curl_set_method(struct concord_conn_s *conn, enum http_method method);
 void Curl_set_url(struct concord_conn_s *conn, char endpoint[]);
 
 /*************/
-/* concord-gateway.c */
+/* concord-websockets.c */
 
-concord_gateway_st* Concord_gateway_init(char token[]);
-void Concord_gateway_destroy(concord_gateway_st *gateway);
-int Concord_gateway_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
-int Concord_gateway_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
+concord_ws_st* Concord_ws_init(char token[]);
+void Concord_ws_destroy(concord_ws_st *ws);
+int Concord_ws_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
+int Concord_ws_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
 void Concord_on_connect_cb(void *data, CURL *easy_handle, const char *ws_protocols);
 void Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len);
 void Concord_on_close_cb(void *data, CURL *easy_handle, enum cws_close_reason cwscode, const char *reason, size_t len);

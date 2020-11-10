@@ -17,9 +17,9 @@ int main(void)
 
   concord_st *concord = concord_init(bot_token);
 
-  concord_gateway_connect(concord);
+  concord_ws_connect(concord);
 
-  while (concord_gateway_isrunning(concord)){
+  while (concord_ws_isrunning(concord)){
     continue;
   }
 

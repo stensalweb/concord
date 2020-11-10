@@ -12,7 +12,7 @@
 
 void
 Concord_http_request(
-  concord_utils_st *utils, 
+  concord_http_st *http, 
   void **p_object, 
   concord_load_obj_ft *load_cb,
   enum http_method http_method,
@@ -33,7 +33,7 @@ Concord_http_request(
   char *bucket_key = Concord_tryget_major(endpoint);
 
   Concord_bucket_build(
-             utils,
+             http,
              p_object,
              load_cb,
              http_method,
@@ -41,31 +41,31 @@ Concord_http_request(
              url_route);
 }
 
-static concord_utils_st*
-_concord_utils_init(char token[])
+static concord_http_st*
+_concord_http_init(char token[])
 {
-  concord_utils_st *new_utils = safe_malloc(sizeof *new_utils);
+  concord_http_st *new_http = safe_malloc(sizeof *new_http);
 
-  new_utils->loop = uv_default_loop();
-  uv_loop_set_data(new_utils->loop, new_utils);
+  new_http->loop = uv_default_loop();
+  uv_loop_set_data(new_http->loop, new_http);
 
-  new_utils->token = strndup(token, strlen(token)-1);
-  DEBUG_ASSERT(NULL != new_utils->token, "Out of memory");
+  new_http->token = strndup(token, strlen(token)-1);
+  DEBUG_ASSERT(NULL != new_http->token, "Out of memory");
 
-  new_utils->request_header = Curl_request_header_init(new_utils);
+  new_http->request_header = Curl_request_header_init(new_http);
 
-  uv_timer_init(new_utils->loop, &new_utils->timeout);
-  uv_handle_set_data((uv_handle_t*)&new_utils->timeout, new_utils);
+  uv_timer_init(new_http->loop, &new_http->timeout);
+  uv_handle_set_data((uv_handle_t*)&new_http->timeout, new_http);
 
-  new_utils->multi_handle = Concord_utils_multi_init(new_utils);
+  new_http->multi_handle = Concord_http_multi_init(new_http);
 
-  new_utils->bucket_dict = dictionary_init();
-  dictionary_build(new_utils->bucket_dict, BUCKET_DICTIONARY_SIZE);
+  new_http->bucket_dict = dictionary_init();
+  dictionary_build(new_http->bucket_dict, BUCKET_DICTIONARY_SIZE);
 
-  new_utils->header = dictionary_init();
-  dictionary_build(new_utils->header, HEADER_DICTIONARY_SIZE);
+  new_http->header = dictionary_init();
+  dictionary_build(new_http->header, HEADER_DICTIONARY_SIZE);
 
-  return new_utils;
+  return new_http;
 }
 
 static void
@@ -77,30 +77,30 @@ _uv_on_walk_cb(uv_handle_t *handle, void *arg)
 }
 
 static void
-_concord_utils_destroy(concord_utils_st *utils)
+_concord_http_destroy(concord_http_st *http)
 {
-  curl_slist_free_all(utils->request_header);
-  curl_multi_cleanup(utils->multi_handle);
+  curl_slist_free_all(http->request_header);
+  curl_multi_cleanup(http->multi_handle);
 
-  int uvcode = uv_loop_close(utils->loop);
+  int uvcode = uv_loop_close(http->loop);
   if (UV_EBUSY == uvcode){ //there are still handles that need to be closed
-    uv_walk(utils->loop, &_uv_on_walk_cb, NULL); //close each handle encountered
+    uv_walk(http->loop, &_uv_on_walk_cb, NULL); //close each handle encountered
 
-    uvcode = uv_run(utils->loop, UV_RUN_DEFAULT); //run the loop again to close remaining handles
+    uvcode = uv_run(http->loop, UV_RUN_DEFAULT); //run the loop again to close remaining handles
     DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
-    uvcode = uv_loop_close(utils->loop); //finally, close the loop
+    uvcode = uv_loop_close(http->loop); //finally, close the loop
     DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
   }
 
-  dictionary_destroy(utils->bucket_dict);
-  dictionary_destroy(utils->header);
+  dictionary_destroy(http->bucket_dict);
+  dictionary_destroy(http->header);
 
-  safe_free(utils->client_buckets);
+  safe_free(http->client_buckets);
 
-  safe_free(utils->token);
+  safe_free(http->token);
 
-  safe_free(utils);
+  safe_free(http);
 }
 
 concord_st*
@@ -108,8 +108,8 @@ concord_init(char token[])
 {
   concord_st *new_concord = safe_malloc(sizeof *new_concord);
 
-  new_concord->utils = _concord_utils_init(token);
-  new_concord->gateway = Concord_gateway_init(token);
+  new_concord->http = _concord_http_init(token);
+  new_concord->ws = Concord_ws_init(token);
 
   new_concord->channel = concord_channel_init();
   new_concord->guild = concord_guild_init();
@@ -122,9 +122,9 @@ concord_init(char token[])
 void
 concord_cleanup(concord_st *concord)
 {
-  Concord_gateway_destroy(concord->gateway);
+  Concord_ws_destroy(concord->ws);
 
-  _concord_utils_destroy(concord->utils);
+  _concord_http_destroy(concord->http);
 
   concord_channel_destroy(concord->channel);
   concord_guild_destroy(concord->guild);
