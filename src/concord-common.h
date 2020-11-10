@@ -186,7 +186,7 @@ typedef struct concord_ws_s {
 
   uv_loop_t *loop; /* the event loop */
   uv_timer_t timeout;
-  uv_timer_t heartbeat_signal; /* keep connection with ws alive */
+  uv_timer_t heartbeat_timer; /* keep connection with ws alive */
   uv_async_t async; /* wakeup callback from another thread */
   uv_thread_t thread_id; /* ws loop thread id */
 

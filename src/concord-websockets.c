@@ -23,8 +23,8 @@ Concord_ws_init(char token[])
   uv_timer_init(new_ws->loop, &new_ws->timeout);
   uv_handle_set_data((uv_handle_t*)&new_ws->timeout, new_ws);
 
-  uv_timer_init(new_ws->loop, &new_ws->heartbeat_signal);
-  uv_handle_set_data((uv_handle_t*)&new_ws->heartbeat_signal, new_ws);
+  uv_timer_init(new_ws->loop, &new_ws->heartbeat_timer);
+  uv_handle_set_data((uv_handle_t*)&new_ws->heartbeat_timer, new_ws);
 
   new_ws->easy_handle = Concord_ws_easy_init(new_ws);
   new_ws->multi_handle = Concord_ws_multi_init(new_ws);
@@ -222,11 +222,11 @@ _concord_heartbeat_send(concord_ws_st *ws)
 }
 
 static void
-_uv_on_heartbeat_signal_cb(uv_timer_t *req)
+_uv_on_heartbeat_cb(uv_timer_t *req)
 {
   concord_ws_st *ws = uv_handle_get_data((uv_handle_t*)req);
 
-  DEBUG_PRINT("REPEAT_MS: %ld", uv_timer_get_repeat(&ws->heartbeat_signal));
+  DEBUG_PRINT("REPEAT_MS: %ld", uv_timer_get_repeat(&ws->heartbeat_timer));
 
   _concord_heartbeat_send(ws);
 }
@@ -263,7 +263,7 @@ _concord_on_ws_hello(concord_ws_st *ws)
   unsigned long heartbeat_ms = (unsigned long)jscon_get_integer(jscon_get_branch(ws->payload.event_data, "heartbeat_interval"));
   DEBUG_ASSERT(heartbeat_ms > 0, "Invalid heartbeat_ms");
 
-  int uvcode = uv_timer_start(&ws->heartbeat_signal, &_uv_on_heartbeat_signal_cb, 0, heartbeat_ms);
+  int uvcode = uv_timer_start(&ws->heartbeat_timer, &_uv_on_heartbeat_cb, 0, heartbeat_ms);
   DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 }
 
@@ -408,8 +408,8 @@ _uv_on_force_close_cb(uv_async_t *req)
 
   uv_close((uv_handle_t*)req, NULL);
 
-  uv_timer_stop(&ws->heartbeat_signal);
-  uv_close((uv_handle_t*)&ws->heartbeat_signal, NULL);
+  uv_timer_stop(&ws->heartbeat_timer);
+  uv_close((uv_handle_t*)&ws->heartbeat_timer, NULL);
 }
 
 static void
