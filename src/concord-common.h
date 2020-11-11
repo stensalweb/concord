@@ -268,7 +268,7 @@ void Concord_transfers_run(concord_http_st *http);
 char* Concord_tryget_major(char endpoint[]);
 long long Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, struct dictionary_s *header, bool use_clock);
 
-void Concord_queue_pop(concord_http_st *http, struct concord_queue_s *queue);
+void Concord_queue_npop(concord_http_st *http, struct concord_queue_s *queue, int num_conn);
 
 void Concord_start_client_buckets(concord_http_st *http);
 void Concord_stop_client_buckets(concord_http_st *http);

@@ -170,19 +170,63 @@ _concord_queue_push(concord_http_st *http, struct concord_queue_s *queue, struct
   }
 }
 
+/* pops N connections from queue (essentially sets them for transfers) */
 void
-Concord_queue_pop(concord_http_st *http, struct concord_queue_s *queue)
+Concord_queue_npop(concord_http_st *http, struct concord_queue_s *queue, int num_conn)
 {
-  if (queue->separator == queue->top_onhold) return; /* no conn to pop */
+  queue->bottom_running = queue->separator;
 
-  struct concord_conn_s *conn = queue->conns[queue->separator];
-  DEBUG_ASSERT(NULL != conn, "Queue's slot is NULL, can't pop");
+  if (queue->bottom_running == queue->top_onhold){
+    DEBUG_PRINT("No conn left to be added\n\t" \
+                "Bucket Hash:\t%s", 
+                ((struct concord_bucket_s*)queue)->hash_key);
+    return;
+  }
 
-  curl_multi_add_handle(http->multi_handle, conn->easy_handle);
-  conn->status = RUNNING;
+  struct concord_conn_s *conn; 
+  while (num_conn--){
+    if (queue->separator == queue->top_onhold)
+      return; /* no conn to pop */
 
-  ++queue->separator;
-  --http->transfers_onhold;
+    conn = queue->conns[queue->separator];
+    DEBUG_ASSERT(NULL != conn, "Queue's slot is NULL, can't pop");
+
+    curl_multi_add_handle(http->multi_handle, conn->easy_handle);
+    conn->status = RUNNING;
+
+    ++queue->separator;
+    --http->transfers_onhold;
+  }
+
+  DEBUG_PRINT("Bucket Hash:\t%s\n\t" \
+              "Queue Size:\t%ld\n\t" \
+              "Queue Bottom:\t%ld\n\t" \
+              "Queue Separator:%ld\n\t" \
+              "Queue Top:\t%ld",
+              ((struct concord_bucket_s*)queue)->hash_key,
+              queue->size,
+              queue->bottom_running,
+              queue->separator,
+              queue->top_onhold);
+}
+
+void
+_concord_queue_reset(struct concord_queue_s *queue)
+{
+  queue->bottom_running = 0;
+  queue->separator = 0;
+  queue->top_onhold = 0;
+
+  DEBUG_PRINT("Bucket Hash:\t%s\n\t" \
+              "Queue Size:\t%ld\n\t" \
+              "Queue Bottom:\t%ld\n\t" \
+              "Queue Separator:%ld\n\t" \
+              "Queue Top:\t%ld",
+              ((struct concord_bucket_s*)queue)->hash_key,
+              queue->size,
+              queue->bottom_running,
+              queue->separator,
+              queue->top_onhold);
 }
 
 void
@@ -191,19 +235,7 @@ Concord_start_client_buckets(concord_http_st *http)
   struct concord_bucket_s **client_buckets = http->client_buckets;
 
   for (size_t i=0; i < http->num_buckets; ++i){
-    client_buckets[i]->queue.bottom_running = client_buckets[i]->queue.separator;
-    Concord_queue_pop(http, &client_buckets[i]->queue);
-
-    DEBUG_PRINT("Bucket Hash:\t%s\n\t" \
-                "Queue Size:\t%ld\n\t" \
-                "Queue Bottom:\t%ld\n\t" \
-                "Queue Separator:%ld\n\t" \
-                "Queue Top:\t%ld",
-                client_buckets[i]->hash_key,
-                client_buckets[i]->queue.size,
-                client_buckets[i]->queue.bottom_running,
-                client_buckets[i]->queue.separator,
-                client_buckets[i]->queue.top_onhold);
+    Concord_queue_npop(http, &client_buckets[i]->queue, 1);
   }
 }
 
@@ -213,20 +245,7 @@ Concord_stop_client_buckets(concord_http_st *http)
   struct concord_bucket_s **client_buckets = http->client_buckets;
 
   for (size_t i=0; i < http->num_buckets; ++i){
-    client_buckets[i]->queue.bottom_running = 0;
-    client_buckets[i]->queue.separator = 0;
-    client_buckets[i]->queue.top_onhold = 0;
-
-    DEBUG_PRINT("Bucket Hash:\t%s\n\t" \
-                "Queue Size:\t%ld\n\t" \
-                "Queue Bottom:\t%ld\n\t" \
-                "Queue Separator:%ld\n\t" \
-                "Queue Top:\t%ld",
-                client_buckets[i]->hash_key,
-                client_buckets[i]->queue.size,
-                client_buckets[i]->queue.bottom_running,
-                client_buckets[i]->queue.separator,
-                client_buckets[i]->queue.top_onhold);
+    _concord_queue_reset(&client_buckets[i]->queue);
   }
 }
 

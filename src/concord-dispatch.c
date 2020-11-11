@@ -44,30 +44,8 @@ _uv_add_remaining_cb(uv_timer_t *req)
 {
   struct concord_bucket_s *bucket = uv_handle_get_data((uv_handle_t*)req);
 
-  bucket->queue.bottom_running = bucket->queue.separator;
-
-  if (bucket->queue.bottom_running == bucket->queue.top_onhold){
-    DEBUG_PRINT("No conn left to be added\n\t" \
-                "Bucket Hash:\t%s", bucket->hash_key);
-    return;
-  }
-
-  DEBUG_PUTS("Adding remainining conns");
-  do {
-    Concord_queue_pop(bucket->p_http, &bucket->queue);
-  } while (bucket->remaining--);
-
-  DEBUG_PRINT("Adding remaining conns\n\t" \
-              "Bucket Hash:\t%s\n\t" \
-              "Queue Size:\t%ld\n\t" \
-              "Queue Bottom:\t%ld\n\t" \
-              "Queue Separator:%ld\n\t" \
-              "Queue Top:\t%ld",
-              bucket->hash_key,
-              bucket->queue.size,
-              bucket->queue.bottom_running,
-              bucket->queue.separator,
-              bucket->queue.top_onhold);
+  DEBUG_PUTS("Adding remaining conns");
+  Concord_queue_npop(bucket->p_http, &bucket->queue, 1+bucket->remaining);
 }
 
 static void
