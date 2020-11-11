@@ -161,6 +161,7 @@ struct concord_bucket_s {
 
   uv_timer_t ratelimit_timer; /* resume transfers from ratelimited bucket */
   int remaining; /* conns available for simultaneous transfers */
+  int finished; /* fetch connections from queue if finished transfers surpasses remaining */
 
   struct concord_http_s *p_http; /* client this bucket is a part of */
 };

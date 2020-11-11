@@ -45,7 +45,7 @@ _uv_add_remaining_cb(uv_timer_t *req)
   struct concord_bucket_s *bucket = uv_handle_get_data((uv_handle_t*)req);
 
   Concord_queue_npop(bucket->p_http, &bucket->queue, bucket->remaining);
-  bucket->remaining = 0;
+  bucket->finished = bucket->remaining = 0;
 }
 
 static void
@@ -65,12 +65,24 @@ _concord_load_obj_perform(struct concord_conn_s *conn)
 static void
 _concord_200async_tryremaining(concord_http_st *http, struct concord_conn_s *conn)
 {
-  long long delay_ms = Concord_parse_ratelimit_header(conn->p_bucket, http->header, true);
-  /* after delay_ms time has elapsed, the event loop will add the remaining connections to the multi stack (if there are any) */
-  uv_timer_start(&conn->p_bucket->ratelimit_timer, &_uv_add_remaining_cb, delay_ms, 0);
+  ++conn->p_bucket->finished;
 
   _concord_load_obj_perform(conn);
   curl_multi_remove_handle(http->multi_handle, conn->easy_handle);
+
+  DEBUG_PRINT("Finished transfers:\t%d\n\t" \
+              "Remainining transfers:\t%d",
+              conn->p_bucket->finished,
+              conn->p_bucket->remaining);
+
+  /* if conn->p_bucket->finished is greater than remaining, then
+   *   we can fetch more connections from queue (if there are any) */
+  if (conn->p_bucket->finished >= conn->p_bucket->remaining){
+    long long delay_ms = Concord_parse_ratelimit_header(conn->p_bucket, http->header, true);
+    /* after delay_ms time has elapsed, the event loop will add the
+     *   remaining connections to the multi stack (if there are any) */
+    uv_timer_start(&conn->p_bucket->ratelimit_timer, &_uv_add_remaining_cb, delay_ms, 0);
+  }
 }
 
 static void
@@ -338,7 +350,7 @@ concord_dispatch(concord_st *concord)
 static void
 _concord_200sync_getbucket(concord_http_st *http, struct concord_conn_s *conn, char bucket_key[])
 {
-  long long delay_ms = Concord_parse_ratelimit_header(conn->p_bucket, http->header, true);
+  long long delay_ms = Concord_parse_ratelimit_header(NULL, http->header, true);
   uv_sleep(delay_ms);
 
   _concord_load_obj_perform(conn);

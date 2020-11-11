@@ -201,6 +201,7 @@ Concord_on_connect_cb(void *data, CURL *easy_handle, const char *ws_protocols)
   ws->status = CONNECTED;
 
   (void)easy_handle;
+  (void)ws_protocols;
 }
 
 static void
@@ -380,6 +381,9 @@ Concord_on_close_cb(void *data, CURL *easy_handle, enum cws_close_reason cwscode
   ws->status = DISCONNECTING;
 
   (void)easy_handle;
+  (void)cwscode;
+  (void)len;
+  (void)reason;
 }
 
 static void
