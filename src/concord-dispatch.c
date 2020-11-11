@@ -44,8 +44,8 @@ _uv_add_remaining_cb(uv_timer_t *req)
 {
   struct concord_bucket_s *bucket = uv_handle_get_data((uv_handle_t*)req);
 
-  DEBUG_PUTS("Adding remaining conns");
-  Concord_queue_npop(bucket->p_http, &bucket->queue, 1+bucket->remaining);
+  Concord_queue_npop(bucket->p_http, &bucket->queue, bucket->remaining);
+  bucket->remaining = 0;
 }
 
 static void

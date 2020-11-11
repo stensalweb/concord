@@ -170,23 +170,24 @@ _concord_queue_push(concord_http_st *http, struct concord_queue_s *queue, struct
   }
 }
 
-/* pops N connections from queue (essentially sets them for transfers) */
+/* pops N conns from queue (essentially adds them to active transfers) */
 void
 Concord_queue_npop(concord_http_st *http, struct concord_queue_s *queue, int num_conn)
 {
   queue->bottom_running = queue->separator;
 
-  if (queue->bottom_running == queue->top_onhold){
+  if (queue->bottom_running >= queue->top_onhold){
     DEBUG_PRINT("No conn left to be added\n\t" \
                 "Bucket Hash:\t%s", 
                 ((struct concord_bucket_s*)queue)->hash_key);
     return;
   }
+  DEBUG_PRINT("Adding conns:\t%d", num_conn);
 
   struct concord_conn_s *conn; 
-  while (num_conn--){
+  do {
     if (queue->separator == queue->top_onhold)
-      return; /* no conn to pop */
+      break; /* no conn to pop */
 
     conn = queue->conns[queue->separator];
     DEBUG_ASSERT(NULL != conn, "Queue's slot is NULL, can't pop");
@@ -196,7 +197,7 @@ Concord_queue_npop(concord_http_st *http, struct concord_queue_s *queue, int num
 
     ++queue->separator;
     --http->transfers_onhold;
-  }
+  } while(--num_conn);
 
   DEBUG_PRINT("Bucket Hash:\t%s\n\t" \
               "Queue Size:\t%ld\n\t" \
