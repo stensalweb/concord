@@ -45,6 +45,8 @@ _concord_ws_disconnect(concord_ws_st *ws)
 {
   uv_async_send(&ws->async);
   uv_thread_join(&ws->thread_id);
+
+  DEBUG_ASSERT(DISCONNECTED == ws->status, "Couldn't disconnect from gateway");
 }
 
 void
@@ -181,7 +183,7 @@ Concord_ws_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *
       }
       break;
   default:
-      DEBUG_PRINT("Unknown CURL_POLL_XXX option encountered\n\tCode: %d", action);
+      DEBUG_PRINT("Unknown CURL_POLL_XXXX option encountered\n\tCode: %d", action);
       abort();
   }
 
@@ -205,8 +207,12 @@ Concord_on_connect_cb(void *data, CURL *easy_handle, const char *ws_protocols)
 }
 
 static void
-_concord_heartbeat_send(concord_ws_st *ws)
+_uv_on_heartbeat_cb(uv_timer_t *req)
 {
+  concord_ws_st *ws = uv_handle_get_data((uv_handle_t*)req);
+
+  DEBUG_PRINT("REPEAT_MS: %ld", uv_timer_get_repeat(&ws->heartbeat_timer));
+
   char send_payload[250];
 
   if (0 == ws->payload.seq_number){
@@ -215,21 +221,11 @@ _concord_heartbeat_send(concord_ws_st *ws)
     snprintf(send_payload, 249, "{\"op\": 1, \"d\": %lld}", ws->payload.seq_number);
   }
 
-  DEBUG_PRINT("HEARTBEAT_PAYLOAD:\n\t\t%s", send_payload);
+  DEBUG_NOTOP_PRINT("HEARTBEAT_PAYLOAD:\n\t\t%s", send_payload);
   bool ret = cws_send_text(ws->easy_handle, send_payload);
   DEBUG_ASSERT(true == ret, "Couldn't send heartbeat payload");
 
   _uv_perform_cb(&ws->context->poll_handle, uv_is_closing((uv_handle_t*)&ws->context->poll_handle), UV_READABLE);
-}
-
-static void
-_uv_on_heartbeat_cb(uv_timer_t *req)
-{
-  concord_ws_st *ws = uv_handle_get_data((uv_handle_t*)req);
-
-  DEBUG_PRINT("REPEAT_MS: %ld", uv_timer_get_repeat(&ws->heartbeat_timer));
-
-  _concord_heartbeat_send(ws);
 }
 
 char*
@@ -346,7 +342,7 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
                &ws->payload.opcode,
                &ws->payload.event_data);
 
-  DEBUG_PRINT("OP:\t\t%s\n\tEVENT_NAME:\t%s\n\tSEQ_NUMBER:\t%lld", 
+  DEBUG_NOTOP_PRINT("OP:\t\t%s\n\tEVENT_NAME:\t%s\n\tSEQ_NUMBER:\t%lld", 
               _concord_payload_strevent(ws->payload.opcode), 
               !*ws->payload.event_name /* "if is empty string" */
                  ? "NULL" 
@@ -363,7 +359,7 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
   case GATEWAY_HEARTBEAT_ACK:
         break; 
   default:
-        DEBUG_PRINT("Not yet implemented Gateway Opcode: %d", ws->payload.opcode);
+        DEBUG_NOTOP_PRINT("Not yet implemented Gateway Opcode: %d", ws->payload.opcode);
         abort();
   }
 
@@ -389,7 +385,6 @@ Concord_on_close_cb(void *data, CURL *easy_handle, enum cws_close_reason cwscode
 static void
 _uv_disconnect_cb(uv_timer_t *req)
 {
-  DEBUG_PUTS("ATTEMPTING TO DISCONNECT FROM GATEWAY ...");
   concord_ws_st *ws = uv_handle_get_data((uv_handle_t*)req);
 
   char reason[] = "Disconnecting!";
@@ -400,6 +395,8 @@ _uv_disconnect_cb(uv_timer_t *req)
   uv_close((uv_handle_t*)&ws->timeout, NULL);
 
   _uv_perform_cb(&ws->context->poll_handle, uv_is_closing((uv_handle_t*)&ws->context->poll_handle), UV_READABLE|UV_DISCONNECT);
+
+  DEBUG_NOTOP_PUTS("Disconnected");
 }
 
 static void
@@ -407,6 +404,7 @@ _uv_on_force_close_cb(uv_async_t *req)
 {
   concord_ws_st *ws = uv_handle_get_data((uv_handle_t*)req);
 
+  DEBUG_PUTS("Attempting to disconnect from gateway ...");
   int uvcode = uv_timer_start(&ws->timeout, &_uv_disconnect_cb, 0, 0);
   DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
@@ -435,7 +433,7 @@ void
 concord_ws_connect(concord_st *concord)
 {
   if ((CONNECTING|CONNECTED) & concord->ws->status){
-    DEBUG_PUTS("Gateway already running, returning"); 
+    DEBUG_NOTOP_PUTS("Gateway already connected, returning ..."); 
     return;
   }
 
@@ -448,7 +446,7 @@ void
 concord_ws_disconnect(concord_st *concord)
 {
   if ((DISCONNECTING|DISCONNECTED) & concord->ws->status){
-    DEBUG_PUTS("Gateway already innactive, returning"); 
+    DEBUG_NOTOP_PUTS("Gateway already disconnected, returning ..."); 
     return;
   }
 

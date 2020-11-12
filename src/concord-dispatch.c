@@ -11,7 +11,7 @@
 struct concord_context_s*
 Concord_context_init(uv_loop_t *loop, curl_socket_t sockfd)
 {
-  DEBUG_PUTS("Creating new context");
+  DEBUG_NOTOP_PUTS("Creating new context");
   struct concord_context_s *new_context = safe_malloc(sizeof *new_context);
 
   new_context->sockfd = sockfd;
@@ -27,7 +27,7 @@ Concord_context_init(uv_loop_t *loop, curl_socket_t sockfd)
 static void
 _uv_context_destroy_cb(uv_handle_t *handle)
 {
-  DEBUG_PUTS("Destroying context");
+  DEBUG_NOTOP_PUTS("Destroying context");
   struct concord_context_s *context = (struct concord_context_s*)handle;
   safe_free(context);
 }
@@ -38,7 +38,6 @@ Concord_context_destroy(struct concord_context_s *context)
   uv_close((uv_handle_t*)&context->poll_handle, &_uv_context_destroy_cb);
 }
 
-/* @todo move to concord-ratelimit.c */
 static void
 _uv_add_remaining_cb(uv_timer_t *req)
 {
@@ -52,6 +51,7 @@ static void
 _concord_load_obj_perform(struct concord_conn_s *conn)
 {
   (*conn->load_cb)(conn->p_object, &conn->response_body);
+  DEBUG_NOTOP_PUTS("Object loaded with API response"); 
 
   conn->p_object = NULL;
   conn->load_cb  = NULL;
@@ -65,24 +65,33 @@ _concord_load_obj_perform(struct concord_conn_s *conn)
 static void
 _concord_200async_tryremaining(concord_http_st *http, struct concord_conn_s *conn)
 {
-  ++conn->p_bucket->finished;
-
   _concord_load_obj_perform(conn);
   curl_multi_remove_handle(http->multi_handle, conn->easy_handle);
 
-  DEBUG_PRINT("Finished transfers:\t%d\n\t" \
-              "Remainining transfers:\t%d",
-              conn->p_bucket->finished,
-              conn->p_bucket->remaining);
+  struct concord_bucket_s *bucket = conn->p_bucket;
+  if (bucket->queue.separator == bucket->queue.top_onhold){
+    DEBUG_PRINT("Bucket Hash:\t%s\n\t" \
+                "No conn remaining in queue to be added",
+                bucket->hash_key);
+    return;
+  }
 
   /* if conn->p_bucket->finished is greater than remaining, then
    *   we can fetch more connections from queue (if there are any) */
-  if (conn->p_bucket->finished >= conn->p_bucket->remaining){
-    long long delay_ms = Concord_parse_ratelimit_header(conn->p_bucket, http->header, true);
+  if (bucket->finished == bucket->remaining){
+    long long delay_ms = Concord_parse_ratelimit_header(bucket, http->header, true);
     /* after delay_ms time has elapsed, the event loop will add the
      *   remaining connections to the multi stack (if there are any) */
-    uv_timer_start(&conn->p_bucket->ratelimit_timer, &_uv_add_remaining_cb, delay_ms, 0);
+    int uvcode = uv_timer_start(&bucket->ratelimit_timer, &_uv_add_remaining_cb, delay_ms, 0);
+    DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
   }
+
+  ++bucket->finished;
+
+  DEBUG_PRINT("Finished transfers:\t%d\n\t" \
+              "Remainining transfers:\t%d",
+              bucket->finished,
+              bucket->remaining);
 }
 
 static void
@@ -90,9 +99,6 @@ _concord_queue_pause(struct concord_queue_s *queue)
 {
   concord_http_st *http = ((struct concord_bucket_s*)queue)->p_http;
 
-
-  /* @todo this is not an optimal solution, doing transfer status
-      per bucket instead of per connection would be quicker */
   for (size_t i = queue->bottom_running; i < queue->separator; ++i){
     if (RUNNING != queue->conns[i]->status)
       continue;
@@ -111,9 +117,6 @@ _uv_queue_resume_cb(uv_timer_t *req)
 
   DEBUG_PRINT("Resuming pending transfers:\t%ld", uv_now(http->loop));
 
-
-  /* @todo this is not an optimal solution, doing transfer status
-      per bucket instead of per connection would be quicker */
   for (size_t i = queue->bottom_running; i < queue->separator; ++i){
     if (PAUSE != queue->conns[i]->status)
       continue;
@@ -144,15 +147,14 @@ _concord_429async_tryrecover(concord_http_st *http, struct concord_conn_s *conn)
   DEBUG_PRINT("%s", message);
 
   if (true == global){
-    DEBUG_PRINT("Global ratelimit, retrying after %lld seconds", retry_after);
-    /* @todo this will stall every active client */
+    DEBUG_NOTOP_PRINT("Global ratelimit, retrying after %lld seconds", retry_after);
     uv_sleep(retry_after*1000);
 
     curl_multi_remove_handle(http->multi_handle, conn->easy_handle);
     curl_multi_add_handle(http->multi_handle, conn->easy_handle);
   }
   else {
-    DEBUG_PRINT("Bucket ratelimit, stopping transfer on hold for %lld seconds", retry_after);
+    DEBUG_NOTOP_PRINT("Bucket ratelimit, stopping transfer on hold for %lld seconds", retry_after);
     uv_timer_start(&conn->p_bucket->ratelimit_timer, &_uv_queue_resume_cb, retry_after*1000, 0);
     _concord_queue_pause(&conn->p_bucket->queue);
   }
@@ -179,7 +181,13 @@ _concord_asynchronous_perform(concord_http_st *http, CURL *easy_handle)
   ecode = curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
-  DEBUG_PRINT("Conn URL: %s", url);
+  DEBUG_PRINT("Conn URL: %s\n\t" \
+              "Transfers Running: %d\n\t" \
+              "Transfers On Hold: %d",
+              url,
+              http->transfers_running,
+              http->transfers_onhold);
+    
 
   switch (http_code){
   case HTTP_OK:
@@ -211,8 +219,6 @@ _concord_tryperform_asynchronous(concord_http_st *http)
   {
     if (CURLMSG_DONE != msg->msg)
       continue;
-    
-    DEBUG_PRINT("Transfers Running: %d\n\tTransfers On Hold: %d", http->transfers_running, http->transfers_onhold);
     
     _concord_asynchronous_perform(http, msg->easy_handle);
   }
@@ -313,7 +319,7 @@ Concord_http_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void
       }
       break;
   default:
-      DEBUG_PRINT("Unknown CURL_POLL_XXX option encountered\n\tCode: %d", action);
+      DEBUG_PRINT("Unknown CURL_POLL_XXXX option encountered\n\tCode: %d", action);
       abort();
   }
 
@@ -324,7 +330,7 @@ void
 Concord_transfers_run(concord_http_st *http)
 {
   if (!http->transfers_onhold){
-    DEBUG_PUTS("No transfers on hold, returning"); 
+    DEBUG_NOTOP_PUTS("No transfers on hold, returning ..."); 
     return;
   }
 
@@ -356,7 +362,7 @@ _concord_200sync_getbucket(concord_http_st *http, struct concord_conn_s *conn, c
   _concord_load_obj_perform(conn);
 
   char *bucket_hash = dictionary_get(http->header, "x-ratelimit-bucket");
-  DEBUG_PRINT("Bucket Hash: %s", bucket_hash);
+  DEBUG_NOTOP_PRINT("New Key/Hash pair:  %s - %s", bucket_key, bucket_hash);
 
   /* create bucket if it doesn't exist, otherwise, get existing one */
   struct concord_bucket_s *bucket = Concord_trycreate_bucket(http, bucket_hash);
@@ -402,8 +408,6 @@ _concord_429sync_tryrecover(struct concord_conn_s *conn)
 void
 Concord_register_bucket_key(concord_http_st *http, struct concord_conn_s *conn, char bucket_key[])
 {
-  DEBUG_PUTS("Unknown bucket key, performing connection to get bucket hash");
-
   enum discord_http_code http_code; /* http response code */
   char *url = NULL; /* URL from request */
   CURLcode ecode;
@@ -419,7 +423,7 @@ Concord_register_bucket_key(concord_http_st *http, struct concord_conn_s *conn, 
       ecode = curl_easy_getinfo(conn->easy_handle, CURLINFO_EFFECTIVE_URL, &url);
       DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
-      DEBUG_PRINT("Conn URL: %s", url);
+      DEBUG_NOTOP_PRINT("Conn URL: %s", url);
 
       switch (http_code){
       case HTTP_OK:
@@ -432,7 +436,7 @@ Concord_register_bucket_key(concord_http_st *http, struct concord_conn_s *conn, 
           DEBUG_ASSERT(!url || !*url, "No server response has been received");
           return; /* early exit */
       default:
-          DEBUG_PRINT("Found not yet implemented HTTP Code: %d", http_code);
+          DEBUG_NOTOP_PRINT("Found not yet implemented HTTP Code: %d", http_code);
           abort();
       }
   } while (HTTP_OK != http_code);

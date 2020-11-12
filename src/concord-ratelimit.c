@@ -21,7 +21,6 @@ long long
 Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, dictionary_st *header, bool use_clock)
 {
   int remaining = dictionary_get_strtoll(header, "x-ratelimit-remaining");
-  DEBUG_PRINT("Ratelimit remaining: %d", remaining);
   
   if (bucket){
     bucket->remaining = remaining;
@@ -85,9 +84,11 @@ _concord_client_buckets_append(concord_http_st *http, struct concord_bucket_s *b
   http->client_buckets = tmp;
 
   http->client_buckets[http->num_buckets-1] = bucket;
+
+  DEBUG_NOTOP_PRINT("Appending new bucket to clients bucket at slot %ld", http->num_buckets-1);
 }
 
-/* @param ptr is NULL because we want to pass this function as a
+/* @param ptr is void* because we want to pass this function as a
     destructor callback to dictionary_set, which only accepts
     destructors with void* param */
 static void
@@ -127,6 +128,8 @@ _concord_bucket_init(concord_http_st *http, char bucket_hash[])
   DEBUG_ASSERT(res == new_bucket, "Couldn't create new bucket");
 
   _concord_client_buckets_append(http, new_bucket);
+
+  DEBUG_NOTOP_PUTS("Created Bucket");
 
   return new_bucket;
 }
@@ -176,9 +179,9 @@ Concord_queue_npop(concord_http_st *http, struct concord_queue_s *queue, int num
 {
   queue->bottom_running = queue->separator;
 
-  if (queue->bottom_running >= queue->top_onhold){
-    DEBUG_PRINT("No conn left to be added\n\t" \
-                "Bucket Hash:\t%s", 
+  if (queue->bottom_running == queue->top_onhold){
+    DEBUG_PRINT("Bucket Hash:\t%s\n\t" \
+                "No conn remaining in queue to be added",
                 ((struct concord_bucket_s*)queue)->hash_key);
     return;
   }
@@ -199,16 +202,16 @@ Concord_queue_npop(concord_http_st *http, struct concord_queue_s *queue, int num
     --http->transfers_onhold;
   } while(--num_conn);
 
-  DEBUG_PRINT("Bucket Hash:\t%s\n\t" \
-              "Queue Size:\t%ld\n\t" \
-              "Queue Bottom:\t%ld\n\t" \
-              "Queue Separator:%ld\n\t" \
-              "Queue Top:\t%ld",
-              ((struct concord_bucket_s*)queue)->hash_key,
-              queue->size,
-              queue->bottom_running,
-              queue->separator,
-              queue->top_onhold);
+  DEBUG_NOTOP_PRINT("Bucket Hash:\t%s\n\t" \
+                    "Queue Size:\t%ld\n\t" \
+                    "Queue Bottom:\t%ld\n\t" \
+                    "Queue Separator:%ld\n\t" \
+                    "Queue Top:\t%ld",
+                    ((struct concord_bucket_s*)queue)->hash_key,
+                    queue->size,
+                    queue->bottom_running,
+                    queue->separator,
+                    queue->top_onhold);
 }
 
 void
@@ -259,7 +262,7 @@ Concord_trycreate_bucket(concord_http_st *http, char bucket_hash[])
   struct concord_bucket_s *bucket = dictionary_get(http->bucket_dict, bucket_hash);
   if (!bucket){
     /* hashbucket doesn't exist, create it */
-    DEBUG_PUTS("Bucket hash not found, creating new ...");
+    DEBUG_PUTS("Bucket hash not found, creating new bucket ...");
     bucket = _concord_bucket_init(http, bucket_hash);
   }
 
@@ -276,18 +279,18 @@ Concord_bucket_build(
   char url_route[])
 {
   struct concord_bucket_s *bucket = dictionary_get(http->bucket_dict, bucket_key);
-  DEBUG_PRINT("Bucket Key: %s", bucket_key);
+  DEBUG_PRINT("Bucket key found: %s\n\tAttempting to get matching hash ... ", bucket_key);
 
   /* conn to be pushed to (or recycled from) bucket queue */
   struct concord_conn_s *new_conn;
-  
   if (!bucket){ /* no bucket referencing the given bucket key */
+    DEBUG_NOTOP_PUTS("Couldn't find bucket hash assigned to key, creating new conn ... ");
     /* this is the first time using this bucket_key. We will perform a blocking
         connection to the Discord API, in order to fetch this bucket key
         corresponding bucket */
     new_conn = _concord_conn_init(http);
     DEBUG_ASSERT(NULL != new_conn, "Out of memory");
-    DEBUG_PUTS("New conn created");
+    DEBUG_NOTOP_PUTS("New conn created");
 
 
     Curl_set_method(new_conn, http_method); /* set the http request method (GET, POST, ...) */
@@ -308,19 +311,18 @@ Concord_bucket_build(
   else {
     /* found bucket reference from given key add connection
         to bucket or reuse innactive existing one */
-    DEBUG_PRINT("Matching hashbucket found: %s", bucket->hash_key);
-    DEBUG_ASSERT(bucket->queue.top_onhold < bucket->queue.size, "Queue top has reached threshold");
+    DEBUG_NOTOP_PRINT("Matching hash found: %s", bucket->hash_key);
 
     new_conn = bucket->queue.conns[bucket->queue.top_onhold];
     if (!new_conn){
-      DEBUG_PUTS("Bucket exists but needs a new conn pushed to it (can't recycle)");
+      DEBUG_NOTOP_PRINT("Creating new conn and pushing to queue at slot %ld", bucket->queue.top_onhold);
 
       new_conn = _concord_conn_init(http);
       DEBUG_ASSERT(NULL != new_conn, "Out of memory");
 
       _concord_queue_push(http, &bucket->queue, new_conn);
     } else { 
-      DEBUG_PUTS("Recycling existing connection");
+      DEBUG_NOTOP_PRINT("Recycling INNACTIVE connection at queue's slot %ld", bucket->queue.top_onhold);
       _concord_queue_recycle(http, &bucket->queue);
     }
 
