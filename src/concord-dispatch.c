@@ -436,7 +436,7 @@ Concord_register_bucket_key(concord_http_st *http, struct concord_conn_s *conn, 
           DEBUG_ASSERT(!url || !*url, "No server response has been received");
           return; /* early exit */
       default:
-          DEBUG_NOTOP_PRINT("Found not yet implemented HTTP Code: %d", http_code);
+          DEBUG_PRINT("Found not yet implemented HTTP Code: %d", http_code);
           abort();
       }
   } while (HTTP_OK != http_code);
