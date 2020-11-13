@@ -8,7 +8,7 @@ This document describes features to be incorporated in the future.
   - Intuitive event handler
   - Resume logic on error
   - Add signal receiver that interrupts and cleans gateway resources
-- Add lib package (pkg-config) to seach path
+- Add lib package (pkg-config) to search path
 
 ## MEDIUM
 
