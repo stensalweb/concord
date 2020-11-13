@@ -281,32 +281,32 @@ _concord_ws_start_identify(concord_ws_st *ws)
   jscon_list_st *helper_list = jscon_list_init();  
 
   /* https://discord.com/developers/docs/topics/gateway#identify-identify-connection-properties */
-  jscon_list_append(helper_list, jscon_string(buffer.sysname, "$os"));
+  jscon_list_append(helper_list, jscon_string("$os", buffer.sysname));
   /* @todo library name should be from a macro */
-  jscon_list_append(helper_list, jscon_string("libconcord", "$browser"));
-  jscon_list_append(helper_list, jscon_string("libconcord", "$device"));
-  jscon_list_append(main_list, jscon_object(helper_list, "properties"));
+  jscon_list_append(helper_list, jscon_string("$browser", "libconcord"));
+  jscon_list_append(helper_list, jscon_string("$device", "libconcord"));
+  jscon_list_append(main_list, jscon_object("properties", helper_list));
   /* https://discord.com/developers/docs/topics/gateway#sharding */
   /* @todo */
 
   /* https://discord.com/developers/docs/topics/gateway#update-status-gateway-status-update-structure */
   jscon_list_append(helper_list, jscon_null("since"));
   jscon_list_append(helper_list, jscon_null("activities"));
-  jscon_list_append(helper_list, jscon_string("online","status"));
-  jscon_list_append(helper_list, jscon_boolean(false,"afk"));
-  jscon_list_append(main_list, jscon_object(helper_list, "presence"));
+  jscon_list_append(helper_list, jscon_string("status", "online"));
+  jscon_list_append(helper_list, jscon_boolean("afk", false));
+  jscon_list_append(main_list, jscon_object("presence", helper_list));
 
   /* https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
-  jscon_list_append(main_list, jscon_string(ws->token, "token"));
-  jscon_list_append(main_list, jscon_boolean(false, "compress"));
-  jscon_list_append(main_list, jscon_integer(50, "large_threshold"));
-  jscon_list_append(main_list, jscon_boolean(true, "guild_subscriptions"));
-  jscon_list_append(main_list, jscon_integer(GUILD_MESSAGES, "intents"));
-  jscon_list_append(main_list, jscon_object(main_list, "d"));
-  jscon_list_append(main_list, jscon_integer(GATEWAY_IDENTIFY, "op"));
+  jscon_list_append(main_list, jscon_string("token", ws->token));
+  jscon_list_append(main_list, jscon_boolean("compress", false));
+  jscon_list_append(main_list, jscon_integer("large_threshold", 50));
+  jscon_list_append(main_list, jscon_boolean("guild_subscriptions", true));
+  jscon_list_append(main_list, jscon_integer("intents", GUILD_MESSAGES));
+  jscon_list_append(main_list, jscon_object("d", main_list));
+  jscon_list_append(main_list, jscon_integer("op", GATEWAY_IDENTIFY));
   
   /* @todo make this a separate function */
-  ws->identify = jscon_object(main_list, NULL);
+  ws->identify = jscon_object(NULL, main_list);
 
   char *send_payload = jscon_stringify(ws->identify, JSCON_ANY);
   DEBUG_PRINT("IDENTIFY PAYLOAD:\n\t%s", send_payload);
