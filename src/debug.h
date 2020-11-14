@@ -1,10 +1,8 @@
-#ifndef LIBCONCORD_DEBUG_H_
-#define LIBCONCORD_DEBUG_H_
-
-//#include <libconcord.h> implicit
+#ifndef DEBUG_H_
+#define DEBUG_H_
 
 
-#if CONCORD_DEBUG_MODE == 1 /* DEBUG MODE ACTIVE */
+#if DEBUG_MODE == 1 /* DEBUG MODE ACTIVE */
 #       define DEBUG_OUT stderr
 #       define DEBUG_FMT_PREFIX "[%s:%d] %s()\n\t"
 #       define DEBUG_FMT_ARGS __FILE__, __LINE__, __func__

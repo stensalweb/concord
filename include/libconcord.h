@@ -8,8 +8,8 @@
 #include <uv.h>
 
 
-#define CONCORD_DEBUG_MODE     1 /* set to 1 to activate debug mode */
-#define CONCORD_MEMDEBUG_MODE  0 /* set to 1 to activate memdebug mode */
+#define DEBUG_MODE     1 /* set to 1 to activate debug mode */
+#define MEMDEBUG_MODE  0 /* set to 1 to activate memdebug mode */
 
 /* CHANNEL TYPES
 https://discord.com/developers/docs/resources/channel#channel-object-channel-types */
