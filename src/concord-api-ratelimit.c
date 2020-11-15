@@ -53,7 +53,7 @@ Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, dictionary_st *h
 static struct concord_conn_s*
 _concord_conn_init(concord_http_st *http)
 {
-  struct concord_conn_s *new_conn = safe_malloc(sizeof *new_conn);
+  struct concord_conn_s *new_conn = safe_calloc(1, sizeof *new_conn);
 
   new_conn->easy_handle = Concord_conn_easy_init(http, new_conn);
 
@@ -110,10 +110,10 @@ _concord_bucket_destroy(void *ptr)
 static struct concord_bucket_s*
 _concord_bucket_init(concord_http_st *http, char bucket_hash[])
 {
-  struct concord_bucket_s *new_bucket = safe_malloc(sizeof *new_bucket);
+  struct concord_bucket_s *new_bucket = safe_calloc(1, sizeof *new_bucket);
 
   new_bucket->queue.size = MAX_QUEUE_SIZE;
-  new_bucket->queue.conns = safe_malloc(sizeof *new_bucket->queue.conns * new_bucket->queue.size);
+  new_bucket->queue.conns = safe_calloc(1, sizeof *new_bucket->queue.conns * MAX_QUEUE_SIZE);
 
   new_bucket->hash_key = strdup(bucket_hash);
   DEBUG_ASSERT(NULL != new_bucket->hash_key, "Out of memory");

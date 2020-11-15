@@ -12,7 +12,7 @@ struct concord_context_s*
 Concord_context_init(uv_loop_t *loop, curl_socket_t sockfd)
 {
   DEBUG_NOTOP_PUTS("Creating new context");
-  struct concord_context_s *new_context = safe_malloc(sizeof *new_context);
+  struct concord_context_s *new_context = safe_calloc(1, sizeof *new_context);
 
   new_context->sockfd = sockfd;
 

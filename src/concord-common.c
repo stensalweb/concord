@@ -44,7 +44,7 @@ Concord_http_request(
 static concord_http_st*
 _concord_http_init(char token[])
 {
-  concord_http_st *new_http = safe_malloc(sizeof *new_http);
+  concord_http_st *new_http = safe_calloc(1, sizeof *new_http);
 
   new_http->loop = uv_default_loop();
   uv_loop_set_data(new_http->loop, new_http);
@@ -64,6 +64,12 @@ _concord_http_init(char token[])
 
   new_http->header = dictionary_init();
   dictionary_build(new_http->header, HEADER_DICTIONARY_SIZE);
+
+  new_http->transfers_onhold = 0;
+  new_http->transfers_running = 0;
+
+  new_http->client_buckets = NULL;
+  new_http->num_buckets = 0;
 
   return new_http;
 }
@@ -106,7 +112,7 @@ _concord_http_destroy(concord_http_st *http)
 concord_st*
 concord_init(char token[])
 {
-  concord_st *new_concord = safe_malloc(sizeof *new_concord);
+  concord_st *new_concord = safe_calloc(1, sizeof *new_concord);
 
   new_concord->http = _concord_http_init(token);
   new_concord->ws = Concord_ws_init(token);

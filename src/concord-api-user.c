@@ -11,7 +11,7 @@
 concord_user_st*
 concord_user_init()
 {
-  concord_user_st *new_user = safe_malloc(sizeof *new_user);
+  concord_user_st *new_user = safe_calloc(1, sizeof *new_user);
   new_user->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_user->username = safe_malloc(MAX_USERNAME_LEN);
   new_user->discriminator = safe_malloc(MAX_DISCRIMINATOR_LEN);

@@ -192,10 +192,10 @@ typedef struct concord_ws_s {
   uv_thread_t thread_id; /* ws loop thread id */
 
   struct { /* PAYLOAD STRUCTURE */
-    enum ws_opcode opcode;         /* field 'op' */
-    long long seq_number;               /* field 's' */
-    char event_name[25];                /* field 't' */
-    jscon_item_st *event_data;          /* field 'd' */
+    enum ws_opcode opcode;      /* field 'op' */
+    long long seq_number;       /* field 's' */
+    char event_name[25];        /* field 't' */
+    jscon_item_st *event_data;  /* field 'd' */
   } payload;
 
 } concord_ws_st;
@@ -224,9 +224,14 @@ typedef struct concord_http_s {
 /* memory.c */
 
 void __safe_free(void **p_ptr, const char file[], const int line, const char func[]);
-#define safe_free(n) __safe_free((void**)&(n), __FILE__, __LINE__, __func__)
+void* __safe_calloc(size_t nmemb, size_t size, const char file[], const int line, const char func[]);
 void* __safe_malloc(size_t size, const char file[], const int line, const char func[]);
-#define safe_malloc(n) __safe_malloc(n, __FILE__, __LINE__, __func__)
+void* __safe_realloc(void *ptr, size_t size, const char file[], const int line, const char func[]);
+
+#define safe_free(ptr) __safe_free((void**)&(ptr), __FILE__, __LINE__, __func__)
+#define safe_calloc(nmemb, size) __safe_calloc(nmemb, size, __FILE__, __LINE__, __func__)
+#define safe_malloc(size) __safe_malloc(size, __FILE__, __LINE__, __func__)
+#define safe_realloc(ptr, size) __safe_realloc(ptr, size, __FILE__, __LINE__, __func__)
 
 /*************/
 /* concord-common.c */

@@ -11,7 +11,7 @@
 concord_ws_st*
 Concord_ws_init(char token[])
 {
-  concord_ws_st *new_ws = safe_malloc(sizeof *new_ws);
+  concord_ws_st *new_ws = safe_calloc(1, sizeof *new_ws);
   
   new_ws->loop = safe_malloc(sizeof *new_ws->loop);
   uv_loop_init(new_ws->loop);

@@ -11,7 +11,7 @@
 concord_channel_st*
 concord_channel_init()
 {
-  concord_channel_st *new_channel = safe_malloc(sizeof *new_channel);
+  concord_channel_st *new_channel = safe_calloc(1, sizeof *new_channel);
   new_channel->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_channel->guild_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_channel->name = safe_malloc(MAX_NAME_LEN);

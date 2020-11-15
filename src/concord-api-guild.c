@@ -11,10 +11,11 @@
 concord_guild_st*
 concord_guild_init()
 {
-  concord_guild_st *new_guild = safe_malloc(sizeof *new_guild);
+  concord_guild_st *new_guild = safe_calloc(1, sizeof *new_guild);
   new_guild->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_guild->name = safe_malloc(MAX_NAME_LEN);
   new_guild->icon = safe_malloc(MAX_HASH_LEN);
+  /* missing new_guild->splash */
   new_guild->discovery_splash = safe_malloc(MAX_HASH_LEN);
   new_guild->owner_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_guild->permissions_new = safe_malloc(SNOWFLAKE_INCREMENT);
