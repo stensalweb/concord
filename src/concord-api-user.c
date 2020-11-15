@@ -136,6 +136,7 @@ _concord_load_client_guilds(void **p_client, struct concord_response_s *response
   }
 
   client->guilds = jscon_parse(response_body->str);
+  DEBUG_ASSERT(NULL != client->guilds, "Out of memory");
 
   *p_client = client;
 }

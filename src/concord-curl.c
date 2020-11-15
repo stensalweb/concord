@@ -219,8 +219,7 @@ Curl_set_method(struct concord_conn_s *conn, enum http_method method)
       ecode = curl_easy_setopt(conn->easy_handle, CURLOPT_UPLOAD, 1L);
       break;
   default:
-      DEBUG_PRINT("Unknown http_method\n\tCode: %d", method);
-      abort();
+      DEBUG_ERR("Unknown http_method\n\tCode: %d", method);
   }
 
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));

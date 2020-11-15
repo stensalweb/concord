@@ -132,6 +132,7 @@ _concord_load_guild_channels(void **p_guild, struct concord_response_s *response
   }
 
   guild->channels = jscon_parse(response_body->str);
+  DEBUG_ASSERT(NULL != guild->channels, "Out of memory");
 
   *p_guild = guild;
 }

@@ -183,8 +183,7 @@ Concord_ws_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *
       }
       break;
   default:
-      DEBUG_PRINT("Unknown CURL_POLL_XXXX option encountered\n\tCode: %d", action);
-      abort();
+      DEBUG_ERR("Unknown CURL_POLL_XXXX option encountered\n\tCode: %d", action);
   }
 
   (void)easy_handle;
@@ -249,8 +248,7 @@ _concord_payload_strevent(enum ws_opcode opcode)
   CASE_RETURN_STR(GATEWAY_HEARTBEAT_ACK);
 
   default:
-  DEBUG_PRINT("Invalid ws opcode:\t%d", opcode);
-  abort();
+  DEBUG_ERR("Invalid ws opcode:\t%d", opcode);
   }
 }
 
@@ -359,8 +357,7 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
   case GATEWAY_HEARTBEAT_ACK:
         break; 
   default:
-        DEBUG_NOTOP_PRINT("Not yet implemented Gateway Opcode: %d", ws->payload.opcode);
-        abort();
+        DEBUG_ERR("Not yet implemented Gateway Opcode: %d", ws->payload.opcode);
   }
 
   (void)len;

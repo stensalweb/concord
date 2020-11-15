@@ -201,8 +201,7 @@ _concord_asynchronous_perform(concord_http_st *http, CURL *easy_handle)
       curl_multi_remove_handle(http->multi_handle, easy_handle);
       return;
   default:
-      DEBUG_PRINT("Found not yet implemented HTTP Code: %d", http_code);
-      abort();
+      DEBUG_ERR("Found not yet implemented HTTP Code: %d", http_code);
   }
 }
 
@@ -319,8 +318,7 @@ Concord_http_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void
       }
       break;
   default:
-      DEBUG_PRINT("Unknown CURL_POLL_XXXX option encountered\n\tCode: %d", action);
-      abort();
+      DEBUG_ERR("Unknown CURL_POLL_XXXX option encountered\n\tCode: %d", action);
   }
 
   return 0;
@@ -436,8 +434,7 @@ Concord_register_bucket_key(concord_http_st *http, struct concord_conn_s *conn, 
           DEBUG_ASSERT(!url || !*url, "No server response has been received");
           return; /* early exit */
       default:
-          DEBUG_PRINT("Found not yet implemented HTTP Code: %d", http_code);
-          abort();
+          DEBUG_ERR("Found not yet implemented HTTP Code: %d", http_code);
       }
   } while (HTTP_OK != http_code);
 }

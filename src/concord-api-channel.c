@@ -147,6 +147,7 @@ _concord_load_channel_messages(void **p_channel, struct concord_response_s *resp
   }
 
   channel->messages = jscon_parse(response_body->str);
+  DEBUG_ASSERT(NULL != channel->messages, "Out of memory");
 
   *p_channel = channel;
 }
