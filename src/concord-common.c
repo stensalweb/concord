@@ -65,12 +65,6 @@ _concord_http_init(char token[])
   new_http->header = dictionary_init();
   dictionary_build(new_http->header, HEADER_DICTIONARY_SIZE);
 
-  new_http->transfers_onhold = 0;
-  new_http->transfers_running = 0;
-
-  new_http->client_buckets = NULL;
-  new_http->num_buckets = 0;
-
   return new_http;
 }
 
