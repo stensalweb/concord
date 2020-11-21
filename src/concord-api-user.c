@@ -8,10 +8,10 @@
 #include "debug.h"
 #include "concord-common.h"
 
-concord_user_st*
+concord_user_t*
 concord_user_init()
 {
-  concord_user_st *new_user = safe_calloc(1, sizeof *new_user);
+  concord_user_t *new_user = safe_calloc(1, sizeof *new_user);
   new_user->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_user->username = safe_malloc(MAX_USERNAME_LEN);
   new_user->discriminator = safe_malloc(MAX_DISCRIMINATOR_LEN);
@@ -23,7 +23,7 @@ concord_user_init()
 }
 
 void
-concord_user_destroy(concord_user_st *user)
+concord_user_destroy(concord_user_t *user)
 {
   safe_free(user->id);
   safe_free(user->username);
@@ -42,7 +42,7 @@ concord_user_destroy(concord_user_st *user)
 static void
 _concord_load_user(void **p_user, struct concord_response_s *response_body)
 {
-  concord_user_st *user = *p_user;
+  concord_user_t *user = *p_user;
 
   jscon_scanf(response_body->str,
      "#id%js " \
@@ -95,7 +95,7 @@ _concord_load_user(void **p_user, struct concord_response_s *response_body)
 }
 
 void
-concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user)
+concord_get_user(concord_t *concord, char user_id[], concord_user_t **p_user)
 {
   if (NULL == p_user){
     p_user = &concord->user;
@@ -111,7 +111,7 @@ concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user)
 }
 
 void 
-concord_get_client(concord_st *concord, concord_user_st **p_client)
+concord_get_client(concord_t *concord, concord_user_t **p_client)
 {
   if (NULL == p_client){
     p_client = &concord->client;
@@ -129,7 +129,7 @@ concord_get_client(concord_st *concord, concord_user_st **p_client)
 static void
 _concord_load_client_guilds(void **p_client, struct concord_response_s *response_body)
 {
-  concord_user_st *client = *p_client;
+  concord_user_t *client = *p_client;
 
   if (NULL != client->guilds){
     jscon_destroy(client->guilds);
@@ -142,7 +142,7 @@ _concord_load_client_guilds(void **p_client, struct concord_response_s *response
 }
 
 void 
-concord_get_client_guilds(concord_st *concord, concord_user_st **p_client)
+concord_get_client_guilds(concord_t *concord, concord_user_t **p_client)
 {
   if (NULL == p_client){
     p_client = &concord->client;

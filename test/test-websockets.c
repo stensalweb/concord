@@ -15,7 +15,7 @@ int main(void)
 
   concord_global_init();
 
-  concord_st *concord = concord_init(bot_token);
+  concord_t *concord = concord_init(bot_token);
 
   concord_ws_connect(concord);
 

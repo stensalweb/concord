@@ -8,10 +8,10 @@
 #include "debug.h"
 
 
-concord_ws_st*
+concord_ws_t*
 Concord_ws_init(char token[])
 {
-  concord_ws_st *new_ws = safe_calloc(1, sizeof *new_ws);
+  concord_ws_t *new_ws = safe_calloc(1, sizeof *new_ws);
   
   new_ws->loop = safe_malloc(sizeof *new_ws->loop);
   uv_loop_init(new_ws->loop);
@@ -41,7 +41,7 @@ _uv_on_walk_cb(uv_handle_t *handle, void *arg)
 }
 
 static void
-_concord_ws_disconnect(concord_ws_st *ws)
+_concord_ws_disconnect(concord_ws_t *ws)
 {
   uv_async_send(&ws->async);
   uv_thread_join(&ws->thread_id);
@@ -50,7 +50,7 @@ _concord_ws_disconnect(concord_ws_st *ws)
 }
 
 void
-Concord_ws_destroy(concord_ws_st *ws)
+Concord_ws_destroy(concord_ws_t *ws)
 {
   if ((CONNECTING|CONNECTED) & ws->status){
     _concord_ws_disconnect(ws);
@@ -92,7 +92,7 @@ _uv_perform_cb(uv_poll_t *req, int uvstatus, int events)
 {
   DEBUG_ASSERT(!uvstatus, uv_strerror(uvstatus));
 
-  concord_ws_st *ws = uv_handle_get_data((uv_handle_t*)req);
+  concord_ws_t *ws = uv_handle_get_data((uv_handle_t*)req);
 
   int flags = 0;
   if (events & UV_READABLE) flags |= CURL_CSELECT_IN;
@@ -120,7 +120,7 @@ _uv_perform_cb(uv_poll_t *req, int uvstatus, int events)
 static void
 _uv_on_timeout_cb(uv_timer_t *req)
 {
-  concord_ws_st *ws = uv_handle_get_data((uv_handle_t*)req);
+  concord_ws_t *ws = uv_handle_get_data((uv_handle_t*)req);
 
   CURLMcode mcode = curl_multi_socket_action(ws->multi_handle, CURL_SOCKET_TIMEOUT, 0, &ws->transfers_running);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
@@ -154,7 +154,7 @@ Concord_ws_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
 int
 Concord_ws_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket)
 {
-  concord_ws_st *ws = p_userdata;
+  concord_ws_t *ws = p_userdata;
   int uvcode;
   int events = 0;
 
@@ -195,7 +195,7 @@ Concord_ws_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *
 void
 Concord_on_connect_cb(void *data, CURL *easy_handle, const char *ws_protocols)
 {
-  concord_ws_st *ws = data;
+  concord_ws_t *ws = data;
 
   DEBUG_PRINT("Connected, WS-Protocols: '%s'", ws_protocols);
 
@@ -208,7 +208,7 @@ Concord_on_connect_cb(void *data, CURL *easy_handle, const char *ws_protocols)
 static void
 _uv_on_heartbeat_cb(uv_timer_t *req)
 {
-  concord_ws_st *ws = uv_handle_get_data((uv_handle_t*)req);
+  concord_ws_t *ws = uv_handle_get_data((uv_handle_t*)req);
 
   DEBUG_PRINT("REPEAT_MS: %ld", uv_timer_get_repeat(&ws->heartbeat_timer));
 
@@ -253,7 +253,7 @@ _concord_payload_strevent(enum ws_opcode opcode)
 }
 
 static void
-_concord_on_ws_hello(concord_ws_st *ws)
+_concord_on_ws_hello(concord_ws_t *ws)
 {
   unsigned long heartbeat_ms = (unsigned long)jscon_get_integer(jscon_get_branch(ws->payload.event_data, "heartbeat_interval"));
   DEBUG_ASSERT(heartbeat_ms > 0, "Invalid heartbeat_ms");
@@ -263,7 +263,7 @@ _concord_on_ws_hello(concord_ws_st *ws)
 }
 
 static void
-_concord_ws_start_identify(concord_ws_st *ws)
+_concord_ws_start_identify(concord_ws_t *ws)
 {
   if (ws->identify){
     jscon_destroy(ws->identify);
@@ -275,8 +275,8 @@ _concord_ws_start_identify(concord_ws_st *ws)
   DEBUG_ASSERT(!uvcode, "Couldn't fetch system information");
 
 
-  jscon_list_st *main_list = jscon_list_init();  
-  jscon_list_st *helper_list = jscon_list_init();  
+  jscon_list_t *main_list = jscon_list_init();  
+  jscon_list_t *helper_list = jscon_list_init();  
 
   /* https://discord.com/developers/docs/topics/gateway#identify-identify-connection-properties */
   jscon_list_append(helper_list, jscon_string("$os", buffer.sysname));
@@ -321,7 +321,7 @@ _concord_ws_start_identify(concord_ws_st *ws)
 void
 Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
 {
-  concord_ws_st *ws = data;
+  concord_ws_t *ws = data;
 
   DEBUG_PRINT("ON_TEXT:\n\t\t%s", text);
 
@@ -367,7 +367,7 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
 void
 Concord_on_close_cb(void *data, CURL *easy_handle, enum cws_close_reason cwscode, const char *reason, size_t len)
 {
-  concord_ws_st *ws = data;
+  concord_ws_t *ws = data;
 
   DEBUG_PRINT("CLOSE=%4d %zd bytes '%s'", cwscode, len, reason);
 
@@ -382,7 +382,7 @@ Concord_on_close_cb(void *data, CURL *easy_handle, enum cws_close_reason cwscode
 static void
 _uv_disconnect_cb(uv_timer_t *req)
 {
-  concord_ws_st *ws = uv_handle_get_data((uv_handle_t*)req);
+  concord_ws_t *ws = uv_handle_get_data((uv_handle_t*)req);
 
   char reason[] = "Disconnecting!";
   bool ret = cws_close(ws->easy_handle, CWS_CLOSE_REASON_NORMAL, reason, strlen(reason));
@@ -399,7 +399,7 @@ _uv_disconnect_cb(uv_timer_t *req)
 static void
 _uv_on_force_close_cb(uv_async_t *req)
 {
-  concord_ws_st *ws = uv_handle_get_data((uv_handle_t*)req);
+  concord_ws_t *ws = uv_handle_get_data((uv_handle_t*)req);
 
   DEBUG_PUTS("Attempting to disconnect from gateway ...");
   int uvcode = uv_timer_start(&ws->timeout, &_uv_disconnect_cb, 0, 0);
@@ -414,7 +414,7 @@ _uv_on_force_close_cb(uv_async_t *req)
 static void
 _concord_ws_run(void *ptr)
 {
-  concord_ws_st *ws = ptr; 
+  concord_ws_t *ws = ptr; 
 
   uv_async_init(ws->loop, &ws->async, &_uv_on_force_close_cb);
   uv_handle_set_data((uv_handle_t*)&ws->async, ws);
@@ -427,7 +427,7 @@ _concord_ws_run(void *ptr)
 }
 
 void
-concord_ws_connect(concord_st *concord)
+concord_ws_connect(concord_t *concord)
 {
   if ((CONNECTING|CONNECTED) & concord->ws->status){
     DEBUG_NOTOP_PUTS("Gateway already connected, returning ..."); 
@@ -440,7 +440,7 @@ concord_ws_connect(concord_st *concord)
 }
 
 void
-concord_ws_disconnect(concord_st *concord)
+concord_ws_disconnect(concord_t *concord)
 {
   if ((DISCONNECTING|DISCONNECTED) & concord->ws->status){
     DEBUG_NOTOP_PUTS("Gateway already disconnected, returning ..."); 
@@ -453,7 +453,7 @@ concord_ws_disconnect(concord_st *concord)
 }
 
 int
-concord_ws_isrunning(concord_st *concord)
+concord_ws_isrunning(concord_t *concord)
 {
   return ((CONNECTING|CONNECTED) & concord->ws->status);
 }

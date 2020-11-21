@@ -30,7 +30,7 @@ typedef struct {
   long long type;
   char *guild_id;
   long long position;
-  jscon_item_st *permission_overwrites;
+  jscon_item_t *permission_overwrites;
   char *name;
   char *topic;
   bool nsfw;
@@ -38,15 +38,15 @@ typedef struct {
   long long bitrate;
   long long user_limit;
   long long rate_limit_per_user;
-  jscon_item_st *recipients;
+  jscon_item_t *recipients;
   char *icon;
   char *owner_id;
   char *application_id;
   char *parent_id;
   char *last_pin_timestamp;
 
-  jscon_item_st *messages;
-} concord_channel_st;
+  jscon_item_t *messages;
+} concord_channel_t;
 
 /* GUILD OBJECT
 https://discord.com/developers/docs/resources/guild#guild-object-guild-structure */
@@ -68,9 +68,9 @@ typedef struct {
   long long verification_level;
   long long default_message_notifications;
   long long explicit_content_filter;
-  jscon_item_st *roles;
-  jscon_item_st *emojis;
-  jscon_item_st *features;
+  jscon_item_t *roles;
+  jscon_item_t *emojis;
+  jscon_item_t *features;
   long long mfa_level;
   char *application_id;
   bool widget_enabled;
@@ -82,10 +82,10 @@ typedef struct {
   bool large;
   bool unavailable;
   long long member_count;
-  jscon_item_st *voice_states;
-  jscon_item_st *members;
-  jscon_item_st *channels;
-  jscon_item_st *presences;
+  jscon_item_t *voice_states;
+  jscon_item_t *members;
+  jscon_item_t *channels;
+  jscon_item_t *presences;
   long long max_presences;
   long long mas_members;
   char *vanity_url_code;
@@ -98,7 +98,7 @@ typedef struct {
   long long max_video_channel_users;
   long long approximate_member_count;
   long long approximate_presence_count;
-} concord_guild_st;
+} concord_guild_t;
 
 
 /* USER OBJECT
@@ -117,46 +117,46 @@ typedef struct {
   long long flags;
   long long premium_type;
   long long public_flags;
-  jscon_item_st *guilds;
-} concord_user_st;
+  jscon_item_t *guilds;
+} concord_user_t;
 
 typedef struct concord_s {
   struct concord_http_s *http;
   struct concord_ws_s *ws;
 
-  concord_channel_st *channel;
-  concord_user_st *user;
-  concord_user_st *client;
-  concord_guild_st *guild;
-} concord_st;
+  concord_channel_t *channel;
+  concord_user_t *user;
+  concord_user_t *client;
+  concord_guild_t *guild;
+} concord_t;
 
 
-void concord_dispatch(concord_st *concord);
-void concord_ws_connect(concord_st *concord);
-void concord_ws_disconnect(concord_st *concord);
+void concord_dispatch(concord_t *concord);
+void concord_ws_connect(concord_t *concord);
+void concord_ws_disconnect(concord_t *concord);
 
-int concord_ws_isrunning(concord_st *concord);
+int concord_ws_isrunning(concord_t *concord);
 
 void concord_global_init();
 void concord_global_cleanup();
 
-concord_channel_st* concord_channel_init();
-void concord_channel_destroy(concord_channel_st *channel);
-void concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st **p_channel);
-void concord_get_channel_messages(concord_st *concord, char channel_id[], concord_channel_st **p_channel);
+concord_channel_t* concord_channel_init();
+void concord_channel_destroy(concord_channel_t *channel);
+void concord_get_channel(concord_t *concord, char channel_id[], concord_channel_t **p_channel);
+void concord_get_channel_messages(concord_t *concord, char channel_id[], concord_channel_t **p_channel);
 
-concord_guild_st* concord_guild_init();
-void concord_guild_destroy(concord_guild_st *guild);
-void concord_get_guild(concord_st *concord, char guild_id[], concord_guild_st **p_guild);
-void concord_get_guild_channels(concord_st *concord, char guild_id[], concord_guild_st **p_guild);
+concord_guild_t* concord_guild_init();
+void concord_guild_destroy(concord_guild_t *guild);
+void concord_get_guild(concord_t *concord, char guild_id[], concord_guild_t **p_guild);
+void concord_get_guild_channels(concord_t *concord, char guild_id[], concord_guild_t **p_guild);
 
-concord_user_st* concord_user_init();
-void concord_user_destroy(concord_user_st *user);
-void concord_get_user(concord_st *concord, char user_id[], concord_user_st **p_user);
-void concord_get_client(concord_st *concord, concord_user_st **p_client);
-void concord_get_client_guilds(concord_st* concord, concord_user_st **p_client);
+concord_user_t* concord_user_init();
+void concord_user_destroy(concord_user_t *user);
+void concord_get_user(concord_t *concord, char user_id[], concord_user_t **p_user);
+void concord_get_client(concord_t *concord, concord_user_t **p_client);
+void concord_get_client_guilds(concord_t* concord, concord_user_t **p_client);
 
-concord_st* concord_init(char token[]);
-void concord_cleanup(concord_st* concord);
+concord_t* concord_init(char token[]);
+void concord_cleanup(concord_t* concord);
 
 #endif

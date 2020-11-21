@@ -63,7 +63,7 @@ _concord_load_obj_perform(struct concord_conn_s *conn)
 }
 
 static void
-_concord_200async_tryremaining(concord_http_st *http, struct concord_conn_s *conn)
+_concord_200async_tryremaining(concord_http_t *http, struct concord_conn_s *conn)
 {
   _concord_load_obj_perform(conn);
   curl_multi_remove_handle(http->multi_handle, conn->easy_handle);
@@ -97,7 +97,7 @@ _concord_200async_tryremaining(concord_http_st *http, struct concord_conn_s *con
 static void
 _concord_queue_pause(struct concord_queue_s *queue)
 {
-  concord_http_st *http = ((struct concord_bucket_s*)queue)->p_http;
+  concord_http_t *http = ((struct concord_bucket_s*)queue)->p_http;
 
   for (size_t i = queue->bottom_running; i < queue->separator; ++i){
     if (RUNNING != queue->conns[i]->status)
@@ -112,7 +112,7 @@ static void
 _uv_queue_resume_cb(uv_timer_t *req)
 {
   struct concord_queue_s *queue = uv_handle_get_data((uv_handle_t*)req);
-  concord_http_st *http = ((struct concord_bucket_s*)queue)->p_http;
+  concord_http_t *http = ((struct concord_bucket_s*)queue)->p_http;
 
 
   DEBUG_PRINT("Resuming pending transfers:\t%ld", uv_now(http->loop));
@@ -129,7 +129,7 @@ _uv_queue_resume_cb(uv_timer_t *req)
 /* if is global, then sleep for x amount inside the function and
     return 0, otherwise return the retry_after amount in ms */
 static void
-_concord_429async_tryrecover(concord_http_st *http, struct concord_conn_s *conn)
+_concord_429async_tryrecover(concord_http_t *http, struct concord_conn_s *conn)
 {
   char message[256] = {0};
   long long retry_after;
@@ -164,7 +164,7 @@ _concord_429async_tryrecover(concord_http_st *http, struct concord_conn_s *conn)
 }
 
 static void
-_concord_asynchronous_perform(concord_http_st *http, CURL *easy_handle)
+_concord_asynchronous_perform(concord_http_t *http, CURL *easy_handle)
 {
   struct concord_conn_s *conn; /* conn referenced by this easy_handle */
   enum discord_http_code http_code; /* http response code */
@@ -206,7 +206,7 @@ _concord_asynchronous_perform(concord_http_st *http, CURL *easy_handle)
 }
 
 static void
-_concord_tryperform_asynchronous(concord_http_st *http)
+_concord_tryperform_asynchronous(concord_http_t *http)
 {
   /* These are related to the current easy_handle being read */
   CURLMsg *msg; /* for picking up messages with the transfer status */
@@ -228,7 +228,7 @@ _uv_perform_cb(uv_poll_t *req, int uvstatus, int events)
 {
   DEBUG_ASSERT(!uvstatus, uv_strerror(uvstatus));
 
-  concord_http_st *http = uv_handle_get_data((uv_handle_t*)req);
+  concord_http_t *http = uv_handle_get_data((uv_handle_t*)req);
   struct concord_context_s *context = (struct concord_context_s*)req;
 
   int flags = 0;
@@ -244,7 +244,7 @@ _uv_perform_cb(uv_poll_t *req, int uvstatus, int events)
 static void
 _uv_on_timeout_cb(uv_timer_t *req)
 {
-  concord_http_st *http = uv_handle_get_data((uv_handle_t*)req);
+  concord_http_t *http = uv_handle_get_data((uv_handle_t*)req);
 
   CURLMcode mcode = curl_multi_socket_action(http->multi_handle, CURL_SOCKET_TIMEOUT, 0, &http->transfers_running);
   DEBUG_ASSERT(CURLM_OK == mcode, curl_multi_strerror(mcode));
@@ -276,7 +276,7 @@ Concord_http_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata)
 int
 Concord_http_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket)
 {
-  concord_http_st *http = p_userdata;
+  concord_http_t *http = p_userdata;
   CURLMcode mcode;
   int uvcode;
   int events = 0;
@@ -325,7 +325,7 @@ Concord_http_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void
 }
 
 void
-Concord_transfers_run(concord_http_st *http)
+Concord_transfers_run(concord_http_t *http)
 {
   if (!http->transfers_onhold){
     DEBUG_NOTOP_PUTS("No transfers on hold, returning ..."); 
@@ -346,13 +346,13 @@ Concord_transfers_run(concord_http_st *http)
 }
 
 void
-concord_dispatch(concord_st *concord)
+concord_dispatch(concord_t *concord)
 {
   Concord_transfers_run(concord->http);
 }
 
 static void
-_concord_200sync_getbucket(concord_http_st *http, struct concord_conn_s *conn, char bucket_key[])
+_concord_200sync_getbucket(concord_http_t *http, struct concord_conn_s *conn, char bucket_key[])
 {
   long long delay_ms = Concord_parse_ratelimit_header(NULL, http->header, true);
   uv_sleep(delay_ms);
@@ -404,7 +404,7 @@ _concord_429sync_tryrecover(struct concord_conn_s *conn)
 }
 
 void
-Concord_register_bucket_key(concord_http_st *http, struct concord_conn_s *conn, char bucket_key[])
+Concord_register_bucket_key(concord_http_t *http, struct concord_conn_s *conn, char bucket_key[])
 {
   enum discord_http_code http_code; /* http response code */
   char *url = NULL; /* URL from request */

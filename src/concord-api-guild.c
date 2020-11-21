@@ -8,10 +8,10 @@
 #include "debug.h"
 #include "concord-common.h"
 
-concord_guild_st*
+concord_guild_t*
 concord_guild_init()
 {
-  concord_guild_st *new_guild = safe_calloc(1, sizeof *new_guild);
+  concord_guild_t *new_guild = safe_calloc(1, sizeof *new_guild);
   new_guild->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_guild->name = safe_malloc(MAX_NAME_LEN);
   new_guild->icon = safe_malloc(MAX_HASH_LEN);
@@ -37,7 +37,7 @@ concord_guild_init()
 }
 
 void
-concord_guild_destroy(concord_guild_st *guild)
+concord_guild_destroy(concord_guild_t *guild)
 {
   safe_free(guild->id);
   safe_free(guild->name);
@@ -69,7 +69,7 @@ concord_guild_destroy(concord_guild_st *guild)
 static void
 _concord_load_guild(void **p_guild, struct concord_response_s *response_body)
 {
-  concord_guild_st *guild = *p_guild;
+  concord_guild_t *guild = *p_guild;
 
   jscon_scanf(response_body->str,
      "#id%js " \
@@ -108,7 +108,7 @@ _concord_load_guild(void **p_guild, struct concord_response_s *response_body)
 }
 
 void
-concord_get_guild(concord_st *concord, char guild_id[], concord_guild_st **p_guild)
+concord_get_guild(concord_t *concord, char guild_id[], concord_guild_t **p_guild)
 {
   if (NULL == p_guild){
     p_guild = &concord->guild;
@@ -126,7 +126,7 @@ concord_get_guild(concord_st *concord, char guild_id[], concord_guild_st **p_gui
 static void
 _concord_load_guild_channels(void **p_guild, struct concord_response_s *response_body)
 {
-  concord_guild_st *guild = *p_guild;
+  concord_guild_t *guild = *p_guild;
 
   if (NULL != guild->channels){
     jscon_destroy(guild->channels);
@@ -139,7 +139,7 @@ _concord_load_guild_channels(void **p_guild, struct concord_response_s *response
 }
 
 void
-concord_get_guild_channels(concord_st *concord, char guild_id[], concord_guild_st **p_guild)
+concord_get_guild_channels(concord_t *concord, char guild_id[], concord_guild_t **p_guild)
 {
   if (NULL == p_guild){
     p_guild = &concord->guild;

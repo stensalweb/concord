@@ -12,7 +12,7 @@
 
 void
 Concord_http_request(
-  concord_http_st *http, 
+  concord_http_t *http, 
   void **p_object, 
   concord_load_obj_ft *load_cb,
   enum http_method http_method,
@@ -41,10 +41,10 @@ Concord_http_request(
              url_route);
 }
 
-static concord_http_st*
+static concord_http_t*
 _concord_http_init(char token[])
 {
-  concord_http_st *new_http = safe_calloc(1, sizeof *new_http);
+  concord_http_t *new_http = safe_calloc(1, sizeof *new_http);
 
   new_http->loop = uv_default_loop();
   uv_loop_set_data(new_http->loop, new_http);
@@ -77,7 +77,7 @@ _uv_on_walk_cb(uv_handle_t *handle, void *arg)
 }
 
 static void
-_concord_http_destroy(concord_http_st *http)
+_concord_http_destroy(concord_http_t *http)
 {
   curl_slist_free_all(http->request_header);
   curl_multi_cleanup(http->multi_handle);
@@ -103,10 +103,10 @@ _concord_http_destroy(concord_http_st *http)
   safe_free(http);
 }
 
-concord_st*
+concord_t*
 concord_init(char token[])
 {
-  concord_st *new_concord = safe_calloc(1, sizeof *new_concord);
+  concord_t *new_concord = safe_calloc(1, sizeof *new_concord);
 
   new_concord->http = _concord_http_init(token);
   new_concord->ws = Concord_ws_init(token);
@@ -120,7 +120,7 @@ concord_init(char token[])
 }
 
 void
-concord_cleanup(concord_st *concord)
+concord_cleanup(concord_t *concord)
 {
   Concord_ws_destroy(concord->ws);
 

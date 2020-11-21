@@ -15,18 +15,18 @@ int main(void)
 
   concord_global_init();
 
-  concord_st *concord = concord_init(bot_token);
+  concord_t *concord = concord_init(bot_token);
 
-  concord_user_st *client = concord_user_init();
+  concord_user_t *client = concord_user_init();
   concord_get_client_guilds(concord, &client);
   concord_dispatch(concord);
 
   /* THIS WILL FETCH CHANNELS FROM EACH GUILD BOT IS A PART OF */
-  concord_guild_st **guilds = malloc(jscon_size(client->guilds) * sizeof *guilds);
+  concord_guild_t **guilds = malloc(jscon_size(client->guilds) * sizeof *guilds);
   assert(NULL != guilds);
 
   for (size_t i=0; i < jscon_size(client->guilds); ++i){
-    jscon_item_st *item_guild = jscon_get_byindex(client->guilds, i);
+    jscon_item_t *item_guild = jscon_get_byindex(client->guilds, i);
     char *guild_id = jscon_get_string(jscon_get_branch(item_guild, "id"));
     assert(NULL != guild_id);
 
@@ -38,11 +38,11 @@ int main(void)
 
 
   // FETCH 50 MESSAGES FROM EACH CHANNEL FROM FIRST GUILD AND WILL OUTPUT THEM TO A a.out FILE
-  concord_channel_st **channels = malloc(jscon_size(guilds[0]->channels) * sizeof *channels);
+  concord_channel_t **channels = malloc(jscon_size(guilds[0]->channels) * sizeof *channels);
   assert(NULL != channels);
 
   for (size_t i=0; i < jscon_size(guilds[0]->channels); ++i){
-    jscon_item_st *item_channel = jscon_get_byindex(guilds[0]->channels, i);
+    jscon_item_t *item_channel = jscon_get_byindex(guilds[0]->channels, i);
     char *channel_id = jscon_get_string(jscon_get_branch(item_channel, "id"));
     assert(NULL != channel_id);
 

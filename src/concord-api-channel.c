@@ -8,10 +8,10 @@
 #include "concord-common.h"
 #include "debug.h"
 
-concord_channel_st*
+concord_channel_t*
 concord_channel_init()
 {
-  concord_channel_st *new_channel = safe_calloc(1, sizeof *new_channel);
+  concord_channel_t *new_channel = safe_calloc(1, sizeof *new_channel);
   new_channel->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_channel->guild_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
   new_channel->name = safe_malloc(MAX_NAME_LEN);
@@ -27,7 +27,7 @@ concord_channel_init()
 }
 
 void
-concord_channel_destroy(concord_channel_st *channel)
+concord_channel_destroy(concord_channel_t *channel)
 {
   safe_free(channel->id);
   safe_free(channel->guild_id);
@@ -54,7 +54,7 @@ concord_channel_destroy(concord_channel_st *channel)
 static void
 _concord_load_channel(void **p_channel, struct concord_response_s *response_body)
 {
-  concord_channel_st *channel = *p_channel;
+  concord_channel_t *channel = *p_channel;
 
   jscon_scanf(response_body->str,
      "#position%jd " \
@@ -122,7 +122,7 @@ _concord_load_channel(void **p_channel, struct concord_response_s *response_body
 }
 
 void
-concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st **p_channel)
+concord_get_channel(concord_t *concord, char channel_id[], concord_channel_t **p_channel)
 {
   if (NULL == p_channel){
     p_channel = &concord->channel;
@@ -140,7 +140,7 @@ concord_get_channel(concord_st *concord, char channel_id[], concord_channel_st *
 static void
 _concord_load_channel_messages(void **p_channel, struct concord_response_s *response_body)
 {
-  concord_channel_st *channel = *p_channel;
+  concord_channel_t *channel = *p_channel;
 
   if (NULL != channel->messages){
     jscon_destroy(channel->messages);
@@ -153,7 +153,7 @@ _concord_load_channel_messages(void **p_channel, struct concord_response_s *resp
 }
 
 void
-concord_get_channel_messages(concord_st *concord, char channel_id[], concord_channel_st **p_channel)
+concord_get_channel_messages(concord_t *concord, char channel_id[], concord_channel_t **p_channel)
 {
   if (NULL == p_channel){
     p_channel = &concord->channel;

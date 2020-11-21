@@ -12,7 +12,7 @@
 
 /* @todo create distinction between bot and user token */
 struct curl_slist*
-Curl_request_header_init(concord_http_st *http)
+Curl_request_header_init(concord_http_t *http)
 {
   char auth[MAX_HEADER_LEN] = "Authorization: Bot "; 
 
@@ -92,7 +92,7 @@ Curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 
 /* init easy handle with some default opt */
 CURL*
-Concord_conn_easy_init(concord_http_st *http, struct concord_conn_s *conn)
+Concord_conn_easy_init(concord_http_t *http, struct concord_conn_s *conn)
 {
   CURL *new_easy_handle = curl_easy_init();
   DEBUG_ASSERT(NULL != new_easy_handle, "Out of memory");
@@ -129,7 +129,7 @@ Concord_conn_easy_init(concord_http_st *http, struct concord_conn_s *conn)
 
 /* init multi handle with some default opt */
 CURLM*
-Concord_http_multi_init(concord_http_st *http)
+Concord_http_multi_init(concord_http_t *http)
 {
   CURLM *new_multi_handle = curl_multi_init();
   DEBUG_ASSERT(NULL != new_multi_handle, "Out of memory");
@@ -152,7 +152,7 @@ Concord_http_multi_init(concord_http_st *http)
 
 /* init easy handle with some default opt */
 CURL*
-Concord_ws_easy_init(concord_ws_st *ws)
+Concord_ws_easy_init(concord_ws_t *ws)
 {
   /* missing on_binary, on_ping, on_pong */
   struct cws_callbacks cws_cbs = {
@@ -177,7 +177,7 @@ Concord_ws_easy_init(concord_ws_st *ws)
 
 /* init multi handle with some default opt */
 CURLM*
-Concord_ws_multi_init(concord_ws_st *ws)
+Concord_ws_multi_init(concord_ws_t *ws)
 {
   CURLM *new_multi_handle = curl_multi_init();
   DEBUG_ASSERT(NULL != new_multi_handle, "Out of memory");

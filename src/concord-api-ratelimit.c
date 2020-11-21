@@ -18,7 +18,7 @@ Concord_tryget_major(char endpoint[])
 }
 
 long long
-Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, dictionary_st *header, bool use_clock)
+Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, dictionary_t *header, bool use_clock)
 {
   int remaining = dictionary_get_strtoll(header, "x-ratelimit-remaining");
   
@@ -51,7 +51,7 @@ Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, dictionary_st *h
 }
 
 static struct concord_conn_s*
-_concord_conn_init(concord_http_st *http)
+_concord_conn_init(concord_http_t *http)
 {
   struct concord_conn_s *new_conn = safe_calloc(1, sizeof *new_conn);
 
@@ -74,7 +74,7 @@ _concord_conn_destroy(struct concord_conn_s *conn)
 }
 
 static void
-_concord_client_buckets_append(concord_http_st *http, struct concord_bucket_s *bucket)
+_concord_client_buckets_append(concord_http_t *http, struct concord_bucket_s *bucket)
 {
   ++http->num_buckets;
 
@@ -108,7 +108,7 @@ _concord_bucket_destroy(void *ptr)
 }
 
 static struct concord_bucket_s*
-_concord_bucket_init(concord_http_st *http, char bucket_hash[])
+_concord_bucket_init(concord_http_t *http, char bucket_hash[])
 {
   struct concord_bucket_s *new_bucket = safe_calloc(1, sizeof *new_bucket);
 
@@ -136,7 +136,7 @@ _concord_bucket_init(concord_http_st *http, char bucket_hash[])
 
 /* recycle existing innactive connection */
 static void
-_concord_queue_recycle(concord_http_st *http, struct concord_queue_s *queue)
+_concord_queue_recycle(concord_http_t *http, struct concord_queue_s *queue)
 {
   DEBUG_ASSERT(NULL != queue->conns[queue->top_onhold], "Can't recycle conn from a NULL queue slot");
   DEBUG_ASSERT(queue->top_onhold < queue->size, "Queue top has reached threshold");
@@ -154,7 +154,7 @@ _concord_queue_recycle(concord_http_st *http, struct concord_queue_s *queue)
 
 /* push new connection to queue */
 static void
-_concord_queue_push(concord_http_st *http, struct concord_queue_s *queue, struct concord_conn_s *conn)
+_concord_queue_push(concord_http_t *http, struct concord_queue_s *queue, struct concord_conn_s *conn)
 {
   DEBUG_ASSERT(NULL == queue->conns[queue->top_onhold], "Can't push conn to a non-NULL queue slot");
   DEBUG_ASSERT(queue->top_onhold < queue->size, "Queue top has reached threshold");
@@ -175,7 +175,7 @@ _concord_queue_push(concord_http_st *http, struct concord_queue_s *queue, struct
 
 /* pops N conns from queue (essentially adds them to active transfers) */
 void
-Concord_queue_npop(concord_http_st *http, struct concord_queue_s *queue, int num_conn)
+Concord_queue_npop(concord_http_t *http, struct concord_queue_s *queue, int num_conn)
 {
   queue->bottom_running = queue->separator;
 
@@ -234,7 +234,7 @@ _concord_queue_reset(struct concord_queue_s *queue)
 }
 
 void
-Concord_start_client_buckets(concord_http_st *http)
+Concord_start_client_buckets(concord_http_t *http)
 {
   struct concord_bucket_s **client_buckets = http->client_buckets;
 
@@ -244,7 +244,7 @@ Concord_start_client_buckets(concord_http_st *http)
 }
 
 void
-Concord_stop_client_buckets(concord_http_st *http)
+Concord_stop_client_buckets(concord_http_t *http)
 {
   struct concord_bucket_s **client_buckets = http->client_buckets;
 
@@ -254,7 +254,7 @@ Concord_stop_client_buckets(concord_http_st *http)
 }
 
 struct concord_bucket_s*
-Concord_trycreate_bucket(concord_http_st *http, char bucket_hash[])
+Concord_trycreate_bucket(concord_http_t *http, char bucket_hash[])
 {
   DEBUG_ASSERT(NULL != bucket_hash, "Bucket hash unspecified (NULL)");
 
@@ -271,7 +271,7 @@ Concord_trycreate_bucket(concord_http_st *http, char bucket_hash[])
 
 void
 Concord_bucket_build(
-  concord_http_st *http,
+  concord_http_t *http,
   void **p_object, 
   concord_load_obj_ft *load_cb,
   enum http_method http_method,

@@ -176,7 +176,7 @@ enum ws_status {
 typedef struct concord_ws_s {
   char *token;
   /* https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
-  jscon_item_st *identify;
+  jscon_item_t *identify;
 
   struct concord_context_s *context;
 
@@ -195,10 +195,10 @@ typedef struct concord_ws_s {
     enum ws_opcode opcode;      /* field 'op' */
     long long seq_number;       /* field 's' */
     char event_name[25];        /* field 't' */
-    jscon_item_st *event_data;  /* field 'd' */
+    jscon_item_t *event_data;  /* field 'd' */
   } payload;
 
-} concord_ws_st;
+} concord_ws_t;
 
 /* @todo hash/unhash token */
 typedef struct concord_http_s {
@@ -218,7 +218,7 @@ typedef struct concord_http_s {
 
   struct dictionary_s *bucket_dict; /* store buckets by endpoints/major parameters */
   struct dictionary_s *header; /* holds the http response header */
-} concord_http_st;
+} concord_http_t;
 
 
 /* memory.c */
@@ -249,7 +249,7 @@ void* __safe_realloc(void *ptr, size_t size, const char file[], const int line, 
     endpoint
 */
 void Concord_http_request(
-    concord_http_st *http,
+    concord_http_t *http,
     void **p_object,
     concord_load_obj_ft *load_cb,
     enum http_method http_method,
@@ -264,8 +264,8 @@ struct concord_context_s* Concord_context_init(uv_loop_t *loop, curl_socket_t so
 void Concord_context_destroy(struct concord_context_s *context);
 int Concord_http_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
 int Concord_http_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
-void Concord_register_bucket_key(concord_http_st *http, struct concord_conn_s *conn, char bucket_key[]);
-void Concord_transfers_run(concord_http_st *http);
+void Concord_register_bucket_key(concord_http_t *http, struct concord_conn_s *conn, char bucket_key[]);
+void Concord_transfers_run(concord_http_t *http);
 
 /*************/
 /* concord-ratelimit.c */
@@ -274,13 +274,13 @@ void Concord_transfers_run(concord_http_st *http);
 char* Concord_tryget_major(char endpoint[]);
 long long Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, struct dictionary_s *header, bool use_clock);
 
-void Concord_queue_npop(concord_http_st *http, struct concord_queue_s *queue, int num_conn);
+void Concord_queue_npop(concord_http_t *http, struct concord_queue_s *queue, int num_conn);
 
-void Concord_start_client_buckets(concord_http_st *http);
-void Concord_stop_client_buckets(concord_http_st *http);
+void Concord_start_client_buckets(concord_http_t *http);
+void Concord_stop_client_buckets(concord_http_t *http);
 
-void Concord_bucket_build(concord_http_st *http, void **p_object, concord_load_obj_ft *load_cb, enum http_method http_method, char bucket_key[], char url_route[]);
-struct concord_bucket_s* Concord_trycreate_bucket(concord_http_st *http, char bucket_hash[]);
+void Concord_bucket_build(concord_http_t *http, void **p_object, concord_load_obj_ft *load_cb, enum http_method http_method, char bucket_key[], char url_route[]);
+struct concord_bucket_s* Concord_trycreate_bucket(concord_http_t *http, char bucket_hash[]);
 
 /*************/
 /* curl-ext.c */
@@ -288,11 +288,11 @@ struct concord_bucket_s* Concord_trycreate_bucket(concord_http_st *http, char bu
 size_t Curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata);
 size_t Curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata);
 
-struct curl_slist* Curl_request_header_init(concord_http_st *http);
-CURL* Concord_conn_easy_init(concord_http_st *http, struct concord_conn_s *conn);
-CURLM* Concord_http_multi_init(concord_http_st *http);
-CURL* Concord_ws_easy_init(concord_ws_st *ws);
-CURLM* Concord_ws_multi_init(concord_ws_st *ws);
+struct curl_slist* Curl_request_header_init(concord_http_t *http);
+CURL* Concord_conn_easy_init(concord_http_t *http, struct concord_conn_s *conn);
+CURLM* Concord_http_multi_init(concord_http_t *http);
+CURL* Concord_ws_easy_init(concord_ws_t *ws);
+CURLM* Concord_ws_multi_init(concord_ws_t *ws);
 
 void Curl_set_method(struct concord_conn_s *conn, enum http_method method);
 void Curl_set_url(struct concord_conn_s *conn, char endpoint[]);
@@ -300,8 +300,8 @@ void Curl_set_url(struct concord_conn_s *conn, char endpoint[]);
 /*************/
 /* concord-websockets.c */
 
-concord_ws_st* Concord_ws_init(char token[]);
-void Concord_ws_destroy(concord_ws_st *ws);
+concord_ws_t* Concord_ws_init(char token[]);
+void Concord_ws_destroy(concord_ws_t *ws);
 int Concord_ws_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
 int Concord_ws_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
 void Concord_on_connect_cb(void *data, CURL *easy_handle, const char *ws_protocols);
