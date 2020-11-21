@@ -137,7 +137,7 @@ _concord_429async_tryrecover(concord_http_t *http, struct concord_conn_s *conn)
 
 
   jscon_scanf(conn->response_body.str,
-    "#message%ls " \
+    "#message%js " \
     "#retry_after%jd " \
     "#global%jb",
      message,
@@ -390,7 +390,7 @@ _concord_429sync_tryrecover(struct concord_conn_s *conn)
   long long retry_after;
 
   jscon_scanf(conn->response_body.str,
-    "#message%ls " \
+    "#message%js " \
     "#retry_after%jd",
      message,
      &retry_after);
