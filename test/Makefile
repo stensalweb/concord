@@ -39,4 +39,4 @@ $(LIBDIR) :
 	$(MAKE) -C $(TOP)
 
 clean :
-	rm -rf test-api test-gateway *.out
+	rm -rf test-api test-websockets *.out
