@@ -121,7 +121,7 @@ typedef struct {
 } concord_user_t;
 
 typedef struct concord_s {
-  struct concord_http_s *http;
+  struct concord_api_s *api;
   struct concord_ws_s *ws;
 
   concord_channel_t *channel;

@@ -51,11 +51,11 @@ Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, dictionary_t *he
 }
 
 static struct concord_conn_s*
-_concord_conn_init(concord_http_t *http)
+_concord_conn_init(concord_api_t *api)
 {
   struct concord_conn_s *new_conn = safe_calloc(1, sizeof *new_conn);
 
-  new_conn->easy_handle = Concord_conn_easy_init(http, new_conn);
+  new_conn->easy_handle = Concord_conn_easy_init(api, new_conn);
 
   return new_conn;
 }
@@ -74,18 +74,18 @@ _concord_conn_destroy(struct concord_conn_s *conn)
 }
 
 static void
-_concord_client_buckets_append(concord_http_t *http, struct concord_bucket_s *bucket)
+_concord_client_buckets_append(concord_api_t *api, struct concord_bucket_s *bucket)
 {
-  ++http->num_buckets;
+  ++api->num_buckets;
 
-  void *tmp = realloc(http->client_buckets, sizeof *http->client_buckets * http->num_buckets);
+  void *tmp = realloc(api->client_buckets, sizeof *api->client_buckets * api->num_buckets);
   DEBUG_ASSERT(NULL != tmp, "Out of memory");
 
-  http->client_buckets = tmp;
+  api->client_buckets = tmp;
 
-  http->client_buckets[http->num_buckets-1] = bucket;
+  api->client_buckets[api->num_buckets-1] = bucket;
 
-  DEBUG_NOTOP_PRINT("Appending new bucket to clients bucket at slot %ld", http->num_buckets-1);
+  DEBUG_NOTOP_PRINT("Appending new bucket to clients bucket at slot %ld", api->num_buckets-1);
 }
 
 /* @param ptr is void* because we want to pass this function as a
@@ -108,7 +108,7 @@ _concord_bucket_destroy(void *ptr)
 }
 
 static struct concord_bucket_s*
-_concord_bucket_init(concord_http_t *http, char bucket_hash[])
+_concord_bucket_init(concord_api_t *api, char bucket_hash[])
 {
   struct concord_bucket_s *new_bucket = safe_calloc(1, sizeof *new_bucket);
 
@@ -118,16 +118,16 @@ _concord_bucket_init(concord_http_t *http, char bucket_hash[])
   new_bucket->hash_key = strdup(bucket_hash);
   DEBUG_ASSERT(NULL != new_bucket->hash_key, "Out of memory");
 
-  int uvcode = uv_timer_init(http->loop, &new_bucket->ratelimit_timer);
+  int uvcode = uv_timer_init(api->loop, &new_bucket->ratelimit_timer);
   DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
 
-  new_bucket->p_http = http;
+  new_bucket->p_api = api;
   uv_handle_set_data((uv_handle_t*)&new_bucket->ratelimit_timer, new_bucket);
 
-  void *res = dictionary_set(http->bucket_dict, bucket_hash, new_bucket, &_concord_bucket_destroy);
+  void *res = dictionary_set(api->bucket_dict, bucket_hash, new_bucket, &_concord_bucket_destroy);
   DEBUG_ASSERT(res == new_bucket, "Couldn't create new bucket");
 
-  _concord_client_buckets_append(http, new_bucket);
+  _concord_client_buckets_append(api, new_bucket);
 
   DEBUG_NOTOP_PUTS("Created Bucket");
 
@@ -136,7 +136,7 @@ _concord_bucket_init(concord_http_t *http, char bucket_hash[])
 
 /* recycle existing innactive connection */
 static void
-_concord_queue_recycle(concord_http_t *http, struct concord_queue_s *queue)
+_concord_queue_recycle(concord_api_t *api, struct concord_queue_s *queue)
 {
   DEBUG_ASSERT(NULL != queue->conns[queue->top_onhold], "Can't recycle conn from a NULL queue slot");
   DEBUG_ASSERT(queue->top_onhold < queue->size, "Queue top has reached threshold");
@@ -144,17 +144,17 @@ _concord_queue_recycle(concord_http_t *http, struct concord_queue_s *queue)
   queue->conns[queue->top_onhold]->status = ON_HOLD;
 
   ++queue->top_onhold;
-  ++http->transfers_onhold;
+  ++api->transfers_onhold;
 
   if (queue->top_onhold == queue->size){
     DEBUG_PUTS("Reach queue threshold, auto performing ALL transfers on hold ...");
-    Concord_transfers_run(http);
+    Concord_transfers_run(api);
   }
 }
 
 /* push new connection to queue */
 static void
-_concord_queue_push(concord_http_t *http, struct concord_queue_s *queue, struct concord_conn_s *conn)
+_concord_queue_push(concord_api_t *api, struct concord_queue_s *queue, struct concord_conn_s *conn)
 {
   DEBUG_ASSERT(NULL == queue->conns[queue->top_onhold], "Can't push conn to a non-NULL queue slot");
   DEBUG_ASSERT(queue->top_onhold < queue->size, "Queue top has reached threshold");
@@ -165,17 +165,17 @@ _concord_queue_push(concord_http_t *http, struct concord_queue_s *queue, struct 
   queue->conns[queue->top_onhold] = conn; 
 
   ++queue->top_onhold;
-  ++http->transfers_onhold;
+  ++api->transfers_onhold;
 
   if (queue->top_onhold == queue->size){
     DEBUG_PUTS("Reach queue threshold, auto performing ALL transfers on hold ...");
-    Concord_transfers_run(http);
+    Concord_transfers_run(api);
   }
 }
 
 /* pops N conns from queue (essentially adds them to active transfers) */
 void
-Concord_queue_npop(concord_http_t *http, struct concord_queue_s *queue, int num_conn)
+Concord_queue_npop(concord_api_t *api, struct concord_queue_s *queue, int num_conn)
 {
   queue->bottom_running = queue->separator;
 
@@ -195,11 +195,11 @@ Concord_queue_npop(concord_http_t *http, struct concord_queue_s *queue, int num_
     conn = queue->conns[queue->separator];
     DEBUG_ASSERT(NULL != conn, "Queue's slot is NULL, can't pop");
 
-    curl_multi_add_handle(http->multi_handle, conn->easy_handle);
+    curl_multi_add_handle(api->multi_handle, conn->easy_handle);
     conn->status = RUNNING;
 
     ++queue->separator;
-    --http->transfers_onhold;
+    --api->transfers_onhold;
   } while(--num_conn);
 
   DEBUG_NOTOP_PRINT("Bucket Hash:\t%s\n\t" \
@@ -234,36 +234,36 @@ _concord_queue_reset(struct concord_queue_s *queue)
 }
 
 void
-Concord_start_client_buckets(concord_http_t *http)
+Concord_start_client_buckets(concord_api_t *api)
 {
-  struct concord_bucket_s **client_buckets = http->client_buckets;
+  struct concord_bucket_s **client_buckets = api->client_buckets;
 
-  for (size_t i=0; i < http->num_buckets; ++i){
-    Concord_queue_npop(http, &client_buckets[i]->queue, 1);
+  for (size_t i=0; i < api->num_buckets; ++i){
+    Concord_queue_npop(api, &client_buckets[i]->queue, 1);
   }
 }
 
 void
-Concord_stop_client_buckets(concord_http_t *http)
+Concord_stop_client_buckets(concord_api_t *api)
 {
-  struct concord_bucket_s **client_buckets = http->client_buckets;
+  struct concord_bucket_s **client_buckets = api->client_buckets;
 
-  for (size_t i=0; i < http->num_buckets; ++i){
+  for (size_t i=0; i < api->num_buckets; ++i){
     _concord_queue_reset(&client_buckets[i]->queue);
   }
 }
 
 struct concord_bucket_s*
-Concord_trycreate_bucket(concord_http_t *http, char bucket_hash[])
+Concord_trycreate_bucket(concord_api_t *api, char bucket_hash[])
 {
   DEBUG_ASSERT(NULL != bucket_hash, "Bucket hash unspecified (NULL)");
 
   /* check if hashbucket with bucket_hash already exists */
-  struct concord_bucket_s *bucket = dictionary_get(http->bucket_dict, bucket_hash);
+  struct concord_bucket_s *bucket = dictionary_get(api->bucket_dict, bucket_hash);
   if (!bucket){
     /* hashbucket doesn't exist, create it */
     DEBUG_PUTS("Bucket hash not found, creating new bucket ...");
-    bucket = _concord_bucket_init(http, bucket_hash);
+    bucket = _concord_bucket_init(api, bucket_hash);
   }
 
   return bucket;
@@ -271,14 +271,14 @@ Concord_trycreate_bucket(concord_http_t *http, char bucket_hash[])
 
 void
 Concord_bucket_build(
-  concord_http_t *http,
+  concord_api_t *api,
   void **p_object, 
   concord_load_obj_ft *load_cb,
   enum http_method http_method,
   char bucket_key[],
   char url_route[])
 {
-  struct concord_bucket_s *bucket = dictionary_get(http->bucket_dict, bucket_key);
+  struct concord_bucket_s *bucket = dictionary_get(api->bucket_dict, bucket_key);
   DEBUG_PRINT("Bucket key found: %s\n\tAttempting to get matching hash ... ", bucket_key);
 
   /* conn to be pushed to (or recycled from) bucket queue */
@@ -288,7 +288,7 @@ Concord_bucket_build(
     /* this is the first time using this bucket_key. We will perform a blocking
         connection to the Discord API, in order to fetch this bucket key
         corresponding bucket */
-    new_conn = _concord_conn_init(http);
+    new_conn = _concord_conn_init(api);
     DEBUG_ASSERT(NULL != new_conn, "Out of memory");
     DEBUG_NOTOP_PUTS("New conn created");
 
@@ -306,7 +306,7 @@ Concord_bucket_build(
        the new_conn status is set to INNACTIVE, which means 
         it will be ready for recycling after it has performed
         this connection */
-    Concord_register_bucket_key(http, new_conn, bucket_key);
+    Concord_register_bucket_key(api, new_conn, bucket_key);
   }
   else {
     /* found bucket reference from given key add connection
@@ -317,13 +317,13 @@ Concord_bucket_build(
     if (!new_conn){
       DEBUG_NOTOP_PRINT("Creating new conn and pushing to queue at slot %ld", bucket->queue.top_onhold);
 
-      new_conn = _concord_conn_init(http);
+      new_conn = _concord_conn_init(api);
       DEBUG_ASSERT(NULL != new_conn, "Out of memory");
 
-      _concord_queue_push(http, &bucket->queue, new_conn);
+      _concord_queue_push(api, &bucket->queue, new_conn);
     } else { 
       DEBUG_NOTOP_PRINT("Recycling INNACTIVE connection at queue's slot %ld", bucket->queue.top_onhold);
-      _concord_queue_recycle(http, &bucket->queue);
+      _concord_queue_recycle(api, &bucket->queue);
     }
 
     Curl_set_method(new_conn, http_method); /* set the http request method (GET, POST, ...) */

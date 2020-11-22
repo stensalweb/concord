@@ -116,8 +116,8 @@ concord_get_guild(concord_t *concord, char guild_id[], concord_guild_t **p_guild
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Concord_http_request( 
-    concord->http,
+  Concord_api_request( 
+    concord->api,
     (void**)p_guild,
     &_concord_load_guild,
     GET, GUILDS, guild_id);
@@ -147,8 +147,8 @@ concord_get_guild_channels(concord_t *concord, char guild_id[], concord_guild_t 
 
   /* this is a template common to every function that deals with
       sending a request to the Discord API */
-  Concord_http_request( 
-    concord->http,
+  Concord_api_request( 
+    concord->api,
     (void**)p_guild,
     &_concord_load_guild_channels,
     GET, GUILDS_CHANNELS, guild_id);
