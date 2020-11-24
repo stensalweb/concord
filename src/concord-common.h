@@ -141,7 +141,6 @@ struct concord_conn_s {
   void **p_object; /* object to be performed action at load_cb */
 
   struct concord_bucket_s *p_bucket; /* bucket this conn is inside */
-
 };
 
 struct concord_queue_s {
@@ -263,6 +262,8 @@ void Concord_api_request(
 /* concord-api.c */
 
 
+concord_api_t* Concord_api_init(char token[]);
+void Concord_api_destroy(concord_api_t *api);
 int Concord_api_timeout_cb(CURLM *multi_handle, long timeout_ms, void *p_userdata);
 int Concord_api_socket_cb(CURL *easy_handle, curl_socket_t sockfd, int action, void *p_userdata, void *p_socket);
 void Concord_register_bucket_key(concord_api_t *api, struct concord_conn_s *conn, char bucket_key[]);
@@ -273,6 +274,8 @@ void Concord_transfers_run(concord_api_t *api);
 
 
 char* Concord_tryget_major(char endpoint[]);
+int Concord_parse_ratelimit_remaining(struct concord_bucket_s *bucket, struct dictionary_s *header);
+long long Concord_parse_ratelimit_delay(int remaining, struct dictionary_s *header, bool use_clock);
 long long Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, struct dictionary_s *header, bool use_clock);
 
 void Concord_queue_npop(concord_api_t *api, struct concord_queue_s *queue, int num_conn);
@@ -286,17 +289,14 @@ struct concord_bucket_s* Concord_trycreate_bucket(concord_api_t *api, char bucke
 /*************/
 /* concord-curl.c */
 
-size_t Curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata);
-size_t Curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata);
-
-struct curl_slist* Curl_request_header_init(concord_api_t *api);
+struct curl_slist* Concord_reqheader_init(concord_api_t *api);
 CURL* Concord_conn_easy_init(concord_api_t *api, struct concord_conn_s *conn);
-CURLM* Concord_api_multi_init(concord_api_t *api);
 CURL* Concord_ws_easy_init(concord_ws_t *ws);
+CURLM* Concord_api_multi_init(concord_api_t *api);
 CURLM* Concord_ws_multi_init(concord_ws_t *ws);
 
-void Curl_set_method(struct concord_conn_s *conn, enum http_method method);
-void Curl_set_url(struct concord_conn_s *conn, char endpoint[]);
+void Concord_conn_set_method(struct concord_conn_s *conn, enum http_method method);
+void Concord_conn_set_url(struct concord_conn_s *conn, char endpoint[]);
 
 /*************/
 /* concord-websockets.c */

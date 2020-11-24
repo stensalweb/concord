@@ -72,74 +72,12 @@ Concord_api_request(
              url_route);
 }
 
-static concord_api_t*
-_concord_api_init(char token[])
-{
-  concord_api_t *new_api = safe_calloc(1, sizeof *new_api);
-
-  new_api->loop = uv_default_loop();
-  uv_loop_set_data(new_api->loop, new_api);
-
-  new_api->token = strndup(token, strlen(token)-1);
-  DEBUG_ASSERT(NULL != new_api->token, "Out of memory");
-
-  new_api->request_header = Curl_request_header_init(new_api);
-
-  uv_timer_init(new_api->loop, &new_api->timeout);
-  uv_handle_set_data((uv_handle_t*)&new_api->timeout, new_api);
-
-  new_api->multi_handle = Concord_api_multi_init(new_api);
-
-  new_api->bucket_dict = dictionary_init();
-  dictionary_build(new_api->bucket_dict, BUCKET_DICTIONARY_SIZE);
-
-  new_api->header = dictionary_init();
-  dictionary_build(new_api->header, HEADER_DICTIONARY_SIZE);
-
-  return new_api;
-}
-
-static void
-_uv_on_walk_cb(uv_handle_t *handle, void *arg)
-{
-  uv_close(handle, NULL);
-
-  (void)arg;
-}
-
-static void
-_concord_api_destroy(concord_api_t *api)
-{
-  curl_slist_free_all(api->request_header);
-  curl_multi_cleanup(api->multi_handle);
-
-  int uvcode = uv_loop_close(api->loop);
-  if (UV_EBUSY == uvcode){ //there are still handles that need to be closed
-    uv_walk(api->loop, &_uv_on_walk_cb, NULL); //close each handle encountered
-
-    uvcode = uv_run(api->loop, UV_RUN_DEFAULT); //run the loop again to close remaining handles
-    DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
-
-    uvcode = uv_loop_close(api->loop); //finally, close the loop
-    DEBUG_ASSERT(!uvcode, uv_strerror(uvcode));
-  }
-
-  dictionary_destroy(api->bucket_dict);
-  dictionary_destroy(api->header);
-
-  safe_free(api->client_buckets);
-
-  safe_free(api->token);
-
-  safe_free(api);
-}
-
 concord_t*
 concord_init(char token[])
 {
   concord_t *new_concord = safe_calloc(1, sizeof *new_concord);
 
-  new_concord->api = _concord_api_init(token);
+  new_concord->api = Concord_api_init(token);
   new_concord->ws = Concord_ws_init(token);
 
   new_concord->channel = concord_channel_init();
@@ -154,7 +92,7 @@ void
 concord_cleanup(concord_t *concord)
 {
   Concord_ws_destroy(concord->ws);
-  _concord_api_destroy(concord->api);
+  Concord_api_destroy(concord->api);
 
   concord_channel_destroy(concord->channel);
   concord_guild_destroy(concord->guild);

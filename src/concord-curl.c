@@ -12,7 +12,7 @@
 
 /* @todo create distinction between bot and user token */
 struct curl_slist*
-Curl_request_header_init(concord_api_t *api)
+Concord_reqheader_init(concord_api_t *api)
 {
   char auth[MAX_HEADER_LEN] = "Authorization: Bot "; 
 
@@ -35,8 +35,8 @@ Curl_request_header_init(concord_api_t *api)
 }
 
 /* this is a very crude http header parser, splits key/value pairs at ':' */
-size_t
-Curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
+static size_t
+_curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   size_t realsize = size * nmemb;
   struct dictionary_s *header = p_userdata;
@@ -70,8 +70,8 @@ Curl_header_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 }
 
 /* get curl response body */
-size_t
-Curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
+static size_t
+_curl_body_cb(char *content, size_t size, size_t nmemb, void *p_userdata)
 {
   size_t realsize = size * nmemb;
   struct concord_response_s *response_body = p_userdata;
@@ -111,13 +111,13 @@ Concord_conn_easy_init(concord_api_t *api, struct concord_conn_s *conn)
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
   /* SET CURL_EASY CALLBACKS */
-  ecode = curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &Curl_body_cb);
+  ecode = curl_easy_setopt(new_easy_handle, CURLOPT_WRITEFUNCTION, &_curl_body_cb);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
   ecode = curl_easy_setopt(new_easy_handle, CURLOPT_WRITEDATA, &conn->response_body);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
-  ecode = curl_easy_setopt(new_easy_handle, CURLOPT_HEADERFUNCTION, &Curl_header_cb);
+  ecode = curl_easy_setopt(new_easy_handle, CURLOPT_HEADERFUNCTION, &_curl_header_cb);
   DEBUG_ASSERT(CURLE_OK == ecode, curl_easy_strerror(ecode));
 
   ecode = curl_easy_setopt(new_easy_handle, CURLOPT_HEADERDATA, api->header);
@@ -174,7 +174,6 @@ Concord_ws_easy_init(concord_ws_t *ws)
   return new_easy_handle;
 }
 
-/* init multi handle with some default opt */
 CURLM*
 Concord_ws_multi_init(concord_ws_t *ws)
 {
@@ -198,7 +197,7 @@ Concord_ws_multi_init(concord_ws_t *ws)
 }
 
 void
-Curl_set_method(struct concord_conn_s *conn, enum http_method method)
+Concord_conn_set_method(struct concord_conn_s *conn, enum http_method method)
 {
   CURLcode ecode;
   switch (method){
@@ -225,7 +224,7 @@ Curl_set_method(struct concord_conn_s *conn, enum http_method method)
 }
 
 void
-Curl_set_url(struct concord_conn_s *conn, char endpoint[])
+Concord_conn_set_url(struct concord_conn_s *conn, char endpoint[])
 {
   char base_url[MAX_URL_LEN] = BASE_API_URL;
 

@@ -17,17 +17,17 @@ Concord_tryget_major(char endpoint[])
   return endpoint;
 }
 
-long long
-Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, dictionary_t *header, bool use_clock)
+int
+Concord_parse_ratelimit_remaining(struct concord_bucket_s *bucket, dictionary_t *header)
 {
-  int remaining = dictionary_get_strtoll(header, "x-ratelimit-remaining");
-  
-  if (bucket){
-    bucket->remaining = remaining;
-  }
+  bucket->remaining = dictionary_get_strtoll(header, "x-ratelimit-remaining");
+  return bucket->remaining;
+}
 
+long long
+Concord_parse_ratelimit_delay(int remaining, dictionary_t *header, bool use_clock)
+{
   if (remaining) return 0; /* no delay if remaining > 0 */
-
 
   long long reset_after = dictionary_get_strtoll(header, "x-ratelimit-reset-after");
 
@@ -48,6 +48,13 @@ Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, dictionary_t *he
   }
 
   return delay_ms;
+}
+
+long long
+Concord_parse_ratelimit_header(struct concord_bucket_s *bucket, dictionary_t *header, bool use_clock)
+{
+  int remaining = Concord_parse_ratelimit_remaining(bucket, header);
+  return Concord_parse_ratelimit_delay(remaining, header, use_clock);
 }
 
 static struct concord_conn_s*
@@ -293,8 +300,8 @@ Concord_bucket_build(
     DEBUG_NOTOP_PUTS("New conn created");
 
 
-    Curl_set_method(new_conn, http_method); /* set the http request method (GET, POST, ...) */
-    Curl_set_url(new_conn, url_route); /* set the http request url */
+    Concord_conn_set_method(new_conn, http_method); /* set the http request method (GET, POST, ...) */
+    Concord_conn_set_url(new_conn, url_route); /* set the http request url */
 
     new_conn->load_cb = load_cb; /* callback that will perform actions on object */
     new_conn->p_object = p_object; /* object to have action performed on */
@@ -326,8 +333,8 @@ Concord_bucket_build(
       _concord_queue_recycle(api, &bucket->queue);
     }
 
-    Curl_set_method(new_conn, http_method); /* set the http request method (GET, POST, ...) */
-    Curl_set_url(new_conn, url_route); /* set the http request url */
+    Concord_conn_set_method(new_conn, http_method); /* set the http request method (GET, POST, ...) */
+    Concord_conn_set_url(new_conn, url_route); /* set the http request url */
 
     new_conn->load_cb = load_cb; /* callback that will perform actions on object */
     new_conn->p_object = p_object; /* object to have action performed on */
