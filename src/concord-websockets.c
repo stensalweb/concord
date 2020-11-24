@@ -331,9 +331,9 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
   }
 
   jscon_scanf((char*)text, 
-              "#t%js " \
-              "#s%jd " \
-              "#op%jd " \
+              "#t%s " \
+              "#s%lld " \
+              "#op%lld " \
               "#d%ji",
                ws->payload.event_name,
                &ws->payload.seq_number,

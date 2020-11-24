@@ -45,19 +45,19 @@ _concord_load_user(void **p_user, struct concord_response_s *response_body)
   concord_user_t *user = *p_user;
 
   jscon_scanf(response_body->str,
-     "#id%js " \
-     "#username%js " \
-     "#discriminator%js " \
-     "#avatar%js " \
-     "#bot%jb " \
-     "#system%jb " \
-     "#mfa_enabled%jb " \
-     "#locale%js " \
-     "#verified%jb " \
-     "#email%js " \
-     "#flags%jd " \
-     "#premium_type%jd " \
-     "#public_flags%jd",
+     "#id%s " \
+     "#username%s " \
+     "#discriminator%s " \
+     "#avatar%s " \
+     "#bot%b " \
+     "#system%b " \
+     "#mfa_enabled%b " \
+     "#locale%s " \
+     "#verified%b " \
+     "#email%s " \
+     "#flags%lld " \
+     "#premium_type%lld " \
+     "#public_flags%lld",
       user->id,
       user->username,
       user->discriminator,
