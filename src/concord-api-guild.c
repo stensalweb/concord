@@ -76,7 +76,7 @@ _concord_load_guild(void **p_guild, struct concord_response_s *response_body)
      "#name%s " \
      "#icon%s " \
      "#owner%b " \
-     "#permissions%lld " \
+     "#permissions%d " \
      "#permissions_new%s",
       guild->id,
       guild->name,
@@ -84,25 +84,6 @@ _concord_load_guild(void **p_guild, struct concord_response_s *response_body)
       &guild->owner,
       &guild->permissions,
       guild->permissions_new);
- 
-  /* UNCOMMENT FOR TESTING
-  fprintf(stdout,
-      "\njson: %s\n\
-      \nGUILD:\n\
-      \"id\": %s\n\
-      \"name\": %s\n\
-      \"icon\": %s\n\
-      \"owner\": %d\n\
-      \"permissions\": %lld\n\
-      \"permissions_new\": %s\n",
-      response_body->str,
-      guild->id,
-      guild->name,
-      guild->icon,
-      guild->owner,
-      guild->permissions,
-      guild->permissions_new);
-  */
 
   *p_guild = guild;
 }

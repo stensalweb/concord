@@ -217,7 +217,7 @@ _uv_on_heartbeat_cb(uv_timer_t *req)
   if (0 == ws->payload.seq_number){
     snprintf(send_payload, 249, "{\"op\": 1, \"d\": null}");
   } else {
-    snprintf(send_payload, 249, "{\"op\": 1, \"d\": %lld}", ws->payload.seq_number);
+    snprintf(send_payload, 249, "{\"op\": 1, \"d\": %d}", ws->payload.seq_number);
   }
 
   DEBUG_NOTOP_PRINT("HEARTBEAT_PAYLOAD:\n\t\t%s", send_payload);
@@ -332,15 +332,15 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
 
   jscon_scanf((char*)text, 
               "#t%s " \
-              "#s%lld " \
-              "#op%lld " \
+              "#s%d " \
+              "#op%d " \
               "#d%ji",
                ws->payload.event_name,
                &ws->payload.seq_number,
                &ws->payload.opcode,
                &ws->payload.event_data);
 
-  DEBUG_NOTOP_PRINT("OP:\t\t%s\n\tEVENT_NAME:\t%s\n\tSEQ_NUMBER:\t%lld", 
+  DEBUG_NOTOP_PRINT("OP:\t\t%s\n\tEVENT_NAME:\t%s\n\tSEQ_NUMBER:\t%d", 
               _concord_payload_strevent(ws->payload.opcode), 
               !*ws->payload.event_name /* "if is empty string" */
                  ? "NULL" 

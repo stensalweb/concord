@@ -57,21 +57,21 @@ _concord_load_channel(void **p_channel, struct concord_response_s *response_body
   concord_channel_t *channel = *p_channel;
 
   jscon_scanf(response_body->str,
-     "#position%lld " \
+     "#position%d " \
      "#nsfw%b " \
      "#last_message_id%s " \
-     "#bitrate%lld " \
+     "#bitrate%d " \
      "#owner_id%s " \
      "#application_id%s " \
      "#last_pin_timestamp%s " \
      "#id%s " \
-     "#type%lld " \
+     "#type%d " \
      "#guild_id%s " \
      "#permission_overwrites%ji " \
      "#name%s " \
      "#topic%s " \
-     "#user_limit%lld " \
-     "#rate_limit_per_user%lld " \
+     "#user_limit%d " \
+     "#rate_limit_per_user%d " \
      "#recipients%ji " \
      "#icon%s " \
      "#parent_id%s",
@@ -93,30 +93,6 @@ _concord_load_channel(void **p_channel, struct concord_response_s *response_body
       &channel->recipients,
       channel->icon,
       channel->parent_id);
-
-  /*//UNCOMMENT FOR TESTING
-  fprintf(stdout,
-      "\njson: %s\nCHANNEL: %lld %d %s %lld %s %s %s %s %lld %s %p %s %s %lld %lld %p %s %s\n",
-      response_body->str,
-      channel->position,
-      channel->nsfw,
-      channel->last_message_id,
-      channel->bitrate,
-      channel->owner_id,
-      channel->application_id,
-      channel->last_pin_timestamp,
-      channel->id,
-      channel->type,
-      channel->guild_id,
-      (void*)channel->permission_overwrites,
-      channel->name,
-      channel->topic,
-      channel->user_limit,
-      channel->rate_limit_per_user,
-      (void*)channel->recipients,
-      channel->icon,
-      channel->parent_id);
-  */
 
   *p_channel = channel;
 }

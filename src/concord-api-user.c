@@ -55,9 +55,9 @@ _concord_load_user(void **p_user, struct concord_response_s *response_body)
      "#locale%s " \
      "#verified%b " \
      "#email%s " \
-     "#flags%lld " \
-     "#premium_type%lld " \
-     "#public_flags%lld",
+     "#flags%d " \
+     "#premium_type%d " \
+     "#public_flags%d",
       user->id,
       user->username,
       user->discriminator,
@@ -71,25 +71,6 @@ _concord_load_user(void **p_user, struct concord_response_s *response_body)
       &user->flags,
       &user->premium_type,
       &user->public_flags);
-
-  /* UNCOMMENT FOR TESTING
-  fprintf(stdout,
-      "\njson: %s\nUSER: %s %s %s %s %d %d %d %s %d %s %lld %lld %lld\n",
-      response,
-      user->id,
-      user->username,
-      user->discriminator,
-      user->avatar,
-      user->bot,
-      user->sys,
-      user->mfa_enabled,
-      user->locale,
-      user->verified,
-      user->email,
-      user->flags,
-      user->premium_type,
-      user->public_flags);
-  */
 
   *p_user = user;
 }
