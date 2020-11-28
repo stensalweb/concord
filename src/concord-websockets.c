@@ -331,10 +331,10 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
   }
 
   jscon_scanf((char*)text, 
-              "#t%s " \
-              "#s%d " \
-              "#op%d " \
-              "#d%ji",
+              "%s#t " \
+              "%d#s " \
+              "%d#op " \
+              "%ji#d ",
                ws->payload.event_name,
                &ws->payload.seq_number,
                &ws->payload.opcode,

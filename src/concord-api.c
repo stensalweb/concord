@@ -169,9 +169,9 @@ _concord_429async_tryrecover(concord_api_t *api, struct concord_conn_s *conn)
 
 
   jscon_scanf(conn->response_body.str,
-    "#message%s " \
-    "#retry_after%lld " \
-    "#global%b",
+    "%s#message " \
+    "%lld#retry_after " \
+    "%b#global ",
      message,
      &retry_after,
      &global);
@@ -423,8 +423,8 @@ _concord_429sync_tryrecover(struct concord_conn_s *conn)
   long long retry_after;
 
   jscon_scanf(conn->response_body.str,
-    "#message%s " \
-    "#retry_after%lld",
+    "%s#message " \
+    "%lld#retry_after ",
      message,
      &retry_after);
 
