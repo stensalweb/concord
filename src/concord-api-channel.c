@@ -57,24 +57,24 @@ _concord_load_channel(void **p_channel, struct concord_response_s *response_body
   concord_channel_t *channel = *p_channel;
 
   jscon_scanf(response_body->str,
-     "%d#position " \
-     "%b#nsfw " \
-     "%s#last_message_id " \
-     "%d#bitrate " \
-     "%s#owner_id " \
-     "%s#application_id " \
-     "%s#last_pin_timestamp " \
-     "%s#id " \
-     "%d#type " \
-     "%s#guild_id " \
-     "%ji#permission_overwrites " \
-     "%s#name " \
-     "%s#topic " \
-     "%d#user_limit " \
-     "%d#rate_limit_per_user " \
-     "%ji#recipients " \
-     "%s#icon " \
-     "%s#parent_id ",
+     "%d[position]" \
+     "%b[nsfw]" \
+     "%s[last_message_id]" \
+     "%d[bitrate]" \
+     "%s[owner_id]" \
+     "%s[application_id]" \
+     "%s[last_pin_timestamp]" \
+     "%s[id]" \
+     "%d[type]" \
+     "%s[guild_id]" \
+     "%ji[permission_overwrites]" \
+     "%s[name]" \
+     "%s[topic]" \
+     "%d[user_limit]" \
+     "%d[rate_limit_per_user]" \
+     "%ji[recipients]" \
+     "%s[icon]" \
+     "%s[parent_id]",
       &channel->position,
       &channel->nsfw,
       channel->last_message_id,
