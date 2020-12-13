@@ -265,43 +265,38 @@ _concord_on_ws_hello(concord_ws_t *ws)
 static void
 _concord_ws_start_identify(concord_ws_t *ws)
 {
-  if (ws->identify){
-    jscon_destroy(ws->identify);
-    ws->identify = NULL;
+  if (NULL == ws->identify){
+    uv_utsname_t buffer;
+    int uvcode = uv_os_uname(&buffer);
+    DEBUG_ASSERT(!uvcode, "Couldn't fetch system information");
+
+    /* https://discord.com/developers/docs/topics/gateway#identify-identify-connection-properties */
+    jscon_item_t *properties = jscon_object("properties");
+    jscon_append(properties, jscon_string("$os", buffer.sysname));
+    jscon_append(properties, jscon_string("$browser", "libconcord"));
+    jscon_append(properties, jscon_string("$device", "libconcord"));
+
+    /* https://discord.com/developers/docs/topics/gateway#sharding */
+    /* @todo */
+
+    /* https://discord.com/developers/docs/topics/gateway#update-status-gateway-status-update-structure */
+    jscon_item_t *presence = jscon_object("presence");
+    jscon_append(presence, jscon_null("since"));
+    jscon_append(presence, jscon_null("activities"));
+    jscon_append(presence, jscon_string("status", "online"));
+    jscon_append(presence, jscon_boolean("afk", false));
+
+    /* https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
+    jscon_item_t *event_data = jscon_object("d");
+    jscon_append(event_data, jscon_string("token", ws->token));
+    jscon_append(event_data, jscon_integer("intents", GUILD_MESSAGES));
+    jscon_append(event_data, properties);
+    jscon_append(event_data, presence);
+
+    ws->identify = jscon_object(NULL);
+    jscon_append(ws->identify, jscon_integer("op", GATEWAY_IDENTIFY));
+    jscon_append(ws->identify, event_data);
   }
-
-  uv_utsname_t buffer;
-  int uvcode = uv_os_uname(&buffer);
-  DEBUG_ASSERT(!uvcode, "Couldn't fetch system information");
-
-  /* https://discord.com/developers/docs/topics/gateway#identify-identify-connection-properties */
-  jscon_item_t *properties = jscon_object("properties", NULL);
-  jscon_append(properties, jscon_string("$os", buffer.sysname));
-  jscon_append(properties, jscon_string("$browser", "libconcord"));
-  jscon_append(properties, jscon_string("$device", "libconcord"));
-
-  /* https://discord.com/developers/docs/topics/gateway#sharding */
-  /* @todo */
-
-  /* https://discord.com/developers/docs/topics/gateway#update-status-gateway-status-update-structure */
-  jscon_item_t *presence = jscon_object("presence", NULL);
-  jscon_append(presence, jscon_null("since"));
-  jscon_append(presence, jscon_null("activities"));
-  jscon_append(presence, jscon_string("status", "online"));
-  jscon_append(presence, jscon_boolean("afk", false));
-
-  /* https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
-  jscon_item_t *event_data = jscon_object("d", NULL);
-  jscon_append(event_data, jscon_string("token", ws->token));
-  jscon_append(event_data, jscon_integer("intents", GUILD_MESSAGES));
-  jscon_append(event_data, properties);
-  jscon_append(event_data, presence);
-
-  /* @todo make this a separate function */
-  ws->identify = jscon_object(NULL, NULL);
-  jscon_append(ws->identify, jscon_integer("op", GATEWAY_IDENTIFY));
-  jscon_append(ws->identify, event_data);
-  
 
   char *send_payload = jscon_stringify(ws->identify, JSCON_ANY);
   DEBUG_PRINT("IDENTIFY PAYLOAD:\n\t%s", send_payload);
