@@ -192,7 +192,7 @@ typedef struct concord_ws_s {
 
   struct { /* PAYLOAD STRUCTURE */
     enum ws_opcode opcode;      /* field 'op' */
-    int seq_number;       /* field 's' */
+    int seq_number;             /* field 's' */
     char event_name[25];        /* field 't' */
     jscon_item_t *event_data;   /* field 'd' */
   } payload;

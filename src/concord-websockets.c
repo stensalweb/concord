@@ -274,37 +274,34 @@ _concord_ws_start_identify(concord_ws_t *ws)
   int uvcode = uv_os_uname(&buffer);
   DEBUG_ASSERT(!uvcode, "Couldn't fetch system information");
 
-
-  jscon_list_t *main_list = jscon_list_init();  
-  jscon_list_t *helper_list = jscon_list_init();  
-
   /* https://discord.com/developers/docs/topics/gateway#identify-identify-connection-properties */
-  jscon_list_append(helper_list, jscon_string("$os", buffer.sysname));
-  /* @todo library name should be from a macro */
-  jscon_list_append(helper_list, jscon_string("$browser", "libconcord"));
-  jscon_list_append(helper_list, jscon_string("$device", "libconcord"));
-  jscon_list_append(main_list, jscon_object("properties", helper_list));
+  jscon_item_t *properties = jscon_object("properties", NULL);
+  jscon_append(properties, jscon_string("$os", buffer.sysname));
+  jscon_append(properties, jscon_string("$browser", "libconcord"));
+  jscon_append(properties, jscon_string("$device", "libconcord"));
+
   /* https://discord.com/developers/docs/topics/gateway#sharding */
   /* @todo */
 
   /* https://discord.com/developers/docs/topics/gateway#update-status-gateway-status-update-structure */
-  jscon_list_append(helper_list, jscon_null("since"));
-  jscon_list_append(helper_list, jscon_null("activities"));
-  jscon_list_append(helper_list, jscon_string("status", "online"));
-  jscon_list_append(helper_list, jscon_boolean("afk", false));
-  jscon_list_append(main_list, jscon_object("presence", helper_list));
+  jscon_item_t *presence = jscon_object("presence", NULL);
+  jscon_append(presence, jscon_null("since"));
+  jscon_append(presence, jscon_null("activities"));
+  jscon_append(presence, jscon_string("status", "online"));
+  jscon_append(presence, jscon_boolean("afk", false));
 
   /* https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
-  jscon_list_append(main_list, jscon_string("token", ws->token));
-  jscon_list_append(main_list, jscon_boolean("compress", false));
-  jscon_list_append(main_list, jscon_integer("large_threshold", 50));
-  jscon_list_append(main_list, jscon_boolean("guild_subscriptions", true));
-  jscon_list_append(main_list, jscon_integer("intents", GUILD_MESSAGES));
-  jscon_list_append(main_list, jscon_object("d", main_list));
-  jscon_list_append(main_list, jscon_integer("op", GATEWAY_IDENTIFY));
-  
+  jscon_item_t *event_data = jscon_object("d", NULL);
+  jscon_append(event_data, jscon_string("token", ws->token));
+  jscon_append(event_data, jscon_integer("intents", GUILD_MESSAGES));
+  jscon_append(event_data, properties);
+  jscon_append(event_data, presence);
+
   /* @todo make this a separate function */
-  ws->identify = jscon_object(NULL, main_list);
+  ws->identify = jscon_object(NULL, NULL);
+  jscon_append(ws->identify, jscon_integer("op", GATEWAY_IDENTIFY));
+  jscon_append(ws->identify, event_data);
+  
 
   char *send_payload = jscon_stringify(ws->identify, JSCON_ANY);
   DEBUG_PRINT("IDENTIFY PAYLOAD:\n\t%s", send_payload);
@@ -313,9 +310,6 @@ _concord_ws_start_identify(concord_ws_t *ws)
   DEBUG_ASSERT(true == ret, "Couldn't send heartbeat payload");
 
   safe_free(send_payload);
-
-  jscon_list_destroy(helper_list);
-  jscon_list_destroy(main_list);
 }
 
 void
@@ -342,9 +336,9 @@ Concord_on_text_cb(void *data, CURL *easy_handle, const char *text, size_t len)
 
   DEBUG_NOTOP_PRINT("OP:\t\t%s\n\tEVENT_NAME:\t%s\n\tSEQ_NUMBER:\t%d", 
               _concord_payload_strevent(ws->payload.opcode), 
-              !*ws->payload.event_name /* "if is empty string" */
-                 ? "NULL" 
-                 : ws->payload.event_name, 
+              !*ws->payload.event_name      /* if event name exists */
+                 ? "NULL"                   /* print NULL */
+                 : ws->payload.event_name,  /* otherwise, event name */
               ws->payload.seq_number);
 
   switch (ws->payload.opcode){
@@ -386,7 +380,7 @@ _uv_disconnect_cb(uv_timer_t *req)
 
   char reason[] = "Disconnecting!";
   bool ret = cws_close(ws->easy_handle, CWS_CLOSE_REASON_NORMAL, reason, strlen(reason));
-  DEBUG_ASSERT(true == ret, "Couldn't disconnect from WebSockets gracefully");
+  DEBUG_ONLY_ASSERT(true == ret, "Couldn't disconnect gracefully from WebSockets");
 
   uv_timer_stop(&ws->timeout);
   uv_close((uv_handle_t*)&ws->timeout, NULL);
