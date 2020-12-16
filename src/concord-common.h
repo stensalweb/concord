@@ -14,89 +14,89 @@
 #define HEADER_DICTIONARY_SIZE  15
 
 enum http_method {
-	NONE,
-	DELETE,
-	GET,
-	POST,
-	PATCH,
-	PUT,
+    NONE,
+    DELETE,
+    GET,
+    POST,
+    PATCH,
+    PUT,
 };
 
 enum discord_limits {
-	MAX_NAME_LEN           = 100,
-	MAX_TOPIC_LEN          = 1024,
-	MAX_DESCRIPTION_LEN    = 1024,
-	MAX_USERNAME_LEN       = 32,
-	MAX_DISCRIMINATOR_LEN  = 4,
-	MAX_HASH_LEN           = 1024,
-	MAX_LOCALE_LEN         = 15,
-	MAX_EMAIL_LEN          = 254,
-	MAX_REGION_LEN         = 15,
-	MAX_HEADER_LEN         = 512,
-	MAX_URL_LEN            = 512,
+    MAX_NAME_LEN           = 100,
+    MAX_TOPIC_LEN          = 1024,
+    MAX_DESCRIPTION_LEN    = 1024,
+    MAX_USERNAME_LEN       = 32,
+    MAX_DISCRIMINATOR_LEN  = 4,
+    MAX_HASH_LEN           = 1024,
+    MAX_LOCALE_LEN         = 15,
+    MAX_EMAIL_LEN          = 254,
+    MAX_REGION_LEN         = 15,
+    MAX_HEADER_LEN         = 512,
+    MAX_URL_LEN            = 512,
 };
 
 /* HTTP RESPONSE CODES
 https://discord.com/developers/docs/topics/opcodes-and-status-codes#http-http-response-codes */
 enum discord_http_code {
-	HTTP_OK                       = 200,
-	HTTP_CREATED                  = 201,
-	HTTP_NO_CONTENT               = 204,
-	HTTP_NOT_MODIFIED             = 304,
-	HTTP_BAD_REQUEST              = 400,
-	HTTP_UNAUTHORIZED             = 401,
-	HTTP_FORBIDDEN                = 403,
-	HTTP_NOT_FOUND                = 404,
-	HTTP_METHOD_NOT_ALLOWED       = 405,
-	HTTP_TOO_MANY_REQUESTS        = 429,
-	HTTP_GATEWAY_UNAVAILABLE      = 502,
+    HTTP_OK                       = 200,
+    HTTP_CREATED                  = 201,
+    HTTP_NO_CONTENT               = 204,
+    HTTP_NOT_MODIFIED             = 304,
+    HTTP_BAD_REQUEST              = 400,
+    HTTP_UNAUTHORIZED             = 401,
+    HTTP_FORBIDDEN                = 403,
+    HTTP_NOT_FOUND                = 404,
+    HTTP_METHOD_NOT_ALLOWED       = 405,
+    HTTP_TOO_MANY_REQUESTS        = 429,
+    HTTP_GATEWAY_UNAVAILABLE      = 502,
 
-	CURL_NO_RESPONSE              = 0,
+    CURL_NO_RESPONSE              = 0,
 };
 
 /* GATEWAY OPCODES
 https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-opcodes */
 enum ws_opcode {
-	GATEWAY_DISPATCH              = 0,
-	GATEWAY_HEARTBEAT             = 1,
-	GATEWAY_IDENTIFY              = 2,
-	GATEWAY_PRESENCE_UPDATE       = 3,
-	GATEWAY_VOICE_STATE_UPDATE    = 4,
-	GATEWAY_RESUME                = 6,
-	GATEWAY_RECONNECT             = 7,
-	GATEWAY_REQUEST_GUILD_MEMBERS = 8,
-	GATEWAY_INVALID_SESSION       = 9,
-	GATEWAY_HELLO                 = 10,
-	GATEWAY_HEARTBEAT_ACK         = 11,
+    GATEWAY_DISPATCH              = 0,
+    GATEWAY_HEARTBEAT             = 1,
+    GATEWAY_IDENTIFY              = 2,
+    GATEWAY_PRESENCE_UPDATE       = 3,
+    GATEWAY_VOICE_STATE_UPDATE    = 4,
+    GATEWAY_RESUME                = 6,
+    GATEWAY_RECONNECT             = 7,
+    GATEWAY_REQUEST_GUILD_MEMBERS = 8,
+    GATEWAY_INVALID_SESSION       = 9,
+    GATEWAY_HELLO                 = 10,
+    GATEWAY_HEARTBEAT_ACK         = 11,
 };
 
 /* GATEWAY INTENTS
 https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
 enum ws_intents {
-	GUILDS                        = 1 << 0,
-	GUILD_MEMBERS                 = 1 << 1,
-	GUILD_BANS                    = 1 << 2,
-	GUILD_EMOJIS                  = 1 << 3,
-	GUILD_INTEGRATIONS            = 1 << 4,
-	GUILD_WEBHOOKS                = 1 << 5,
-	GUILD_INVITES                 = 1 << 6,
-	GUILD_VOICE_STATES            = 1 << 7,
-	GUILD_PRESENCES               = 1 << 8,
-	GUILD_MESSAGES                = 1 << 9,
-	GUILD_MESSAGE_REACTIONS       = 1 << 10,
-	GUILD_MESSAGE_TYPING          = 1 << 11,
-	DIRECT_MESSAGES               = 1 << 12,
-	DIRECT_MESSAGE_REACTIONS      = 1 << 13,
-	DIRECT_MESSAGE_TYPING         = 1 << 14,
+    GUILDS                        = 1 << 0,
+    GUILD_MEMBERS                 = 1 << 1,
+    GUILD_BANS                    = 1 << 2,
+    GUILD_EMOJIS                  = 1 << 3,
+    GUILD_INTEGRATIONS            = 1 << 4,
+    GUILD_WEBHOOKS                = 1 << 5,
+    GUILD_INVITES                 = 1 << 6,
+    GUILD_VOICE_STATES            = 1 << 7,
+    GUILD_PRESENCES               = 1 << 8,
+    GUILD_MESSAGES                = 1 << 9,
+    GUILD_MESSAGE_REACTIONS       = 1 << 10,
+    GUILD_MESSAGE_TYPING          = 1 << 11,
+    DIRECT_MESSAGES               = 1 << 12,
+    DIRECT_MESSAGE_REACTIONS      = 1 << 13,
+    DIRECT_MESSAGE_TYPING         = 1 << 14,
 };
 
 /* SNOWFLAKES
 https://discord.com/developers/docs/reference#snowflakes */
 enum discord_snowflake {
-	SNOWFLAKE_INCREMENT           = 12,
-	SNOWFLAKE_PROCESS_ID          = 17,
-	SNOWFLAKE_INTERNAL_WORKER_ID  = 22,
-	SNOWFLAKE_TIMESTAMP           = 64,
+    SNOWFLAKE_INCREMENT           = 12,
+    SNOWFLAKE_PROCESS_ID          = 17,
+    SNOWFLAKE_INTERNAL_WORKER_ID  = 22,
+    SNOWFLAKE_TIMESTAMP           = 64,
 };
 
 /* ENDPOINTS */
@@ -111,112 +111,112 @@ enum discord_snowflake {
 
 
 struct concord_context_s {
-	uv_poll_t poll_handle;
-	curl_socket_t sockfd; /* curl internal socket file descriptor */
+    uv_poll_t poll_handle;
+    curl_socket_t sockfd; /* curl internal socket file descriptor */
 };
 
 struct concord_response_s {
-	char *str;    /* content of response str */
-	size_t size;  /* length of response str */
+    char *str;    /* content of response str */
+    size_t size;  /* length of response str */
 };
 
 enum conn_status {
-	INNACTIVE = 0,  /* conn is open for reuse/recycle */
-	RUNNING,        /* conn is awaiting server response */
-	PAUSE,          /* running conn has been temporarily paused */
-	ON_HOLD,        /* conn is waiting on queue, not running */
+    INNACTIVE = 0,  /* conn is open for reuse/recycle */
+    RUNNING,        /* conn is awaiting server response */
+    PAUSE,          /* running conn has been temporarily paused */
+    ON_HOLD,        /* conn is waiting on queue, not running */
 };
 
 typedef void (concord_load_obj_ft)(void **p_object, struct concord_response_s *response_body);
 
 struct concord_conn_s {
-	struct concord_context_s *context;
+    struct concord_context_s *context;
 
-	CURL *easy_handle; /* easy handle that performs the request */
-	enum conn_status status; /* easy_handle's conn status */
+    CURL *easy_handle; /* easy handle that performs the request */
+    enum conn_status status; /* easy_handle's conn status */
 
-	struct concord_response_s response_body; /* response body associated with the conn */
+    struct concord_response_s response_body; /* response body associated with the conn */
 
-	concord_load_obj_ft *load_cb; /* load object callback */
-	void **p_object; /* object to be performed action at load_cb */
+    concord_load_obj_ft *load_cb; /* load object callback */
+    void **p_object; /* object to be performed action at load_cb */
 
-	struct concord_bucket_s *p_bucket; /* bucket this conn is inside */
+    struct concord_bucket_s *p_bucket; /* bucket this conn is inside */
 };
 
 struct concord_queue_s {
-	struct concord_conn_s **conns; /* the connections queue */
-	size_t size; /* how many conns the queue supports (not how many conns it currently holds) */
+    struct concord_conn_s **conns; /* the connections queue */
+    size_t size; /* how many conns the queue supports (not how many conns it currently holds) */
 
-	/* @todo illustrate how this works */
-	size_t bottom_running; /* bottom index of running conns */
-	size_t separator; /* top index of running conns and bottom index on hold conns */
-	size_t top_onhold; /* top index of on hold conns */
+    /* @todo illustrate how this works */
+    size_t bottom_running; /* bottom index of running conns */
+    size_t separator; /* top index of running conns and bottom index on hold conns */
+    size_t top_onhold; /* top index of on hold conns */
 };
 
 struct concord_bucket_s {
-	struct concord_queue_s queue; /* queue containing the bucket connections */
+    struct concord_queue_s queue; /* queue containing the bucket connections */
 
-	char *hash_key; /* per-route key given by the discord API */
+    char *hash_key; /* per-route key given by the discord API */
 
-	uv_timer_t ratelimit_timer; /* resume transfers from ratelimited bucket */
-	int remaining; /* conns available for simultaneous transfers */
-	int finished; /* fetch connections from queue if finished transfers surpasses remaining */
+    uv_timer_t ratelimit_timer; /* resume transfers from ratelimited bucket */
+    int remaining; /* conns available for simultaneous transfers */
+    int finished; /* fetch connections from queue if finished transfers surpasses remaining */
 
-	struct concord_api_s *p_api; /* client this bucket is a part of */
+    struct concord_api_s *p_api; /* client this bucket is a part of */
 };
 
 enum ws_status {
-	DISCONNECTED   = 0,           /* disconnected from ws */
-	DISCONNECTING  = 1 << 0,      /* disconnecting from ws */
-	CONNECTING     = 1 << 1,      /* connecting to ws */
-	CONNECTED      = 1 << 2,      /* connected to ws */
+    DISCONNECTED   = 0,           /* disconnected from ws */
+    DISCONNECTING  = 1 << 0,      /* disconnecting from ws */
+    CONNECTING     = 1 << 1,      /* connecting to ws */
+    CONNECTED      = 1 << 2,      /* connected to ws */
 };
 
 typedef struct concord_ws_s {
-	char *token;
-	/* https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
-	jscon_item_t *identify;
+    char *token;
+    /* https://discord.com/developers/docs/topics/gateway#identify-identify-structure */
+    jscon_item_t *identify;
 
-	struct concord_context_s *context;
+    struct concord_context_s *context;
 
-	CURLM *multi_handle;
-	CURL *easy_handle;
-	enum ws_status status; /* ws's easy_handle status */
-	int transfers_running; /* current running transfers ( 1 or 0 )*/
+    CURLM *multi_handle;
+    CURL *easy_handle;
+    enum ws_status status; /* ws's easy_handle status */
+    int transfers_running; /* current running transfers ( 1 or 0 )*/
 
-	uv_loop_t *loop; /* the event loop */
-	uv_timer_t timeout;
-	uv_timer_t heartbeat_timer; /* keep connection with ws alive */
-	uv_async_t async; /* wakeup callback from another thread */
-	uv_thread_t thread_id; /* ws loop thread id */
+    uv_loop_t *loop; /* the event loop */
+    uv_timer_t timeout;
+    uv_timer_t heartbeat_timer; /* keep connection with ws alive */
+    uv_async_t async; /* wakeup callback from another thread */
+    uv_thread_t thread_id; /* ws loop thread id */
 
-	struct { /* PAYLOAD STRUCTURE */
-	  enum ws_opcode opcode;      /* field 'op' */
-	  int seq_number;             /* field 's' */
-	  char event_name[25];        /* field 't' */
-	  jscon_item_t *event_data;   /* field 'd' */
-	} payload;
+    struct { /* PAYLOAD STRUCTURE */
+      enum ws_opcode opcode;      /* field 'op' */
+      int seq_number;             /* field 's' */
+      char event_name[25];        /* field 't' */
+      jscon_item_t *event_data;   /* field 'd' */
+    } payload;
 
 } concord_ws_t;
 
 /* @todo hash/unhash token */
 typedef struct concord_api_s {
-	char *token; /* bot/user token used as identification to the API */
+    char *token; /* bot/user token used as identification to the API */
 
-	struct curl_slist *request_header; /* the default request header sent to discord servers */
+    struct curl_slist *request_header; /* the default request header sent to discord servers */
 
-	CURLM *multi_handle;
-	int transfers_onhold; /* current transfers on hold (waiting in queue)*/
-	int transfers_running; /* current running transfers */
+    CURLM *multi_handle;
+    int transfers_onhold; /* current transfers on hold (waiting in queue)*/
+    int transfers_running; /* current running transfers */
 
-	uv_loop_t *loop; /* the event loop */
-	uv_timer_t timeout;
+    uv_loop_t *loop; /* the event loop */
+    uv_timer_t timeout;
 
-	struct concord_bucket_s **client_buckets; /* array of known buckets */
-	size_t num_buckets; /* known buckets amount */
+    struct concord_bucket_s **client_buckets; /* array of known buckets */
+    size_t num_buckets; /* known buckets amount */
 
-	struct dictionary_s *bucket_dict; /* store buckets by endpoints/major parameters */
-	struct dictionary_s *header; /* holds the http response header */
+    struct dictionary_s *bucket_dict; /* store buckets by endpoints/major parameters */
+    struct dictionary_s *header; /* holds the http response header */
 } concord_api_t;
 
 
@@ -239,24 +239,24 @@ struct concord_context_s* Concord_context_init(uv_loop_t *loop, curl_socket_t so
 void Concord_context_destroy(struct concord_context_s *context);
 
 /* 
-	@param api contains tools common to every request
-	@param p_object is a pointer to the object to be loaded by load_cb
-	@param load_cb is the function that will load the object attributes
-	  once a connection is completed
-	@param http_method is the http method on the client side
-	  (GET, PUT, ...)
-	@param endpoint is the format string that will be joined with the
-	  parameters to create a specific request
-	@param __VAR_ARGS__ are the parameters that will be joined to the
-	  endpoint
+    @param api contains tools common to every request
+    @param p_object is a pointer to the object to be loaded by load_cb
+    @param load_cb is the function that will load the object attributes
+      once a connection is completed
+    @param http_method is the http method on the client side
+      (GET, PUT, ...)
+    @param endpoint is the format string that will be joined with the
+      parameters to create a specific request
+    @param __VAR_ARGS__ are the parameters that will be joined to the
+      endpoint
 */
 void Concord_api_request(
-	  concord_api_t *api,
-	  void **p_object,
-	  concord_load_obj_ft *load_cb,
-	  enum http_method http_method,
-	  char endpoint[], 
-	  ...);
+      concord_api_t *api,
+      void **p_object,
+      concord_load_obj_ft *load_cb,
+      enum http_method http_method,
+      char endpoint[], 
+      ...);
 
 /*************/
 /* concord-api.c */
