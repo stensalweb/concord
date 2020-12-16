@@ -11,126 +11,126 @@
 concord_guild_t*
 concord_guild_init()
 {
-  concord_guild_t *new_guild = safe_calloc(1, sizeof *new_guild);
-  new_guild->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->name = safe_malloc(MAX_NAME_LEN);
-  new_guild->icon = safe_malloc(MAX_HASH_LEN);
-  /* missing new_guild->splash */
-  new_guild->discovery_splash = safe_malloc(MAX_HASH_LEN);
-  new_guild->owner_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->permissions_new = safe_malloc(SNOWFLAKE_INCREMENT);
-  new_guild->region = safe_malloc(MAX_REGION_LEN);
-  new_guild->afk_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->embed_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->application_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->widget_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->system_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->rules_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
-  new_guild->joined_at = safe_malloc(SNOWFLAKE_TIMESTAMP);
-  new_guild->vanity_url_code = safe_malloc(SNOWFLAKE_INCREMENT);
-  new_guild->description = safe_malloc(MAX_DESCRIPTION_LEN);
-  new_guild->banner = safe_malloc(MAX_HASH_LEN);
-  new_guild->preferred_locale = safe_malloc(MAX_LOCALE_LEN);
-  new_guild->public_updates_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+	concord_guild_t *new_guild = safe_calloc(1, sizeof *new_guild);
+	new_guild->id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+	new_guild->name = safe_malloc(MAX_NAME_LEN);
+	new_guild->icon = safe_malloc(MAX_HASH_LEN);
+	/* missing new_guild->splash */
+	new_guild->discovery_splash = safe_malloc(MAX_HASH_LEN);
+	new_guild->owner_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+	new_guild->permissions_new = safe_malloc(SNOWFLAKE_INCREMENT);
+	new_guild->region = safe_malloc(MAX_REGION_LEN);
+	new_guild->afk_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+	new_guild->embed_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+	new_guild->application_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+	new_guild->widget_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+	new_guild->system_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+	new_guild->rules_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
+	new_guild->joined_at = safe_malloc(SNOWFLAKE_TIMESTAMP);
+	new_guild->vanity_url_code = safe_malloc(SNOWFLAKE_INCREMENT);
+	new_guild->description = safe_malloc(MAX_DESCRIPTION_LEN);
+	new_guild->banner = safe_malloc(MAX_HASH_LEN);
+	new_guild->preferred_locale = safe_malloc(MAX_LOCALE_LEN);
+	new_guild->public_updates_channel_id = safe_malloc(SNOWFLAKE_INTERNAL_WORKER_ID);
 
-  return new_guild;
+	return new_guild;
 }
 
 void
 concord_guild_destroy(concord_guild_t *guild)
 {
-  safe_free(guild->id);
-  safe_free(guild->name);
-  safe_free(guild->icon);
-  safe_free(guild->discovery_splash);
-  safe_free(guild->owner_id);
-  safe_free(guild->permissions_new);
-  safe_free(guild->region);
-  safe_free(guild->afk_channel_id);
-  safe_free(guild->embed_channel_id);
-  safe_free(guild->application_id);
-  safe_free(guild->widget_channel_id);
-  safe_free(guild->system_channel_id);
-  safe_free(guild->rules_channel_id);
-  safe_free(guild->joined_at);
-  safe_free(guild->vanity_url_code);
-  safe_free(guild->description);
-  safe_free(guild->banner);
-  safe_free(guild->preferred_locale);
-  safe_free(guild->public_updates_channel_id);
+	safe_free(guild->id);
+	safe_free(guild->name);
+	safe_free(guild->icon);
+	safe_free(guild->discovery_splash);
+	safe_free(guild->owner_id);
+	safe_free(guild->permissions_new);
+	safe_free(guild->region);
+	safe_free(guild->afk_channel_id);
+	safe_free(guild->embed_channel_id);
+	safe_free(guild->application_id);
+	safe_free(guild->widget_channel_id);
+	safe_free(guild->system_channel_id);
+	safe_free(guild->rules_channel_id);
+	safe_free(guild->joined_at);
+	safe_free(guild->vanity_url_code);
+	safe_free(guild->description);
+	safe_free(guild->banner);
+	safe_free(guild->preferred_locale);
+	safe_free(guild->public_updates_channel_id);
 
-  if (NULL != guild->channels){
-    jscon_destroy(guild->channels);
-  }
+	if (NULL != guild->channels){
+        jscon_destroy(guild->channels);
+	}
 
-  safe_free(guild);
+	safe_free(guild);
 }
 
 static void
 _concord_load_guild(void **p_guild, struct concord_response_s *response_body)
 {
-  concord_guild_t *guild = *p_guild;
+	concord_guild_t *guild = *p_guild;
 
-  jscon_scanf(response_body->str,
-     "%s[id]" \
-     "%s[name]" \
-     "%s[icon]" \
-     "%b[owner]" \
-     "%d[permissions]" \
-     "%s[permissions_new]",
-      guild->id,
-      guild->name,
-      guild->icon,
-      &guild->owner,
-      &guild->permissions,
-      guild->permissions_new);
+	jscon_scanf(response_body->str,
+	   "%s[id]" \
+	   "%s[name]" \
+	   "%s[icon]" \
+	   "%b[owner]" \
+	   "%d[permissions]" \
+	   "%s[permissions_new]",
+	    guild->id,
+	    guild->name,
+	    guild->icon,
+	    &guild->owner,
+	    &guild->permissions,
+	    guild->permissions_new);
 
-  *p_guild = guild;
+	*p_guild = guild;
 }
 
 void
 concord_get_guild(concord_t *concord, char guild_id[], concord_guild_t **p_guild)
 {
-  if (NULL == p_guild){
-    p_guild = &concord->guild;
-  }
+	if (NULL == p_guild){
+        p_guild = &concord->guild;
+	}
 
-  /* this is a template common to every function that deals with
-      sending a request to the Discord API */
-  Concord_api_request( 
-    concord->api,
-    (void**)p_guild,
-    &_concord_load_guild,
-    GET, GUILDS, guild_id);
+	/* this is a template common to every function that deals with
+	    sending a request to the Discord API */
+	Concord_api_request( 
+	  concord->api,
+	  (void**)p_guild,
+	  &_concord_load_guild,
+	  GET, GUILDS, guild_id);
 }
 
 static void
 _concord_load_guild_channels(void **p_guild, struct concord_response_s *response_body)
 {
-  concord_guild_t *guild = *p_guild;
+	concord_guild_t *guild = *p_guild;
 
-  if (NULL != guild->channels){
-    jscon_destroy(guild->channels);
-  }
+	if (NULL != guild->channels){
+        jscon_destroy(guild->channels);
+	}
 
-  guild->channels = jscon_parse(response_body->str);
-  DEBUG_ASSERT(NULL != guild->channels, "Out of memory");
+	guild->channels = jscon_parse(response_body->str);
+	DEBUG_ASSERT(NULL != guild->channels, "Out of memory");
 
-  *p_guild = guild;
+	*p_guild = guild;
 }
 
 void
 concord_get_guild_channels(concord_t *concord, char guild_id[], concord_guild_t **p_guild)
 {
-  if (NULL == p_guild){
-    p_guild = &concord->guild;
-  }
+	if (NULL == p_guild){
+        p_guild = &concord->guild;
+	}
 
-  /* this is a template common to every function that deals with
-      sending a request to the Discord API */
-  Concord_api_request( 
-    concord->api,
-    (void**)p_guild,
-    &_concord_load_guild_channels,
-    GET, GUILDS_CHANNELS, guild_id);
+	/* this is a template common to every function that deals with
+	    sending a request to the Discord API */
+	Concord_api_request( 
+	  concord->api,
+	  (void**)p_guild,
+	  &_concord_load_guild_channels,
+	  GET, GUILDS_CHANNELS, guild_id);
 }
