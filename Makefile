@@ -1,4 +1,3 @@
-CC	?= gcc
 SRCDIR	:= src
 OBJDIR	:= obj
 INCLDIR	:= include
@@ -15,8 +14,8 @@ CONCORD_SLIB	= $(LIBDIR)/libconcord.a
 #LIBCURL_CFLAGS	:= $(shell pkg-config --cflags libcurl)
 #LIBCURL_LDFLAGS := $(shell pkg-config --libs libcurl)
 
-#LIBUV_CFLAGS	:= $(shell pkg-config --cflags libuv)
-#LIBUV_LDFLAGS 	:= $(shell pkg-config --libs libuv)
+LIBUV_CFLAGS	:= -I$${HOME}/workspace/packages/build/include 
+LIBUV_LDFLAGS 	:= -L$${HOME}/workspace/packages/build/lib -luv
 
 LIBJSCON_CFLAGS		:= -I./JSCON/include
 LIBJSCON_LDFLAGS	:= -L./JSCON/lib -ljscon 
@@ -31,7 +30,7 @@ LIBS_LDFLAGS	:= $(LIBCURL_LDFLAGS) $(LIBUV_LDFLAGS) \
 		      $(LIBJSCON_LDFLAGS)
 
 # @todo create specific CFLAGS for debugging
-CFLAGS := -Wall -O0 -g
+CFLAGS := -Wall -O0 -g -std=c11 -D_XOPEN_SOURCE=600
 
 .PHONY : all mkdir install clean purge
 
