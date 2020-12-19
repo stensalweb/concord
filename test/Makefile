@@ -1,19 +1,19 @@
 TOP 	:= ..
-CC	:= gcc
+CC	?= gcc
 
 LIBDIR	:= $(TOP)/lib
 
-LIBCURL_CFLAGS	:= $(shell pkg-config --cflags libcurl)
-LIBCURL_LDFLAGS	:= $(shell pkg-config --libs libcurl)
+#LIBCURL_CFLAGS	:= $(shell pkg-config --cflags libcurl)
+LIBCURL_LDFLAGS	:= -lcurl
 
-LIBUV_CFLAGS	:= $(shell pkg-config --cflags libuv)
-LIBUV_LDFLAGS	:= $(shell pkg-config --libs libuv)
+#LIBUV_CFLAGS	:= $(shell pkg-config --cflags libuv)
+#LIBUV_LDFLAGS	:= -luv
 
-LIBJSCON_CFLAGS		:=
-LIBJSCON_LDFLAGS	:= -ljscon
+LIBJSCON_CFLAGS		:= -I$(TOP)/JSCON/include
+LIBJSCON_LDFLAGS	:= -L$(TOP)/JSCON/lib -ljscon
 
 LIBCONCORD_CFLAGS	:= -I$(TOP)/include
-LIBCONCORD_LDFLAGS	:= "-Wl,-rpath,$(LIBDIR)" -L$(LIBDIR) -lconcord
+LIBCONCORD_LDFLAGS	:= -static -L$(LIBDIR) -lconcord -luv -lcurl -lbearssl -ljscon
 
 LIBS_CFLAGS	:= $(LIBCURL_CFLAGS) $(LIBUV_CFLAGS) \
 		      $(LIBJSCON_CFLAGS) $(LIBCONCORD_CFLAGS)
@@ -21,7 +21,7 @@ LIBS_CFLAGS	:= $(LIBCURL_CFLAGS) $(LIBUV_CFLAGS) \
 LIBS_LDFLAGS	:= $(LIBCURL_LDFLAGS) $(LIBUV_LDFLAGS) \
 		      $(LIBJSCON_LDFLAGS) $(LIBCONCORD_LDFLAGS)
 
-CFLAGS	= -Wall -Werror -Wextra -pedantic -g
+CFLAGS	= -Wall  -g
 
 .PHONY : clean purge
 

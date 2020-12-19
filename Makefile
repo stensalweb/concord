@@ -1,4 +1,4 @@
-CC	:= gcc
+CC	?= gcc
 SRCDIR	:= src
 OBJDIR	:= obj
 INCLDIR	:= include
@@ -10,15 +10,16 @@ OBJS  	:= $(addprefix $(OBJDIR)/, $(_OBJS))
 OBJS 	+= $(OBJDIR)/curl-websocket.o
 
 CONCORD_DLIB	= $(LIBDIR)/libconcord.so
+CONCORD_SLIB	= $(LIBDIR)/libconcord.a
 
-LIBCURL_CFLAGS	:= $(shell pkg-config --cflags libcurl)
-LIBCURL_LDFLAGS	:= $(shell pkg-config --libs libcurl)
+#LIBCURL_CFLAGS	:= $(shell pkg-config --cflags libcurl)
+#LIBCURL_LDFLAGS := $(shell pkg-config --libs libcurl)
 
-LIBUV_CFLAGS	:= $(shell pkg-config --cflags libuv)
-LIBUV_LDFLAGS 	:= $(shell pkg-config --libs libuv)
+#LIBUV_CFLAGS	:= $(shell pkg-config --cflags libuv)
+#LIBUV_LDFLAGS 	:= $(shell pkg-config --libs libuv)
 
-LIBJSCON_CFLAGS		:=
-LIBJSCON_LDFLAGS	:= -ljscon
+LIBJSCON_CFLAGS		:= -I./JSCON/include
+LIBJSCON_LDFLAGS	:= -L./JSCON/lib -ljscon 
 
 LIBCONCORD_CFLAGS	:= -I$(INCLDIR)
 LIBCONCORD_LDFLAGS	:=
@@ -30,11 +31,11 @@ LIBS_LDFLAGS	:= $(LIBCURL_LDFLAGS) $(LIBUV_LDFLAGS) \
 		      $(LIBJSCON_LDFLAGS)
 
 # @todo create specific CFLAGS for debugging
-CFLAGS := -Wall -Werror -Wextra -pedantic -fPIC -O2 -g
+CFLAGS := -Wall -O0 -g
 
 .PHONY : all mkdir install clean purge
 
-all : mkdir $(OBJS) $(CONCORD_DLIB)
+all : mkdir $(OBJS) $(CONCORD_DLIB) $(CONCORD_SLIB)
 
 mkdir :
 	mkdir -p $(OBJDIR) $(LIBDIR)
@@ -43,12 +44,12 @@ $(OBJDIR)/%.o : $(SRCDIR)/%.c
 	$(CC) $(CFLAGS) $(LIBS_CFLAGS) \
 	      -c $< -o $@ $(LIBS_LDFLAGS)
 
-$(OBJDIR)/curl-websocket.o :
-	$(MAKE) -C $(SRCDIR)/curl-websocket
-
 $(CONCORD_DLIB) :
 	$(CC) $(LIBS_CFLAGS) \
 	      $(OBJS) -shared -o $(CONCORD_DLIB) $(LIBS_LDFLAGS)
+
+$(CONCORD_SLIB) :
+	$(AR) -cvq $(CONCORD_SLIB) $(OBJS)
 
 install : all
 	cp $(INCLDIR)/* /usr/local/include
