@@ -21,7 +21,15 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <openssl/evp.h>
+#include <bearssl_hash.h>
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <ctype.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 static inline void
 _cws_debug(const char *prefix, const void *buffer, size_t len)
@@ -42,12 +50,12 @@ _cws_debug(const char *prefix, const void *buffer, size_t len)
 }
 
 static void
-_cws_sha1(const void *input, const size_t input_len, void *output)
-{
+_cws_sha1(const void *input, const size_t input_len, void *output) {
+#if 0
     static const EVP_MD *md = NULL;
-    EVP_MD_CTX *ctx;
+    EVP_MD_CTX * ctx;
 
-    ctx = EVP_MD_CTX_new();
+	ctx = EVP_MD_CTX_new();
 
     if (!md) {
         OpenSSL_add_all_digests();
@@ -60,7 +68,13 @@ _cws_sha1(const void *input, const size_t input_len, void *output)
     EVP_DigestUpdate(ctx, input, input_len);
     EVP_DigestFinal_ex(ctx, output, NULL);
 
-    EVP_MD_CTX_free(ctx);
+    EVP_MD_CTX_cleanup(ctx);
+	EVP_MD_CTX_free(ctx);
+#endif
+    br_sha1_context cxt;
+    br_sha1_init(&cxt);
+    br_sha1_update(&cxt, input, input_len);
+    br_sha1_out(&cxt, output);
 }
 
 static void
